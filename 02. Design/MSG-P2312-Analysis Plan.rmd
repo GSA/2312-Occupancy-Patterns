@@ -55,11 +55,17 @@ Insert text here, and delete the gray prompt above when the document is final
 
 ## Data and Data Structure
 
-We will use Daily Check-In data obtained from Management Science and Innovation (MSI), a firm contracted to collect and maintain these data. We will merge in additional variables from the GSA Roster obtained from D2D. The GSA roster is updated monthly at the end of each month. *[We currently have Nov 2022 and Dec 2022 updates; I will try to track down past months. Ideally, we will merge in each monthly check-in file with the preceding month's roster file.]*
-
-### Table 1. GSA Daily Check-In Data Variables Available Feb 2022-Dec 2022. Try bolded variables for merging.
+This section describes variables that will be analyzed, as well as changes that will be made to the raw data with respect to data structure and variables.
 
 ### Data Source(s):
+
+We will use Daily Check-In data obtained from Management Science and Innovation (MSI), a firm contracted to collect and maintain these data. We will merge in additional variables from the GSA Roster obtained from D2D. The GSA roster is updated monthly at the end of each month. [We currently have Nov 2022 and Dec 2022 updates; I will try to track down past months. Ideally, we will merge in each monthly check-in file with the preceding month’s roster file.]
+
+### Table 1. GSA Daily Check-In Data Variables Available Feb 2022-Dec 2022.
+
+
+### Table 2. GSA Roster Variables.
+
 
 Additional administrative data that may be useful for exploratory analysis includes:
 
