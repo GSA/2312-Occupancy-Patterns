@@ -1,0 +1,363 @@
+---
+title: "Analysis plan"
+# date: "`r Sys.Date()`"
+output: 
+  html_document:
+    theme: united
+    highlight: tango
+    code_folding: hide
+params:
+  author: "Sara Guenther and Ben Jaques-Leslie"
+  project_number: 2312
+  project_name: "Occupancy Patterns"
+  analysis_plan_title: "Phase 2 - Clusters"
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(janitor)
+library(skimr)
+library(DataExplorer)
+library(readr)
+library(oescolorrrs)
+library(oesrrr)
+library(flextable)
+```
+
+# Analysis Plan
+
+Project Name: `r params$project_name`
+
+Project Code: `r params$project_number`
+
+Analysis plan title: `r params$analysis_plan_title`
+
+Date Finalized: `r nice_date(Sys.Date())`
+
+<!-- How this document is to be used:  -->
+
+<!-- This document serves as a basis for distinguishing between planned confirmatory analyses and any exploratory analyses that might be conducted on project data. This is crucial to ensuring that results of statistical tests are properly interpreted and reported. For the Analysis Plan to fulfill this purpose, it is essential that it be finalized and date-stamped before we take possession of outcome data. Once this plan is finalized, a date is entered above, and the document is posted publicly on our team website.  -->
+
+<!-- If any analyses are described that will not be included in the MSG abstract or reported to the agency partner, then explicitly identify these in order to streamline reanalysis. -->
+
+### Project Description
+
+<!-- [Brief description of the project, including the challenge, the intervention(s) to be tested, and the questions to be answered. This should be brief, but should provide context sufficient for the analysis plan that follows.] -->
+
+The U.S. General Services Administration's FY 2022 Annual Evaluation
+Plan includes evaluation goals that involve The Future of Work projects
+and objectives. This initiative is part of an effort to right-size the
+federal real estate footprint. Specifically, this project will examine
+the effects of distributed, virtual, and asynchronous work with the goal
+of informing future changes to interior space planning and building
+operations. We will join GSA telework rates and facility occupancy
+patterns with GSA roster data and describe rates of telework and on site
+work across employment and personal demographics. We will also determine
+the rates at which teams work together onsite, remotely, or in a hybrid
+environment.
+
+### Pre Registration Details
+
+This Analysis Plan will be posted on the GSA Evaluation Division website
+at [TBD] before outcome data are analyzed. In addition, this project
+will be pre registered in the [registry name] at [link to the registry,
+either main page or project-specific page].
+
+### Research Question(s)
+
+This work will address the following research questions: 1. What are the
+rates of telework since the federal return-to-office transition? 2. Do
+telework behaviors match position category (e.g., onsite, offsite, etc.)
+in the roster? 3. At what rates to teams work together onsite vs.
+remotely? 4. Do the telework patterns of supervisors match the telework
+patterns of supervisees?
+
+At this stage, our research questions are aimed at describing patterns
+of telework and federal building occupancy rather than estimating the
+impacts of telework.
+
+## Data and Data Structure
+
+This section describes variables that will be analyzed, as well as
+changes that will be made to the raw data with respect to data structure
+and variables.
+
+### Data Source(s):
+
+We will use Daily Check-In data obtained from Management Science and
+Innovation (MSI), a firm contracted to collect and maintain these data.
+We will merge in additional variables from the GSA Roster obtained from
+D2D. The GSA roster is updated monthly at the end of each month. [We
+currently have Nov 2022 and Dec 2022 updates; I will try to track down
+past months. Ideally, we will merge in each monthly check-in file with
+the preceding month's roster file.]
+
+### Table 1. GSA Daily Check-In Data Variables Available Feb 2022-Dec 2022.
+
+```{r}
+tbl <- tibble("Variable Name" = c(
+  "date",
+"SSO",
+"short_id",
+"dept_id",
+"employee_name",
+"supervisor_name",
+"location",
+"daily_status",
+"supervisor_correction"
+),
+"Description" = c(
+  "Date of check-in",
+  # Is SSO single sign on? What did we decide?
+"",
+"2-digit department id",
+"Full department id code",
+"Employee name (Last,First Middle)",
+"Supervisor name (Last,First Middle)",
+"State abbreviation-City-Site (e.g., home or address); could string split and match state with roster, possibly city too.",
+"E.g., Teleworking, Leave, Supervisor Corrected, No Response, Reporting to Job Site, Other",
+# I think that this is an indicator for whether the supervisor corrected the record
+""
+)
+)
+```
+
+```{r}
+tbl %>% 
+  flextable() %>% 
+  # add_header_row(values = c("","","Type of analysis", "Type of analysis")) %>% 
+  # set_header_labels(Group = "Level of analysis") %>% 
+  merge_h(part = "header") %>% 
+  merge_v(j = 1) %>% 
+  theme_vanilla() %>% 
+  autofit()
+```
+
+
+### Table 2. GSA Roster Variables.
+
+Additional administrative data that may be useful for exploratory
+analysis includes:
+
+```{r}
+tbl <- tibble("Variable Name" = c(
+"Snapshot.Date",
+"Department.ID",
+"Employee.Job.Business.Unit.Description",
+"Full.Name",
+"Employee.E.Mail.Address",
+"Position.Title",
+"Pay.Plan",
+"Occupational.Series",
+"Grade",
+"EOD.Date",
+"Supervisor.Level",
+"Supervisor.Level.Description",
+"Supervisor.Display.Name",
+"Supervisor.E.Mail.Address",
+"Business.Line.2.Letter.Department.ID.",
+"GSA.SSO",
+"Agency.Subelement.Code.Description",
+"GSA.Region",
+"GSA.Duty.Station.Region",
+"Location.City",
+"Location.State",
+"Duty.Station.Code",
+"Employee.Job.Bargaining.Unit.Description",
+"Employee.Summary.Bargaining.Unit",
+"Payroll.Accounting.Code",
+"Position.Number",
+"Position.Category.Code",
+"Position.Category.Description"
+),
+"Description" = c(
+ "Date of data export",
+"Should align with check-in’s 'dept_id'",
+"",
+"Last,First Middle; should align with check-in’s 'employee_name'",
+"",
+"",
+"",
+"",
+"",
+"",
+"",
+"",
+"First, Last",
+"",
+"",
+"",
+"",
+"",
+"",
+"",
+"",
+"",
+"",
+"",
+"",
+"",
+"",
+"E.g., Onsite flexible, Offsite, Onsite required, Not specified, Position has changed"
+)
+)
+```
+
+```{r}
+tbl %>% 
+  flextable() %>% 
+  # add_header_row(values = c("","","Type of analysis", "Type of analysis")) %>% 
+  # set_header_labels(Group = "Level of analysis") %>% 
+  merge_h(part = "header") %>% 
+  merge_v(j = 1) %>% 
+  theme_vanilla() %>% 
+  autofit()
+```
+
+### Outcomes to Be Analyzed:
+
+<!-- [List all outcome variables for which analysis is planned. If specific variable names are unavailable, describe the outcomes in sufficient detail to appropriately guide or constrain their calculation. Specify which outcomes will be submitted to confirmatory versus exploratory analysis (or do this later in the ‘Statistical Models & Hypothesis Tests’ section if it is more appropriate there).] -->
+
+For much of this study, no particular outcome will be analyzed. For
+cluster and categorization, we will use various measures of staff work
+location and frequency, for example, proportion of time teleworking or
+frequency of teleworking on particular days.
+
+### Transformations of Data Structure:
+
+<!-- [Describe variables that will be added to the raw data. These may be variables used in the experimental design (e.g., blocking variables) or covariates merged in from a different dataset.]  -->
+
+<!-- [Describe new variables that will be created by transforming or combining variables in the raw data. If you plan on transforming, centering, or recoding the data, or will apply a coding scheme for categorical variables, please describe that process.  If any measurements are  going to be combined into an index (or even a mean), what measures will you use and how will they be combined? Include either a formula or a precise description of your method.] -->
+
+<!-- [Describe any plans to transform the structure of your data (e.g., from cross-sectional to panel).] -->
+
+For all analysis, we will used a defined cohort of staff to examine work
+status over period of time. A cohort of staff employed in the month of
+March 2022 will be followed over six months. Teams will be defined by
+the supervisors of groups of staff in the beginning of March 2022. Any
+analysis will conduct may be reproduced on a separate cohort or may be
+combined with multiple cohorts depending on the data availability.
+
+The analysis will be done for staff and teams separately
+
+```{r, echo=FALSE}
+tbl <- 
+  tibble::tibble(
+    # level = rep("Level of analysis",2),
+                      Group = c("Staff", "Team"),
+                      Cluster = c("Person level aggregation of work status", "Team level aggregation of work status"),
+                      # Sequence = c("Daily person work status", "Daily team work status")
+                       )
+```
+
+```{r}
+tbl %>% 
+  flextable() %>% 
+  # add_header_row(values = c("","","Type of analysis", "Type of analysis")) %>% 
+  set_header_labels(Group = "Level of analysis") %>% 
+  merge_h(part = "header") %>% 
+  merge_v(j = 1) %>% 
+  theme_vanilla() %>% 
+  autofit()
+```
+
+We will approach grouping staff and teams in two ways. First, rules-based groups will be formed. For these, definitions of different types of work will be defined. Second, groups will be formed using k-means clustering. This unsupervised machine learning method produces a defined number of groups (or clusters) minimizing the distance between the members. 
+
+<!-- https://www.r-bloggers.com/2021/04/cluster-analysis-in-r/ -->
+<!-- https://www.guru99.com/r-k-means-clustering.html -->
+
+For cluster analysis of staff work status, the data will be transformed
+so that each row is one staff person. From the raw data, the following
+variables will be defined:
+
+-   Proportion of days working onsite
+
+-   Proportion of days working remote
+
+-   Proportion of days working remote by the day of the week
+
+-   Correlation of work status between days of the week
+
+-   Indicator for an exit form employment
+
+-   Indicator for a switch in supervisor
+
+-   Size of team over observation window
+
+For cluster analysis of team work status, the data will be transformed
+so that each row is one team as defined by the supervisor. Supervisors
+may be in multiple teams as supervisor and subordinate. From the raw
+data, the following variables will be defined:
+
+-   Size of team over observation window
+
+-   Proportion of staff days working onsite
+
+-   Proportion of staff days working remote
+
+-   Proportion of staff days working remote by the day of the week
+
+-   Proportion of days of staff concurrent remote status
+
+-   Proportion of days of staff concurrent onsite status
+
+-   Proportion of staff exiting team
+
+### Data Exclusion and Treatment of Missing Data:
+
+<!-- [Describe criteria you will use to determine whether any observations should be excluded from analysis (e.g., values that are likely data-recording errors, outliers, etc.).] -->
+
+<!-- [Describe your plan to handle missing data.  How will you deal with incomplete or missing data (e.g., pairwise or listwise deletion, imputation, interpolation)?] -->
+
+## Study Design and Analytic Methods
+
+This section describes the statistical models and hypothesis tests that
+will make up the analysis --- including any follow-ups on effects in the
+main statistical model and any exploratory analyses that can be
+anticipated prior to analysis.
+
+### Study Design
+
+<!-- [prompt] -->
+
+### Statistical Models & Hypothesis Tests
+
+<!-- [What criteria will you use to make inferences? Please describe the information you will use (e.g., specify the p-values), as well as cut-off criteria, where appropriate. Will you be using one- or two-tailed tests for each of your analyses? If you are comparing multiple conditions or testing multiple hypotheses, what method will you use to correct for multiple tests? If you are taking into account practical significance, please specify a minimum effect size of interest.] -->
+
+### Descriptive Statistics, Tables, & Graphs
+
+<!-- [What descriptive statistics, tables, and graphs will be needed for reporting? If possible, provide table shells and/or mock graphs. If any statistics, tables, or graphs  are listed that will not be included in the MSG abstract or reported to the agency partner, then explicitly identify these in order to streamline reanalysis.] -->
+
+Three broad parts of descriptive work are part of this analysis. First, the overall description of work patterns in the data. Then, differences in work patterns by rules-based group, and differences in descriptive data by those groups. Lastly, difference in k-means cluster by work patterns and descriptive data. 
+
+Proportion in staff time telework
+
+Proportion in staff time telework by the day of the week
+
+Proportion in staff time onsite
+
+Proportion in staff time onsite by the day of the week
+
+Correlations of by staff time between the days of the week
+
+Size of teams
+
+### Confirmatory Analyses:
+
+<!-- [Specify the hypothesis test(s) that will be reported as confirmatory. Which outcome and which of the above statistical models will you use to test each hypothesis? If you plan to test null hypotheses other than equality (zero effect), please specify the type of test and the margin. Remember that any test not included here must be noted as an exploratory test in any report of this research. Keep in mind that you can specify contingent or follow-up analyses that are still confirmatory. For example, if you find a main effect of the treatment, will you test for heterogeneous treatment effects? Will you look for specific pairwise differences between treatment arms if you find an overall effect of the pooled treatment? Exploratory analyses can be recorded in the next section. If any analyses are described that will not be included in the MSG abstract or reported to the agency partner, then explicitly identify these in order to streamline reanalysis.] -->
+
+### Exploratory Analysis:
+
+<!-- [OPTIONAL: If you plan to explore your data set to look for unexpected differences or relationships, you may describe those tests here. An exploratory test is any test where a prediction is not made up front, or where there are multiple possible tests that you are going to use. A statistically significant finding in an exploratory test is a great way to form a new confirmatory hypothesis, which could then be tested using a pre-specified analysis at a later time. Note that exploratory analyses will not, by default, be included in reanalysis.] -->
+
+### Inference Criteria, Including Any Adjustments for Multiple Comparisons:
+
+<!-- [What criteria will you use to make inferences? Please describe the information you will use (e.g., specify the p-values), as well as cut-off criteria, where appropriate. Will you be using one- or two-tailed tests for each of your analyses? If you are comparing multiple conditions or testing multiple hypotheses, what method will you use to correct for multiple tests? If you are taking into account practical significance, please specify a minimum effect size of interest.] -->
+
+### Limitations:
+
+<!-- [Describe any anticipated limitations associated with this analysis, if not previously identified in the Project Design document.] -->
