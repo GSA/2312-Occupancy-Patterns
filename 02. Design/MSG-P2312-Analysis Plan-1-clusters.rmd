@@ -137,7 +137,6 @@ tbl %>%
   autofit()
 ```
 
-
 ### Table 2. GSA Roster Variables.
 
 Additional administrative data that may be useful for exploratory
@@ -225,7 +224,8 @@ tbl %>%
 For much of this study, no particular outcome will be analyzed. For
 cluster and categorization, we will use various measures of staff work
 location and frequency, for example, proportion of time teleworking or
-frequency of teleworking on particular days.
+frequency of teleworking on particular days. We will investigate the
+relationships between these and other factors.
 
 ### Transformations of Data Structure:
 
@@ -241,6 +241,8 @@ March 2022 will be followed over six months. Teams will be defined by
 the supervisors of groups of staff in the beginning of March 2022. Any
 analysis will conduct may be reproduced on a separate cohort or may be
 combined with multiple cohorts depending on the data availability.
+
+Both data sources will be checked for duplication and deduplicated. The unique identifiers of the daily check-in data are `employee_name` and `date`. For the roster data the unique identifier is `Full.Name` and `Snapshot.Date`. The general approach to deduplication will be that categorical variables will be restructured as indicator variables taking on a one for each category associated with the duplicate. From the roster data, if the duplication is based off of `EOD.Date`, the later date will be selected along with the other variables associated with that date. There appear to be no numeric variables.
 
 The analysis will be done for staff and teams separately
 
@@ -265,14 +267,18 @@ tbl %>%
   autofit()
 ```
 
-We will approach grouping staff and teams in two ways. First, rules-based groups will be formed. For these, definitions of different types of work will be defined. Second, groups will be formed using k-means clustering. This unsupervised machine learning method produces a defined number of groups (or clusters) minimizing the distance between the members. 
 
-<!-- https://www.r-bloggers.com/2021/04/cluster-analysis-in-r/ -->
-<!-- https://www.guru99.com/r-k-means-clustering.html -->
 
-For cluster analysis of staff work status, the data will be transformed
-so that each row is one staff person. From the raw data, the following
-variables will be defined:
+We will approach grouping staff and teams in two ways. First,
+rules-based groups will be formed. For these, definitions of different
+types of work will be defined. Second, groups will be formed using
+k-means clustering. This unsupervised machine learning method produces a
+defined number of groups (or clusters) minimizing the distance between
+the members.
+
+For both rules-based and cluster classification of individual staff, the
+daily check-in data will be transformed so that each row is one staff person. From the
+raw data, the following variables will be defined:
 
 -   Proportion of days working onsite
 
@@ -288,10 +294,10 @@ variables will be defined:
 
 -   Size of team over observation window
 
-For cluster analysis of team work status, the data will be transformed
-so that each row is one team as defined by the supervisor. Supervisors
-may be in multiple teams as supervisor and subordinate. From the raw
-data, the following variables will be defined:
+For both rules-based and cluster classification of teams, the daily check-in data will
+be transformed so that each row is one team as defined by the
+supervisor. Supervisors may be in multiple teams as supervisor and
+subordinate. From the raw data, the following variables will be defined:
 
 -   Size of team over observation window
 
@@ -311,6 +317,121 @@ data, the following variables will be defined:
 
 <!-- [Describe criteria you will use to determine whether any observations should be excluded from analysis (e.g., values that are likely data-recording errors, outliers, etc.).] -->
 
+Missing data from daily check in will be treated as follows:
+
+```{r}
+tbl <- tibble("Variable Name" = c(
+  "date",
+"SSO",
+"short_id",
+"dept_id",
+"employee_name",
+"supervisor_name",
+"location",
+"daily_status",
+"supervisor_correction"
+),
+"Treatment if missing" = c(
+  "Drop observation",
+  "",
+  "Impute from other observations of same staff",
+  "Impute from other observations of same staff",
+  "Drop observation",
+  "Impute from other observations of same staff",
+  "Label as missing",
+  "Label as missing",
+  "Label as missing"
+)
+)
+```
+
+```{r}
+tbl %>% 
+  flextable() %>% 
+  # add_header_row(values = c("","","Type of analysis", "Type of analysis")) %>% 
+  # set_header_labels(Group = "Level of analysis") %>% 
+  merge_h(part = "header") %>% 
+  merge_v(j = 1) %>% 
+  theme_vanilla() %>% 
+  autofit()
+```
+
+Missing data from the roster will be treated as follows:
+
+```{r}
+tbl <- tibble("Variable Name" = c(
+"Snapshot.Date",
+"Department.ID",
+"Employee.Job.Business.Unit.Description",
+"Full.Name",
+"Employee.E.Mail.Address",
+"Position.Title",
+"Pay.Plan",
+"Occupational.Series",
+"Grade",
+"EOD.Date",
+"Supervisor.Level",
+"Supervisor.Level.Description",
+"Supervisor.Display.Name",
+"Supervisor.E.Mail.Address",
+"Business.Line.2.Letter.Department.ID.",
+"GSA.SSO",
+"Agency.Subelement.Code.Description",
+"GSA.Region",
+"GSA.Duty.Station.Region",
+"Location.City",
+"Location.State",
+"Duty.Station.Code",
+"Employee.Job.Bargaining.Unit.Description",
+"Employee.Summary.Bargaining.Unit",
+"Payroll.Accounting.Code",
+"Position.Number",
+"Position.Category.Code",
+"Position.Category.Description"
+),
+"Treatment if missing" = c(
+  "Label as missing",
+  "Label as missing",
+  "Label as missing",
+  "Drop observation",
+  "Label as missing",
+"Label as missing",
+"Label as missing",
+"Label as missing",
+"Label as missing",
+"Label as missing",
+"Label as missing",
+"Label as missing",
+"Label as missing",
+"Label as missing",
+"Label as missing",
+"Label as missing",
+"Label as missing",
+"Label as missing",
+"Label as missing",
+"Label as missing",
+"Label as missing",
+"Label as missing",
+"Label as missing",
+"Label as missing",
+"Label as missing",
+"Label as missing",
+"Label as missing",
+"Label as missing"
+)
+)
+```
+
+```{r}
+tbl %>% 
+  flextable() %>% 
+  # add_header_row(values = c("","","Type of analysis", "Type of analysis")) %>% 
+  # set_header_labels(Group = "Level of analysis") %>% 
+  merge_h(part = "header") %>% 
+  merge_v(j = 1) %>% 
+  theme_vanilla() %>% 
+  autofit()
+```
 <!-- [Describe your plan to handle missing data.  How will you deal with incomplete or missing data (e.g., pairwise or listwise deletion, imputation, interpolation)?] -->
 
 ## Study Design and Analytic Methods
@@ -324,6 +445,10 @@ anticipated prior to analysis.
 
 <!-- [prompt] -->
 
+<!-- https://www.r-bloggers.com/2021/04/cluster-analysis-in-r/ -->
+
+<!-- https://www.guru99.com/r-k-means-clustering.html -->
+
 ### Statistical Models & Hypothesis Tests
 
 <!-- [What criteria will you use to make inferences? Please describe the information you will use (e.g., specify the p-values), as well as cut-off criteria, where appropriate. Will you be using one- or two-tailed tests for each of your analyses? If you are comparing multiple conditions or testing multiple hypotheses, what method will you use to correct for multiple tests? If you are taking into account practical significance, please specify a minimum effect size of interest.] -->
@@ -332,7 +457,11 @@ anticipated prior to analysis.
 
 <!-- [What descriptive statistics, tables, and graphs will be needed for reporting? If possible, provide table shells and/or mock graphs. If any statistics, tables, or graphs  are listed that will not be included in the MSG abstract or reported to the agency partner, then explicitly identify these in order to streamline reanalysis.] -->
 
-Three broad parts of descriptive work are part of this analysis. First, the overall description of work patterns in the data. Then, differences in work patterns by rules-based group, and differences in descriptive data by those groups. Lastly, difference in k-means cluster by work patterns and descriptive data. 
+Three broad parts of descriptive work are part of this analysis. First,
+the overall description of work patterns in the data. Then, differences
+in work patterns by rules-based group, and differences in descriptive
+data by those groups. Lastly, difference in k-means cluster by work
+patterns and descriptive data.
 
 Proportion in staff time telework
 
