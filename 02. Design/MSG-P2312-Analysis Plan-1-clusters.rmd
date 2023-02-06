@@ -26,6 +26,8 @@ library(readr)
 library(oescolorrrs)
 library(oesrrr)
 library(flextable)
+library(tidymodels)
+library(ggthemes)
 ```
 
 # Analysis Plan
@@ -96,7 +98,7 @@ currently have Nov 2022 and Dec 2022 updates; I will try to track down
 past months. Ideally, we will merge in each monthly check-in file with
 the preceding month's roster file.]
 
-### Table 1. GSA Daily Check-In Data Variables Available Feb 2022-Dec 2022.
+#### Table 1. GSA Daily Check-In Data Variables Available Feb 2022-Dec 2022.
 
 ```{r}
 tbl <- tibble("Variable Name" = c(
@@ -137,7 +139,7 @@ tbl %>%
   autofit()
 ```
 
-### Table 2. GSA Roster Variables.
+#### Table 2. GSA Roster Variables.
 
 Additional administrative data that may be useful for exploratory
 analysis includes:
@@ -328,7 +330,7 @@ will be defined:
 
 <!-- [Describe criteria you will use to determine whether any observations should be excluded from analysis (e.g., values that are likely data-recording errors, outliers, etc.).] -->
 
-We have no plans to exclude any date.
+We have no plans to exclude any data.
 
 Missing data from daily check in will be treated as follows:
 
@@ -537,15 +539,90 @@ All of the these variables will be scaled to reduce the effects of
 outliers should they be present.
 
 To determine the number appropriate number of clusters, several methods
-exist. A rule of thumb to identify the correct number us to use
+exist. A rule of thumb to identify the correct number is to use the
+number calculated from:
 
 $$
 \frac{\sqrt{NumberOfObservations}}{2}
 $$
 
+However, for this work, the *elbow method* will be used. To do this, the
+k-means algorithm will be executed for different numbers of clusters
+from 1 to 20. For each number of clusters, a total within sum of squares
+will be calculated. As the number of number of clusters increases the
+total within sum of squares will decrease. The optimal number of
+clusters is when the decrease in total within sum of squares starts
+tapering off.
+
+The figure below shows an example of the this. The total within sum of
+squares decreases with the number of clusters. In this example, three
+clusters appears to be the point where the returns to more cluster
+diminishes.
+
+#### Figure 1. Elbow method example
+
+```{r}
+set.seed(27)
+
+centers <- tibble(
+  cluster = factor(1:3), 
+  num_points = c(100, 150, 50),  # number points in each cluster
+  x1 = c(5, 0, -3),              # x1 coordinate of cluster center
+  x2 = c(-1, 1, -2)              # x2 coordinate of cluster center
+)
+
+labelled_points <- 
+  centers %>%
+  mutate(
+    x1 = map2(num_points, x1, rnorm),
+    x2 = map2(num_points, x2, rnorm)
+  ) %>% 
+  select(-num_points) %>% 
+  unnest(cols = c(x1, x2))
+
+points <- 
+  labelled_points %>% 
+  select(-cluster)
+
+kclusts <- 
+  tibble(k = 1:20) %>%
+  mutate(
+    kclust = map(k, ~kmeans(points, .x)),
+    tidied = map(kclust, tidy),
+    glanced = map(kclust, glance),
+    augmented = map(kclust, augment, points)
+  )
+
+clusters <- 
+  kclusts %>%
+  unnest(cols = c(tidied))
+
+assignments <- 
+  kclusts %>% 
+  unnest(cols = c(augmented))
+
+clusterings <- 
+  kclusts %>%
+  unnest(cols = c(glanced))
+
+ggplot(clusterings, aes(k, tot.withinss)) +
+  geom_line() +
+  geom_point() +
+  theme_minimal()
+
+```
+
+After the optimal number of clusters is determine, the clusters from
+that iteration will be used to categorized the staff and team occupancy.
+
+The work pattern statistics described below will be used to
+characterized the clusters defined by the k-means algorithm.
+
 ### Statistical Models & Hypothesis Tests
 
 <!-- [What criteria will you use to make inferences? Please describe the information you will use (e.g., specify the p-values), as well as cut-off criteria, where appropriate. Will you be using one- or two-tailed tests for each of your analyses? If you are comparing multiple conditions or testing multiple hypotheses, what method will you use to correct for multiple tests? If you are taking into account practical significance, please specify a minimum effect size of interest.] -->
+
+This is descriptive work and we will not be making any causal claims.
 
 ### Descriptive Statistics, Tables, & Graphs
 
@@ -557,17 +634,79 @@ in work patterns by rules-based group, and differences in descriptive
 data by those groups. Lastly, difference in k-means cluster by work
 patterns and descriptive data.
 
-Proportion in staff time telework
+The principle work pattern statistics are as follows:
 
-Proportion in staff time telework by the day of the week
+-   Staff work pattern statistics:
 
-Proportion in staff time onsite
+    -   Proportion in staff time telework
 
-Proportion in staff time onsite by the day of the week
+    -   Proportion in staff time telework by the day of the week
 
-Correlations of by staff time between the days of the week
+    -   Proportion in staff time onsite
 
-Size of teams
+    -   Proportion in staff time onsite by the day of the week
+
+    -   Correlations of by staff time between the days of the week
+
+    -   Size of teams
+
+    -   Number of working days
+
+    -   Number exiting employment
+
+    -   Number changing supervisors
+
+-   Team work pattern statistics:
+
+    -   Proportion in staff time telework
+
+    -   Proportion in staff time onsite
+
+    -   Proportion of concurrent remote days for team members
+
+    -   Proportion of concurrent onsite days for team members
+
+    -   Size of teams
+
+    -   Number of staff working days
+
+The descriptive statistics are:
+
+-   Staff descriptive statistics
+
+    -   Number and proportion of staff by grade
+
+    -   Number and proportion of staff by occupational series
+
+    -   Number and proportion of staff by position category
+
+    -   Number and proportion of staff by GSA region
+
+    -   Number and proportion of staff by SSO
+
+    -   Number and proportion of staff by state
+
+    -   Number and proportion of staff by city
+
+    -   Number and proportion of staff by supervisor level
+
+-   Team descriptive statistics
+
+    -   Number and proportion of staff by most frequent grade
+
+    -   Number and proportion of staff by most frequent occupational series
+
+    -   Number and proportion of staff by most frequent position category
+
+    -   Number and proportion of staff by most frequent GSA region
+
+    -   Number and proportion of staff by most frequent SSO
+
+    -   Number and proportion of staff by most frequent state
+
+    -   Number and proportion of staff by most frequent city
+
+    -   Number and proportion of staff by most frequent supervisor level
 
 ### Confirmatory Analyses:
 
