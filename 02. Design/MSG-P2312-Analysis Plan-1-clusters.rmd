@@ -242,7 +242,15 @@ the supervisors of groups of staff in the beginning of March 2022. Any
 analysis will conduct may be reproduced on a separate cohort or may be
 combined with multiple cohorts depending on the data availability.
 
-Both data sources will be checked for duplication and deduplicated. The unique identifiers of the daily check-in data are `employee_name` and `date`. For the roster data the unique identifier is `Full.Name` and `Snapshot.Date`. The general approach to deduplication will be that categorical variables will be restructured as indicator variables taking on a one for each category associated with the duplicate. From the roster data, if the duplication is based off of `EOD.Date`, the later date will be selected along with the other variables associated with that date. There appear to be no numeric variables.
+Both data sources will be checked for duplication and deduplicated. The
+unique identifiers of the daily check-in data are `employee_name` and
+`date`. For the roster data the unique identifier is `Full.Name` and
+`Snapshot.Date`. The general approach to deduplication will be that
+categorical variables will be restructured as indicator variables taking
+on a one for each category associated with the duplicate. From the
+roster data, if the duplication is based off of `EOD.Date`, the later
+date will be selected along with the other variables associated with
+that date. There appear to be no numeric variables.
 
 The analysis will be done for staff and teams separately
 
@@ -267,8 +275,6 @@ tbl %>%
   autofit()
 ```
 
-
-
 We will approach grouping staff and teams in two ways. First,
 rules-based groups will be formed. For these, definitions of different
 types of work will be defined. Second, groups will be formed using
@@ -277,35 +283,38 @@ defined number of groups (or clusters) minimizing the distance between
 the members.
 
 For both rules-based and cluster classification of individual staff, the
-daily check-in data will be transformed so that each row is one staff person. From the
-raw data, the following variables will be defined:
+daily check-in data will be transformed so that each row is one staff
+person. From the raw data, the following variables will be defined:
 
--   Proportion of days working onsite
+-   Proportion of days onsite
 
--   Proportion of days working remote
+-   Proportion of days remote
 
--   Proportion of days working remote by the day of the week
+-   Proportion of days remote by the day of the week
 
 -   Correlation of work status between days of the week
 
--   Indicator for an exit form employment
+-   Number of working days
+
+-   Indicator for an exit from employment
 
 -   Indicator for a switch in supervisor
 
 -   Size of team over observation window
 
-For both rules-based and cluster classification of teams, the daily check-in data will
-be transformed so that each row is one team as defined by the
-supervisor. Supervisors may be in multiple teams as supervisor and
-subordinate. From the raw data, the following variables will be defined:
+For both rules-based and cluster classification of teams, the daily
+check-in data will be transformed so that each row is one team as
+defined by the supervisor. Supervisors may be in multiple teams as
+supervisor and subordinate. From the raw data, the following variables
+will be defined:
 
 -   Size of team over observation window
 
--   Proportion of staff days working onsite
+-   Proportion of staff working days onsite
 
--   Proportion of staff days working remote
+-   Proportion of staff working days remote
 
--   Proportion of staff days working remote by the day of the week
+-   Proportion of staff working days remote by the day of the week
 
 -   Proportion of days of staff concurrent remote status
 
@@ -313,9 +322,13 @@ subordinate. From the raw data, the following variables will be defined:
 
 -   Proportion of staff exiting team
 
+-   Number of staff working days
+
 ### Data Exclusion and Treatment of Missing Data:
 
 <!-- [Describe criteria you will use to determine whether any observations should be excluded from analysis (e.g., values that are likely data-recording errors, outliers, etc.).] -->
+
+We have no plans to exclude any date.
 
 Missing data from daily check in will be treated as follows:
 
@@ -432,6 +445,7 @@ tbl %>%
   theme_vanilla() %>% 
   autofit()
 ```
+
 <!-- [Describe your plan to handle missing data.  How will you deal with incomplete or missing data (e.g., pairwise or listwise deletion, imputation, interpolation)?] -->
 
 ## Study Design and Analytic Methods
@@ -445,9 +459,89 @@ anticipated prior to analysis.
 
 <!-- [prompt] -->
 
-<!-- https://www.r-bloggers.com/2021/04/cluster-analysis-in-r/ -->
+This is a descriptive study attempting to characterize the work patterns
+of GSA staff as individuals and as teams. Work patterns will be
+categorized by a rules-based approach and a supervised machine learning
+approach called k-means clustering.
 
-<!-- https://www.guru99.com/r-k-means-clustering.html -->
+For the rules based approach, the portion of working days remote will be
+the key variable to determine what category a staff or team will be in.
+Staff will be grouped as follows:
+
+1.  **All remote** - Staff who work remotely above the 95th percentile
+    <!-- could be 75th -->
+2.  **Mostly remote** - Staff who work remotely between the median and
+    the 95th percentile <!-- could be 75th -->
+3.  **Mostly onsite** - Staff who work remotely between 5th percentile
+    and the median <!-- could be 25th -->
+4.  **All onsite** - Staff who work remotely below the 5th percentile
+    <!-- could be 75th -->
+
+Teams will be categorized similarly:
+
+1.  **All remote** - Teams that work remotely above the 95th percentile
+    <!-- could be 75th -->
+2.  **Mostly remote** - Teams that work remotely between the median and
+    the 95th percentile <!-- could be 75th -->
+3.  **Mostly onsite** - Teams that work remotely between 5th percentile
+    and the median <!-- could be 25th -->
+4.  **All onsite** - Teams that work remotely below the 5th percentile
+    <!-- could be 75th -->
+
+For the second categorization, a k-means clustering algorithm will be
+used. We follow the methods layed out in:
+
+-   [Cluster Analysis in
+    R](https://www.r-bloggers.com/2021/04/cluster-analysis-in-r/)
+
+-   [K-means Clustering in R with
+    Example](https://www.guru99.com/r-k-means-clustering.html)
+
+-   [K-means clustering with tidy data
+    principles](https://www.tidymodels.org/learn/statistics/k-means/)
+
+For staff clusters, the following variables will be used to define the
+clusters:
+
+-   Proportion of days onsite
+
+-   Proportion of days remote
+
+-   Proportion of days remote by the day of the week
+
+-   Correlation of work status between days of the week
+
+-   Number of working days
+
+-   Average size of team over observation window
+
+For team clusters, the following variables will be used:
+
+-   Averages size of team over observation window
+
+-   Proportion of staff working days onsite
+
+-   Proportion of staff working days remote
+
+-   Proportion of staff working days remote by the day of the week
+
+-   Proportion of days of staff concurrent remote status
+
+-   Proportion of days of staff concurrent onsite status
+
+-   Proportion of staff exiting team
+
+-   Number of staff working days
+
+All of the these variables will be scaled to reduce the effects of
+outliers should they be present.
+
+To determine the number appropriate number of clusters, several methods
+exist. A rule of thumb to identify the correct number us to use
+
+$$
+\frac{\sqrt{NumberOfObservations}}{2}
+$$
 
 ### Statistical Models & Hypothesis Tests
 
