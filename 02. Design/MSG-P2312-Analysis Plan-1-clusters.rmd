@@ -30,7 +30,9 @@ library(tidymodels)
 library(ggthemes)
 ```
 
-# Analysis Plan
+```{r}
+table_n <- 0
+```
 
 Project Name: `r params$project_name`
 
@@ -93,12 +95,16 @@ and variables.
 We will use Daily Check-In data obtained from Management Science and
 Innovation (MSI), a firm contracted to collect and maintain these data.
 We will merge in additional variables from the GSA Roster obtained from
-D2D. The GSA roster is updated monthly at the end of each month. [We
-currently have Nov 2022 and Dec 2022 updates; I will try to track down
-past months. Ideally, we will merge in each monthly check-in file with
-the preceding month's roster file.]
+D2D. The GSA roster is updated monthly at the end of each month. 
+<!-- [We currently have Nov 2022 and Dec 2022 updates; I will try to track down -->
+<!-- past months. Ideally, we will merge in each monthly check-in file with -->
+<!-- the preceding month's roster file.] -->
 
-#### Table 1. GSA Daily Check-In Data Variables Available Feb 2022-Dec 2022.
+```{r}
+table_n <- table_n + 1
+```
+
+#### Table `r table_n`. GSA Daily Check-In Data Variables Available Feb 2022-Dec 2022.
 
 ```{r}
 tbl <- tibble("Variable Name" = c(
@@ -139,7 +145,11 @@ tbl %>%
   autofit()
 ```
 
-#### Table 2. GSA Roster Variables.
+```{r}
+table_n <- table_n + 1
+```
+
+#### Table `r table_n`. GSA Roster Variables.
 
 Additional administrative data that may be useful for exploratory
 analysis includes:
@@ -241,7 +251,7 @@ For all analysis, we will used a defined cohort of staff to examine work
 status over period of time. A cohort of staff employed in the month of
 March 2022 will be followed over six months. Teams will be defined by
 the supervisors of groups of staff in the beginning of March 2022. Any
-analysis will conduct may be reproduced on a separate cohort or may be
+analysis we conduct may be reproduced on a separate cohort or may be
 combined with multiple cohorts depending on the data availability.
 
 Both data sources will be checked for duplication and deduplicated. The
@@ -254,14 +264,20 @@ roster data, if the duplication is based off of `EOD.Date`, the later
 date will be selected along with the other variables associated with
 that date. There appear to be no numeric variables.
 
-The analysis will be done for staff and teams separately
+The analysis will be done for staff and teams separately and aggregated independently. The table below defines how we plan to aggregate for staff and teams.
+
+```{r}
+table_n <- table_n + 1
+```
+
+#### Table `r table_n`. Level of analysis and aggregation
 
 ```{r, echo=FALSE}
 tbl <- 
   tibble::tibble(
     # level = rep("Level of analysis",2),
                       Group = c("Staff", "Team"),
-                      Cluster = c("Person level aggregation of work status", "Team level aggregation of work status"),
+                      Aggregation = c("Person level aggregation of work status", "Team level aggregation of work status"),
                       # Sequence = c("Daily person work status", "Daily team work status")
                        )
 ```
@@ -332,7 +348,13 @@ will be defined:
 
 We have no plans to exclude any data.
 
-Missing data from daily check in will be treated as follows:
+Missing data from daily check in will be treated as defined in the table below.
+
+```{r}
+table_n <- table_n + 1
+```
+
+#### Table `r table_n`. Treatment of missing data from daily check in
 
 ```{r}
 tbl <- tibble("Variable Name" = c(
@@ -371,7 +393,13 @@ tbl %>%
   autofit()
 ```
 
-Missing data from the roster will be treated as follows:
+Missing data from the roster will be treated as show in the table below.
+
+```{r}
+table_n <- table_n + 1
+```
+
+#### Table `r table_n`. Treatment of missing data from roster
 
 ```{r}
 tbl <- tibble("Variable Name" = c(
@@ -557,7 +585,7 @@ tapering off.
 The figure below shows an example of the this. The total within sum of
 squares decreases with the number of clusters. In this example, three
 clusters appears to be the point where the returns to more cluster
-diminishes.
+diminishes. We will also construct silhouette charts to confirm the number of clusters.
 
 #### Figure 1. Elbow method example
 
@@ -612,6 +640,7 @@ ggplot(clusterings, aes(k, tot.withinss)) +
 
 ```
 
+
 After the optimal number of clusters is determine, the clusters from
 that iteration will be used to categorized the staff and team occupancy.
 
@@ -627,6 +656,13 @@ This is descriptive work and we will not be making any causal claims.
 ### Descriptive Statistics, Tables, & Graphs
 
 <!-- [What descriptive statistics, tables, and graphs will be needed for reporting? If possible, provide table shells and/or mock graphs. If any statistics, tables, or graphs  are listed that will not be included in the MSG abstract or reported to the agency partner, then explicitly identify these in order to streamline reanalysis.] -->
+
+This work will address the following research questions: 1. What are the
+rates of telework since the federal return-to-office transition? 2. Do
+telework behaviors match position category (e.g., onsite, offsite, etc.)
+in the roster? 3. At what rates to teams work together onsite vs.
+remotely? 4. Do the telework patterns of supervisors match the telework
+patterns of supervisees?
 
 Three broad parts of descriptive work are part of this analysis. First,
 the overall description of work patterns in the data. Then, differences
@@ -707,19 +743,43 @@ The descriptive statistics are:
     -   Number and proportion of staff by most frequent city
 
     -   Number and proportion of staff by most frequent supervisor level
+    
+The staff statistics will be calculated for the following groups:
+
+1.    Whole cohort of staff
+2.    By rule-based categories of work pattern
+3.    By cluster defined categories of work pattern
+
+The team statistics will be calculated for the following groups:
+
+1.    Whole cohort of teams
+2.    By rule-based categories of work pattern
+3.    By cluster defined categories of work pattern
+
+Another set of statistics will be designed to understand the relationship between staff work patterns and their supervisor. We will calculate  the proportion of the staff that fall into the same rule-based and clusters as their supervisors overall as well as by those categories. 
+
+These statistics will be presented in tables. Visualizations will be created for a subset to help communicated results. Charts of the work pattern data will be created to confirm and characterize the groupings. In addition, charts showing difference by stated telework position category.  
 
 ### Confirmatory Analyses:
 
 <!-- [Specify the hypothesis test(s) that will be reported as confirmatory. Which outcome and which of the above statistical models will you use to test each hypothesis? If you plan to test null hypotheses other than equality (zero effect), please specify the type of test and the margin. Remember that any test not included here must be noted as an exploratory test in any report of this research. Keep in mind that you can specify contingent or follow-up analyses that are still confirmatory. For example, if you find a main effect of the treatment, will you test for heterogeneous treatment effects? Will you look for specific pairwise differences between treatment arms if you find an overall effect of the pooled treatment? Exploratory analyses can be recorded in the next section. If any analyses are described that will not be included in the MSG abstract or reported to the agency partner, then explicitly identify these in order to streamline reanalysis.] -->
 
+We plan no confirmatory analyses.
+
 ### Exploratory Analysis:
 
 <!-- [OPTIONAL: If you plan to explore your data set to look for unexpected differences or relationships, you may describe those tests here. An exploratory test is any test where a prediction is not made up front, or where there are multiple possible tests that you are going to use. A statistically significant finding in an exploratory test is a great way to form a new confirmatory hypothesis, which could then be tested using a pre-specified analysis at a later time. Note that exploratory analyses will not, by default, be included in reanalysis.] -->
+
+We plan no exploratory analyses. Though, all this work may be considered exploratory.
 
 ### Inference Criteria, Including Any Adjustments for Multiple Comparisons:
 
 <!-- [What criteria will you use to make inferences? Please describe the information you will use (e.g., specify the p-values), as well as cut-off criteria, where appropriate. Will you be using one- or two-tailed tests for each of your analyses? If you are comparing multiple conditions or testing multiple hypotheses, what method will you use to correct for multiple tests? If you are taking into account practical significance, please specify a minimum effect size of interest.] -->
 
+We will not be making any inference. 
+
 ### Limitations:
 
 <!-- [Describe any anticipated limitations associated with this analysis, if not previously identified in the Project Design document.] -->
+
+This is non causal research. The work will not demonstrate if changes or attributes caused differences, only if there are relationships. K-means clustering can be sensetive to the random locations of the first points selected to calculate differences and define clusters. 
