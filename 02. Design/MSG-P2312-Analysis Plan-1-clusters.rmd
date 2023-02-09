@@ -95,10 +95,7 @@ and variables.
 We will use Daily Check-In data obtained from Management Science and
 Innovation (MSI), a firm contracted to collect and maintain these data.
 We will merge in additional variables from the GSA Roster obtained from
-D2D. The GSA roster is updated monthly at the end of each month. 
-<!-- [We currently have Nov 2022 and Dec 2022 updates; I will try to track down -->
-<!-- past months. Ideally, we will merge in each monthly check-in file with -->
-<!-- the preceding month's roster file.] -->
+D2D. The GSA roster is updated monthly at the end of each month.
 
 ```{r}
 table_n <- table_n + 1
@@ -293,6 +290,7 @@ tbl %>%
   autofit()
 ```
 
+<!-- [I might be more discerning about using "staff" vs. "employees" vs. "teams" vs. "groups" vs. "clusters" -- we are grouping employees into teams, but also categorizing them.]  -->
 We will approach grouping staff and teams in two ways. First,
 rules-based groups will be formed. For these, definitions of different
 types of work will be defined. Second, groups will be formed using
