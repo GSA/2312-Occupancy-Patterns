@@ -89,10 +89,7 @@ and variables.
 We will use Daily Check-In data obtained from Management Science and
 Innovation (MSI), a firm contracted to collect and maintain these data.
 We will merge in additional variables from the GSA Roster obtained from
-D2D. The GSA roster is updated monthly at the end of each month. [We
-currently have Nov 2022 and Dec 2022 updates; I will try to track down
-past months. Ideally, we will merge in each monthly check-in file with
-the preceding month's roster file.]
+D2D. The GSA roster is updated monthly at the end of each month.
 
 ### Table 1. GSA Daily Check-In Data Variables Available Feb 2022-Dec 2022.
 
@@ -124,7 +121,7 @@ For all analysis, we will used a defined cohort of staff to examine work
 status over period of time. A cohort of staff employed in the month of
 March 2022 will be followed over six months. Teams will be defined by
 the supervisors of groups of staff in the beginning of March 2022. Any
-analysis will conduct may be reproduced on a separate cohort or may be
+analysis we conduct may be reproduced on a separate cohort or may be
 combined with multiple cohorts depending on the data availability.
 
 The analysis can be thought of as a two-by-two box.
@@ -151,7 +148,7 @@ tbl %>%
 ```
 
 For cluster analysis of staff work status, the data will be transformed
-so that each row is one staff person. From the raw data, the following
+so that each row is one employee. From the raw data, the following
 variables will be defined:
 
 -   Proportion of days working onsite
