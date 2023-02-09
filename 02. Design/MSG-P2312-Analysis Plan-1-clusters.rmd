@@ -756,9 +756,9 @@ The team statistics will be calculated for the following groups:
 2.    By rule-based categories of work pattern
 3.    By cluster defined categories of work pattern
 
-Another set of statistics will be designed to understand the relationship between staff work patterns and their supervisor. We will calculate  the proportion of the staff that fall into the same rule-based and clusters as their supervisors overall as well as by those categories. 
+To understand the relationship between staff work patterns and their supervisor, we will calculate the proportion of the staff that fall into the same rule-based and clusters as their supervisors overall, as well as by the above categories.
 
-These statistics will be presented in tables. Visualizations will be created for a subset to help communicated results. Charts of the work pattern data will be created to confirm and characterize the groupings. In addition, charts showing difference by stated telework position category.  
+The results will be presented in tables, and we will generate visualizations for a subset of the results for streamlined communication. We will use visualizations to validate the work pattern groupings and demonstrate any deviation between clusters, rules-based categories, and stated telework position.  
 
 ### Confirmatory Analyses:
 
