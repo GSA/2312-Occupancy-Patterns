@@ -10,7 +10,7 @@ params:
   author: "Sara Guenther and Ben Jaques-Leslie"
   project_number: 2312
   project_name: "Occupancy Patterns"
-  analysis_plan_title: "Phase 2 - Clusters"
+  analysis_plan_title: "Phase 1 - Clusters"
 editor_options: 
   markdown: 
     wrap: 72
