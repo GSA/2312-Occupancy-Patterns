@@ -10,17 +10,23 @@ params:
   author: "Ben Jaques-Leslie"
   project_number: 2312
   project_name: "Occupancy Patterns"
+  google_drive_home: "G:/Shared drives/MSG Projects/1.0 Real Estate Solutions (LQ1)/2312 Occupancy Patterns"
   data_folder_1: "Occupancy Data Pull"
-  unique_identifier_1: !r c("employee_name")
+  unique_identifier_1: !r c("employee_name","date")
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+install.packages("arsenal")
+devtools::install_github(repo = "GSA/oesrrr")
+library(oesrrr)
 library(tidyverse)
 library(janitor)
 library(skimr)
 library(DataExplorer)
 library(readr)
+library(arsenal)
+library(Hmisc)
 ```
 
 # Data preparation {.tabset .tabset-pills}
@@ -43,24 +49,290 @@ Find the list of .csv files in the `r params$data_folder_1` data folder.
 
 ```{r}
 files <- 
-  list.files(here::here("03. Data Collection",params$data_folder_1), pattern = ".csv", full.names = TRUE)
+  list.files(file.path(params$google_drive_home,"03. Data Collection",params$data_folder_1), pattern = ".csv", full.names = TRUE)
 files
 ```
 
 Load all data files in the `r params$data_folder_1` data folder.
 
 ```{r}
-prep_01 <- files %>% 
-  map_dfr(~read_csv(., 
-    col_types = cols(Date = col_date(format = "%m_%d_%Y")))) %>% 
-  clean_names()
+prep_base <- files %>% 
+  map_dfr(~mutate(.data = read_csv(., 
+    col_types = cols(Date = col_date(format = "%m_%d_%Y"))), 
+        file_name = str_remove(.,pattern = file.path(params$google_drive_home,"03. Data Collection"))
+      )) %>% 
+  clean_names() %>% 
+  distinct()
 ```
 
-Review data.
+### Review data
 
 ```{r}
-prep_01 %>% skim()
+prep_base %>% skim()
 ```
+
+## Addressing duplication
+
+We are using `r params$unique_identifier_1` as the unique identifier. 
+
+### Check for duplication
+
+```{r}
+dupe_01 <- 
+  prep_base %>%
+  get_dupes(params$unique_identifier_1)
+```
+
+#### Data review
+
+```{r}
+dupe_01 %>% 
+  skim()
+```
+
+
+### Dataframe of the unique identifier
+
+```{r}
+prep_uniq <- 
+  prep_base %>% 
+  select(params$unique_identifier_1) %>% 
+  distinct()
+
+prep_uniq %>% 
+  count()
+```
+
+### Identifying and categorizing columns
+
+Created a dataframe of variable metadata
+
+```{r}
+column_meta_data <- 
+  prep_base %>% 
+  contents()
+
+column_meta_data <- 
+  column_meta_data$contents %>% 
+  as.data.frame()
+
+column_meta_data <-
+  column_meta_data %>% 
+  rownames_to_column(var = "variable")
+
+column_meta_data
+```
+
+Function that checks whether there are duplicates for different variables
+
+```{r}
+dupe_check <- function(in_data,in_variable_name)
+{
+  check_01 <- 
+  in_data %>% 
+  select(params$unique_identifier_1,all_of(in_variable_name)) %>% 
+  distinct() %>% 
+  get_dupes(params$unique_identifier_1)
+
+out <- nrow(check_01) > 0 
+
+return(out)
+}
+```
+
+Checking duplicates for each variable in the dataframe.
+
+```{r}
+duplicates_by_variable <- 
+  column_meta_data %>% 
+  pull(variable) %>% 
+  map_lgl(~dupe_check(in_data = dupe_01, .))
+
+duplicates_by_variable
+```
+
+Add this to the column_meta_data dataframe. 
+
+```{r}
+column_meta_data <- 
+  column_meta_data %>% 
+  add_column(
+    duplicates_by_variable = duplicates_by_variable
+  )
+
+column_meta_data
+```
+
+Create dataframe of only variables that cause duplicates.
+
+```{r}
+duplicating_variables <- 
+  column_meta_data %>% 
+  filter(duplicates_by_variable)
+
+duplicating_variables
+```
+
+Grouping variables.
+
+```{r}
+duplicating_variables <- 
+  duplicating_variables %>% 
+  mutate(group = 
+           case_when(variable == "short_id" ~ "short_id",
+                     variable == "dept_id" ~ "short_id",
+                    TRUE ~ variable
+                     ))
+
+duplicating_variables
+```
+
+Create list of groups.
+
+```{r}
+duplicating_groups <- 
+  duplicating_variables %>% 
+  select(group) %>% 
+  distinct() %>% 
+  pull()
+
+duplicating_groups
+```
+
+### Duplication removal
+
+```{r}
+step_n <- 0
+```
+
+```{r}
+step_n <- step_n + 1
+```
+
+#### Step `r step_n`
+
+Removing duplicates produced by:
+
+```{r}
+duplicating_group <- 
+  duplicating_variables %>% 
+  filter(group == duplicating_groups[step_n])
+duplicating_group
+```
+
+Reviewing duplicates.
+
+```{r}
+dupe_01 %>% 
+  select(params$unique_identifier_1,all_of(duplicating_group %>% pull(variable))) %>% 
+  distinct() %>% 
+  get_dupes(params$unique_identifier_1)
+```
+
+Not too many duplicates here. 
+
+First count `sso` across the original data.
+
+```{r}
+prep_base %>% count(sso)
+```
+
+There are just a few, but we'll want to transform these into indicators.
+
+We want to have this change to affect the whole dataframe so we address the duplicates off the original dataframe.
+
+```{r}
+prep_xx <- 
+  prep_base %>% 
+  character_to_indicator(params$unique_identifier_1,sso,"sso")
+
+prep_xx %>% 
+  glimpse()
+
+prep_xx %>% 
+  skim()
+```
+
+
+Count rows.
+
+```{r}
+prep_xx %>% 
+  count()
+```
+
+Do the number of in this dataframe match the number of unique identifiers?
+
+```{r}
+prep_xx %>% 
+  count() %>% 
+  pull() ==
+  prep_uniq %>% 
+  count() %>% 
+  pull()
+```
+
+Rename dataframe.
+
+```{r}
+prep_01 <- prep_xx
+```
+
+```{r}
+step_n <- step_n + 1
+```
+
+#### Step `r step_n`
+
+Removing duplicates produced by:
+
+```{r}
+duplicating_group <- 
+  duplicating_variables %>% 
+  filter(group == duplicating_groups[step_n])
+duplicating_group
+```
+
+Reviewing duplicates.
+
+```{r}
+dupe_01 %>% 
+  select(params$unique_identifier_1,all_of(duplicating_group %>% pull(variable))) %>% 
+  distinct() %>% 
+  get_dupes(params$unique_identifier_1) %>% view()
+```
+
+Quite a few duplicates here.
+
+First count `short_id` and `dept_id` across the original data.
+
+```{r}
+prep_base %>% count(short_id,dept_id)
+```
+
+Counting `short_id`.
+
+```{r}
+prep_base %>% count(short_id)
+```
+
+Counting `dept_id`.
+
+```{r}
+prep_base %>% count(dept_id)
+```
+
+Too many options to create useful indicators. 
+
+For lack better option, we'll select the rows with shorter ids.
+
+```{r}
+dupe_01 %>% 
+  select(params$unique_identifier_1,all_of(duplicating_group %>% pull(variable))) %>% 
+  distinct() %>% 
+  arrange(length(short_id),length(dept_id))
+```
+
 
 Create function to drop rows with null unique identifiers.
 
