@@ -118,7 +118,7 @@ tbl <- tibble("Variable Name" = c(
 "Description" = c(
   "Date of check-in",
   # Is SSO single sign on? What did we decide?
-"",
+"GSA offices",
 "2-digit department id",
 "Full department id code",
 "Employee name (Last,First Middle)",
