@@ -1,0 +1,3340 @@
+---
+title: "Data preparation - JOAs"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    theme: readable
+    highlight: tango
+    code_folding: hide
+params:
+  author: "Sam Kim and Ben Jaques-Leslie"
+  project_number: "001"
+  project_name: "Remote Work"
+  data_folder_1: "03. Data Collection/Original data files from Melissa/JOAs"
+  unique_identifier_1: !r c("usajobs_control_number")
+  date_earliest_open: '2022-01-01'
+  data_latest_close: '2022-12-01'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+tictoc::tic()
+library(Hmisc)
+library(tidyverse)
+library(janitor)
+library(skimr)
+library(DataExplorer)
+library(readr)
+library(data.table)
+library(lubridate)
+library(arsenal)
+```
+
+# {.tabset .tabset-pills}
+
+**Project number**: `r params$project_number`
+
+**Project name**: `r params$project_name`
+
+**Author**: `r params$author`
+
+**Data folder 1**: `r params$data_folder`
+
+**Unique identifier for data folder 1**: `r params$unique_identifier_1`
+
+## Load data {.tabset .tabset-pills}
+
+### Data files
+
+The file names below represent all original candidate data files from Melissa. 
+
+```{r}
+files <- 
+  tibble(files = list.files(here::here(params$data_folder_1))
+)
+
+files
+```
+
+### Function to identify the encoding of the data files.
+
+```{r}
+encoding_data_frame <- function(in_file_name)
+{
+  readr::guess_encoding(here::here(params$data_folder_1,in_file_name)) %>% 
+        mutate(file = in_file_name) %>% 
+        select(file, everything())
+}
+```
+
+### Identifying file encoding
+
+Identify the encoding the candidates data files.
+
+```{r}
+files <- 
+  files %>% 
+  pull() %>% 
+  map_dfr(~encoding_data_frame(.))
+
+files
+```
+
+Filter candidate files to those with greatest confidence in the encoding.
+
+```{r}
+files <- 
+  files %>% 
+  group_by(file) %>% 
+  filter(confidence == max(confidence))
+
+files
+```
+
+### Functions
+
+#### Function to load UTF-8 candidate files
+
+```{r}
+load_utf8 <- function(in_file_name, in_col_names)
+{
+  prep_01 <-
+    fread(
+      here::here(params$data_folder_1,in_file_name)
+    ) %>% 
+      distinct()
+  
+  return(prep_01)
+}
+```
+
+#### Function to load UTF-16 candidate files
+
+```{r}
+load_utf16 <- function(in_file_name)
+{
+  prep_01 <- read.csv(
+    file = here::here(params$data_folder_1,in_file_name),
+    fileEncoding = "UTF-16",
+    sep = "\t"
+    )
+  
+
+  return(prep_01)
+}
+```
+
+#### Function to prepare JOA info data. 
+
+```{r}
+prepare_joa <- function(in_data)
+{
+prep_02 <- 
+  in_data %>% 
+  clean_names()
+
+prep_03 <-
+  prep_02 %>%
+  select(everything())
+
+
+if("announcement_closing_type" %in% names(prep_03))
+{
+  prep_04 <-
+  prep_03 %>%
+  mutate(
+    across(
+      .cols = c(position_open_date,position_close_date),
+      .fns = ~ymd(.)
+    )
+  ) %>% 
+  mutate(
+    across(
+      .cols = c(usajobs_control_number,announcement_closing_type,agency_level,hiring_department_code,series),
+      .fns = ~as.character(.)
+    )
+  ) %>% 
+  mutate(
+    across(
+      .cols = c(hiring_agency_code,total_openings),
+      .fns = ~str_trim(.)
+    )
+  ) %>% 
+  mutate(
+    across(
+      .cols = c(total_openings),
+      .fns = ~as.numeric(.)
+    )
+  )
+}
+
+if(!("announcement_closing_type" %in% names(prep_03)) &
+   !("agency_level" %in% names(prep_03)) &
+   !("hiring_department_code" %in% names(prep_03)) &
+   !("hiring_agency_code" %in% names(prep_03)) 
+     )
+{
+  prep_04 <-
+  prep_03 %>%
+  mutate(
+    across(
+      .cols = c(position_open_date,position_close_date),
+      .fns = ~ymd(.)
+    )
+  ) %>% 
+  mutate(
+    across(
+      .cols = c(usajobs_control_number,
+                # announcement_closing_type,
+                # agency_level,
+                # hiring_department_code,
+                series),
+      .fns = ~as.character(.)
+    )
+  ) %>% 
+  mutate(
+    across(
+      .cols = c(
+        # hiring_agency_code,
+        total_openings),
+      .fns = ~str_trim(.)
+    )
+  ) %>% 
+  mutate(
+    across(
+      .cols = c(total_openings),
+      .fns = ~as.numeric(.)
+    )
+  )
+}
+
+
+  #   position_open_date = ymd(position_open_date),
+  #   position_close_date = ymd(position_close_date),
+  #   usajobs_control_number = as.character(usajobs_control_number),
+  #   race = str_remove(race, " - .*"),
+  #   race = case_when(race == "" ~ "Did not disclose race",
+  #                    is.na(race) ~ "Did not disclose race",
+  #                    TRUE ~ race),
+  #   degree_level = str_remove(degree_level, " \\(.*"),
+  #   degree_level = case_when(degree_level == "" ~ "Did not disclose degree",
+  #                    TRUE ~ degree_level),
+  #   federal_employment_status =
+  #     case_when(
+  #       str_detect(
+  #         federal_employment_status,"former") ~ "Former",
+  #       str_detect(
+  #         federal_employment_status,"currently") ~ "Current",
+  #       str_detect(
+  #         federal_employment_status,"never") ~ "Non-Federal employee"
+  #       )
+  # )
+# 
+# prep_05 <- 
+#   prep_04 %>% 
+#   select(candidate_id,race) %>% 
+#   distinct() %>%
+#   mutate(ind = 1) %>% 
+#   pivot_wider(names_from = race, values_from = ind) %>% 
+#   clean_names() %>% 
+#   mutate(
+#     across(
+#       .cols = where(is.numeric),
+#       .fns = ~replace_na(.,0)
+#     )
+#   )
+# 
+# prep_06 <-
+#   prep_04 %>% 
+#   select(candidate_id,degree_level) %>% 
+#   distinct() %>% 
+#   mutate(ind = 1) %>% 
+#   pivot_wider(names_from = degree_level, values_from = ind) %>% 
+#   clean_names() %>% 
+#   mutate(
+#     across(
+#       .cols = where(is.numeric),
+#       .fns = ~replace_na(.,0)
+#     )
+#   )
+# 
+# prep_07 <- 
+#   prep_04 %>% 
+#   select(-race,-degree_level) %>% 
+#   distinct()
+# 
+# prep_08 <- 
+#   prep_05 %>% 
+#   left_join(prep_06) %>% 
+#   left_join(prep_07)
+
+return(prep_04)
+}
+```
+
+#### Function to prepare JOA info data. 
+
+```{r}
+prepare_joa_telework <- function(in_data)
+{
+prep_02 <- 
+  in_data %>% 
+  clean_names()
+
+prep_03 <-
+  prep_02 %>%
+  select(everything())
+
+
+if("is_tele_work_eligible" %in% names(prep_03))
+{
+  prep_04 <-
+  prep_03 %>%
+    rename(telework_eligible = is_tele_work_eligible)
+}
+
+if(!("is_tele_work_eligible" %in% names(prep_03)))
+{
+  prep_04 <-
+  prep_03
+}
+
+prep_05 <- 
+  prep_04 %>% 
+  select(usajobs_control_number,telework_eligible) %>% 
+  mutate(
+    across(
+      .cols = c(usajobs_control_number,
+               ),
+      .fns = ~as.character(.)
+    )
+  ) %>%
+  mutate(
+    across(
+      .cols = c(telework_eligible),
+      .fns = ~as.numeric(.)
+    )
+  )
+# 
+# if(!("announcement_closing_type" %in% names(prep_03)) &
+#    !("agency_level" %in% names(prep_03)) &
+#    !("hiring_department_code" %in% names(prep_03)) &
+#    !("hiring_agency_code" %in% names(prep_03)) 
+#      )
+# {
+#   prep_04 <-
+#   prep_03 %>%
+#   mutate(
+#     across(
+#       .cols = c(position_open_date,position_close_date),
+#       .fns = ~ymd(.)
+#     )
+#   ) %>% 
+#   mutate(
+#     across(
+#       .cols = c(usajobs_control_number,
+#                 # announcement_closing_type,
+#                 # agency_level,
+#                 # hiring_department_code,
+#                 series),
+#       .fns = ~as.character(.)
+#     )
+#   ) %>% 
+#   mutate(
+#     across(
+#       .cols = c(
+#         # hiring_agency_code,
+#         total_openings),
+#       .fns = ~str_trim(.)
+#     )
+#   ) %>% 
+#   mutate(
+#     across(
+#       .cols = c(total_openings),
+#       .fns = ~as.numeric(.)
+#     )
+#   )
+# }
+
+
+  #   position_open_date = ymd(position_open_date),
+  #   position_close_date = ymd(position_close_date),
+  #   usajobs_control_number = as.character(usajobs_control_number),
+  #   race = str_remove(race, " - .*"),
+  #   race = case_when(race == "" ~ "Did not disclose race",
+  #                    is.na(race) ~ "Did not disclose race",
+  #                    TRUE ~ race),
+  #   degree_level = str_remove(degree_level, " \\(.*"),
+  #   degree_level = case_when(degree_level == "" ~ "Did not disclose degree",
+  #                    TRUE ~ degree_level),
+  #   federal_employment_status =
+  #     case_when(
+  #       str_detect(
+  #         federal_employment_status,"former") ~ "Former",
+  #       str_detect(
+  #         federal_employment_status,"currently") ~ "Current",
+  #       str_detect(
+  #         federal_employment_status,"never") ~ "Non-Federal employee"
+  #       )
+  # )
+# 
+# prep_05 <- 
+#   prep_04 %>% 
+#   select(candidate_id,race) %>% 
+#   distinct() %>%
+#   mutate(ind = 1) %>% 
+#   pivot_wider(names_from = race, values_from = ind) %>% 
+#   clean_names() %>% 
+#   mutate(
+#     across(
+#       .cols = where(is.numeric),
+#       .fns = ~replace_na(.,0)
+#     )
+#   )
+# 
+# prep_06 <-
+#   prep_04 %>% 
+#   select(candidate_id,degree_level) %>% 
+#   distinct() %>% 
+#   mutate(ind = 1) %>% 
+#   pivot_wider(names_from = degree_level, values_from = ind) %>% 
+#   clean_names() %>% 
+#   mutate(
+#     across(
+#       .cols = where(is.numeric),
+#       .fns = ~replace_na(.,0)
+#     )
+#   )
+# 
+# prep_07 <- 
+#   prep_04 %>% 
+#   select(-race,-degree_level) %>% 
+#   distinct()
+# 
+# prep_08 <- 
+#   prep_05 %>% 
+#   left_join(prep_06) %>% 
+#   left_join(prep_07)
+
+return(prep_05)
+}
+```
+
+#### Function to load and prepare JOA information
+
+```{r}
+load_prepare_joa <- function(in_file_name,in_encoding)
+{
+  if(in_encoding == 'ASCII')
+  {
+    prep_01 <- in_file_name %>% 
+  load_utf8()
+  }
+  
+  if(in_encoding == 'UTF-16LE')
+  {
+    prep_01 <- in_file_name %>% 
+  load_utf16()
+  }
+  
+  out <- prep_01 %>% 
+  prepare_joa()
+  
+  return(out)
+  
+}
+```
+
+#### Function to load and prepare JOA telework information
+
+```{r}
+load_prepare_joa_telework <- function(in_file_name,in_encoding)
+{
+  if(in_encoding == 'ASCII')
+  {
+    prep_01 <- in_file_name %>% 
+  load_utf8()
+  }
+  
+  if(in_encoding == 'UTF-16LE')
+  {
+    prep_01 <- in_file_name %>% 
+  load_utf16()
+  }
+  
+  out <- prep_01 %>% 
+  prepare_joa_telework()
+  
+  return(out)
+  
+}
+```
+
+#### Function to convert character to indicator
+
+```{r}
+character_to_indicator <- function(in_data,in_unique_identifier,in_variable,in_prefix)
+{
+  in_data %>% 
+  select(all_of(in_unique_identifier),{{in_variable}}) %>% 
+    distinct() %>% 
+    mutate(ind = 1) %>% 
+    mutate(across(
+      .cols = {{in_variable}},
+      .fns = ~case_when(. == "" ~ "missing",
+                       TRUE ~ .)
+    )) %>% 
+    pivot_wider(names_from = {{in_variable}},
+                values_from = ind) %>% 
+    rename_with(
+      .fn = ~glue::glue("{in_prefix} {.}"),
+  .cols = -in_unique_identifier
+  ) %>% 
+    clean_names() %>% 
+    mutate(
+      across(
+        .cols = where(is.numeric),
+        .fns = ~replace_na(.,0)
+      )
+    )
+}
+```
+
+
+### JOA data
+
+#### Identify files with "full" in title or "Positions_Updated_Dec2022"
+
+```{r}
+files_full <- 
+  files %>% 
+  filter(str_detect(file,"_full_") | str_detect(file,"Positions_Updated_Dec2022")) %>%
+  select(file,encoding)
+
+files_full
+```
+
+#### Load 'full' files
+
+```{r}
+prep_base <- 
+  map2_dfr(
+    .x = files_full$file,
+    .y = files_full$encoding,
+    .f = ~load_prepare_joa(in_file_name = .x, in_encoding = .y)
+  ) %>% 
+  distinct()
+```
+
+#### Identify files with "remote_telework_positions" in title or "telework_eligible_from_09092022"
+
+```{r}
+files_telework <- 
+  files %>% 
+  filter(str_detect(file,"remote_telework_positions") | str_detect(file,"telework_eligible_from_09092022")) %>%
+  select(file,encoding)
+
+files_telework
+```
+
+#### Load 'telework' files
+
+```{r}
+prep_telework <- 
+  map2_dfr(
+    .x = files_telework$file,
+    .y = files_telework$encoding,
+    .f = ~load_prepare_joa_telework(in_file_name = .x, in_encoding = .y)
+  ) %>% 
+  distinct()
+```
+
+```{r}
+prep_telework %>% 
+  skim()
+```
+
+
+## Filter to correct dates
+
+```{r}
+prep_base <- 
+  prep_base %>% 
+  filter(position_open_date >= ymd(params$date_earliest_open) &
+           position_close_date <= ymd(params$data_latest_close))
+
+```
+
+
+#### Review data
+
+```{r}
+prep_base %>%
+  skim()
+```
+
+## Addressing duplication
+
+Melissa recommended using `r params$unique_identifier_1` as the unique identifier. 
+
+To review specific cases you to https://www.usajobs.gov/job/ and put the USAJobs control number at the end. 
+
+### Check for duplication
+
+```{r}
+dupe_01 <- 
+  prep_base %>%
+  get_dupes(params$unique_identifier_1)
+```
+
+#### Data review
+
+```{r}
+dupe_01 %>% 
+  skim()
+```
+
+### Dataframe of the unique identifier
+
+```{r}
+prep_uniq <- 
+  prep_base %>% 
+  select(params$unique_identifier_1) %>% 
+  distinct()
+
+prep_uniq %>% 
+  count()
+```
+
+### Identifying and categorizing columns
+
+Created a dataframe of variable metadata
+
+```{r}
+column_meta_data <- 
+  prep_base %>% 
+  contents()
+
+column_meta_data <- 
+  column_meta_data$contents %>% 
+  as.data.frame()
+
+column_meta_data <-
+  column_meta_data %>% 
+  rownames_to_column(var = "variable")
+
+column_meta_data
+```
+
+Function that checks whether there are duplicates for different variables
+
+```{r}
+dupe_check <- function(in_data,in_variable_name)
+{
+  check_01 <- 
+  in_data %>% 
+  select(params$unique_identifier_1,all_of(in_variable_name)) %>% 
+  distinct() %>% 
+  get_dupes(params$unique_identifier_1)
+
+out <- nrow(check_01) > 0 
+
+return(out)
+}
+```
+
+Checking duplicates for each variable in the dataframe.
+
+```{r}
+duplicates_by_variable <- 
+  column_meta_data %>% 
+  pull(variable) %>% 
+  map_lgl(~dupe_check(in_data = dupe_01, .))
+
+duplicates_by_variable
+```
+
+Add this to the column_meta_data dataframe. 
+
+```{r}
+column_meta_data <- 
+  column_meta_data %>% 
+  add_column(
+    duplicates_by_variable = duplicates_by_variable
+  )
+
+column_meta_data
+```
+
+Create dataframe of only variables that cause duplicates.
+
+```{r}
+duplicating_variables <- 
+  column_meta_data %>% 
+  filter(duplicates_by_variable)
+
+duplicating_variables
+```
+
+Grouping variables.
+
+```{r}
+duplicating_variables <- 
+  duplicating_variables %>% 
+  mutate(group = 
+           case_when(variable == "position_open_date" ~ "dates",
+                     variable == "position_close_date" ~ "dates",
+                     variable == "announcement_closing_type" ~ "announcement_closing_type",
+                     variable == "announcement_closing_type_description" ~ "announcement_closing_type",
+                     variable == "application_limit" ~ "application_limit",
+                     variable == "application_limit_set" ~ "application_limit",
+                     variable == "agency_level" ~ "agency_level",
+                     variable == "agency_level_sort" ~ "agency_level",
+                     variable == "hiring_agency_code" ~ "agency_level",
+                     variable == "hiring_agency_name" ~ "agency_level",
+                     variable == "hiring_department_code" ~ "agency_level",
+                     variable == "hiring_department_name" ~ "agency_level",
+                     variable == "maximum_salary" ~ "maximum_salary",
+                     variable == "minimum_salary" ~ "maximum_salary",
+                     variable == "maximum_grade" ~ "maximum_salary",
+                     variable == "minimum_grade" ~ "maximum_salary",
+                     variable == "series" ~ "series",
+                     variable == "series_title" ~ "series",
+                     TRUE ~ variable
+                     ))
+
+duplicating_variables
+```
+
+Create list of groups.
+
+```{r}
+duplicating_groups <- 
+  duplicating_variables %>% 
+  select(group) %>% 
+  distinct() %>% 
+  pull()
+
+duplicating_groups
+```
+
+
+### Duplication removal
+
+```{r}
+step_n <- 0
+```
+
+```{r}
+step_n <- step_n + 1
+```
+
+#### Step `r step_n`
+
+Removing duplicates produced by:
+
+```{r}
+duplicating_group <- 
+  duplicating_variables %>% 
+  filter(group == duplicating_groups[step_n])
+duplicating_group
+```
+
+Reviewing duplicates.
+
+```{r}
+dupe_01 %>% 
+  select(params$unique_identifier_1,all_of(duplicating_group %>% pull(variable))) %>% 
+  distinct() %>% 
+  get_dupes(params$unique_identifier_1)
+```
+
+Some of these duplicates may be due to small typos. Transforming the string to upper case.
+
+```{r}
+dupe_01 %>% 
+  select(params$unique_identifier_1,all_of(duplicating_group %>% pull(variable))) %>% 
+  mutate(
+    announcement_number = str_to_upper(announcement_number)
+  ) %>% 
+  distinct() %>% 
+  get_dupes(params$unique_identifier_1)
+```
+
+This fixes some, but not all. 
+
+Without better information, we will take the lower of the two values for the remainder.
+
+```{r}
+dedupe <- 
+  dupe_01 %>% 
+  select(params$unique_identifier_1,all_of(duplicating_group %>% pull(variable))) %>% 
+  mutate(
+    announcement_number = str_to_upper(announcement_number)
+  ) %>% 
+  distinct() %>% 
+  arrange(params$unique_identifier_1,announcement_number) %>% 
+  group_by_at(params$unique_identifier_1) %>% 
+  summarise(announcement_number = first(announcement_number))
+
+dedupe %>% 
+  get_dupes(params$unique_identifier_1)
+```
+
+Creating a deduplicated dataframe of `r params$unique_identifier_1` and `r duplicating_groups[step_n]`.
+
+First create a dataframe of distinct rows of the variables from the original data. 
+
+```{r}
+working_01 <- 
+  prep_base %>% 
+  select(params$unique_identifier_1,all_of(duplicating_group %>% pull(variable))) %>% 
+  distinct()
+
+working_01 %>% 
+  glimpse()
+
+working_01 %>% 
+  skim()
+```
+
+Next remove rows that dataframe that were found to be duplicated and save that as a new dataframe. 
+
+```{r}
+working_02 <- 
+  working_01 %>% 
+  anti_join(dedupe %>% select(params$unique_identifier_1))
+
+working_02 %>% 
+  glimpse()
+
+working_02 %>% 
+  skim()
+```
+
+Last bind this dataframe to the deduplicated set above.
+
+```{r}
+prep_xx <- 
+  working_02 %>% 
+  bind_rows(dedupe)
+
+prep_xx %>% 
+  glimpse()
+
+prep_xx %>% 
+  skim()
+```
+
+Rename dataframe and count rows.
+
+```{r}
+prep_01 <- prep_xx
+
+prep_01 %>% 
+  count()
+```
+
+Do the number of in this dataframe match the number of unique identifiers?
+
+```{r}
+prep_01 %>% 
+  count() %>% 
+  pull() ==
+  prep_uniq %>% 
+  count() %>% 
+  pull()
+```
+
+
+```{r}
+step_n <- step_n + 1
+```
+
+#### Step `r step_n`
+
+Removing duplicates produced by:
+
+```{r}
+duplicating_group <- 
+  duplicating_variables %>% 
+  filter(group == duplicating_groups[step_n])
+duplicating_group
+```
+
+Reviewing duplicates.
+
+```{r}
+dupe_02 <- 
+  dupe_01 %>% 
+  select(params$unique_identifier_1,all_of(duplicating_group %>% pull(variable))) %>% 
+  distinct() %>% 
+  get_dupes(params$unique_identifier_1)
+
+dupe_02
+```
+
+Duplication appear to be because of difference in open and close dates. After messaging with Melissa, we decide to retain the later dates as determined by the close date.
+
+```{r}
+dedupe <- 
+  dupe_01 %>% 
+  select(params$unique_identifier_1,all_of(duplicating_group %>% pull(variable))) %>%
+  arrange(params$unique_identifier_1, position_close_date) %>% 
+  group_by(usajobs_control_number) %>% 
+  summarise(
+    across(
+      .cols = all_of(duplicating_group %>% pull(variable)),
+      .fns = last
+    )
+  )
+ 
+
+dedupe %>% 
+  get_dupes(params$unique_identifier_1)
+```
+
+Creating a deduplicated dataframe of `r params$unique_identifier_1` and `r duplicating_groups[step_n]`.
+
+First create a dataframe of distinct rows of the variables from the original data. 
+
+```{r}
+working_01 <- 
+  prep_base %>% 
+  select(params$unique_identifier_1,all_of(duplicating_group %>% pull(variable))) %>% 
+  distinct()
+
+working_01 %>% 
+  glimpse()
+
+working_01 %>% 
+  skim()
+```
+
+Next remove rows that dataframe that were found to be duplicated and save that as a new dataframe. 
+
+```{r}
+working_02 <- 
+  working_01 %>% 
+  anti_join(dedupe %>% select(params$unique_identifier_1))
+
+working_02 %>% 
+  glimpse()
+
+working_02 %>% 
+  skim()
+```
+
+Last bind this dataframe to the deduplicated set above.
+
+```{r}
+prep_xx <- 
+  working_02 %>% 
+  bind_rows(dedupe)
+
+prep_xx %>% 
+  glimpse()
+
+prep_xx %>% 
+  skim()
+```
+
+Count rows.
+
+```{r}
+prep_xx %>% 
+  count()
+```
+
+Do the number of in this dataframe match the number of unique identifiers?
+
+```{r}
+prep_xx %>% 
+  count() %>% 
+  pull() ==
+  prep_uniq %>% 
+  count() %>% 
+  pull()
+```
+
+Rename dataframe
+
+```{r}
+prep_02 <- prep_xx
+```
+
+
+```{r}
+step_n <- step_n + 1
+```
+
+#### Step `r step_n`
+
+Removing duplicates produced by:
+
+```{r}
+duplicating_group <- 
+  duplicating_variables %>% 
+  filter(group == duplicating_groups[step_n])
+duplicating_group
+```
+
+Reviewing duplicates.
+
+```{r}
+dupe_02 <- 
+  dupe_01 %>% 
+  select(params$unique_identifier_1,all_of(duplicating_group %>% pull(variable))) %>% 
+  distinct() %>% 
+  get_dupes(params$unique_identifier_1)
+
+dupe_02
+```
+
+Duplication appear to be because `r duplicating_group %>% pull(variable)` is empty in one row. Transform the empties into 'N'.
+
+We want to have this change to affect the whole dataframe so we address the duplicates off the original dataframe.
+
+```{r}
+prep_xx <- 
+  prep_base %>% 
+  select(params$unique_identifier_1,all_of(duplicating_group %>% pull(variable))) %>% 
+  mutate(
+    is_remote_work_eligible = case_when(is_remote_work_eligible == "" ~ "N",
+                                        TRUE ~ is_remote_work_eligible)
+  ) %>% 
+  distinct() %>% 
+  character_to_indicator(in_unique_identifier = params$unique_identifier_1,
+                         in_variable = is_remote_work_eligible,
+                         in_prefix = "is_remote_work_eligible") %>% 
+  # Drop the "n" indicatoris_remote_work_eligible
+  select(-is_remote_work_eligible_n)
+
+prep_xx %>% 
+  glimpse()
+
+prep_xx %>% 
+  skim()
+```
+
+Count rows.
+
+```{r}
+prep_xx %>% 
+  count()
+```
+
+Do the number of in this dataframe match the number of unique identifiers?
+
+```{r}
+prep_xx %>% 
+  count() %>% 
+  pull() ==
+  prep_uniq %>% 
+  count() %>% 
+  pull()
+```
+
+Rename dataframe
+
+```{r}
+prep_03 <- prep_xx
+```
+
+
+```{r}
+step_n <- step_n + 1
+```
+
+#### Step `r step_n`
+
+Removing duplicates produced by:
+
+```{r}
+duplicating_group <- 
+  duplicating_variables %>% 
+  filter(group == duplicating_groups[step_n])
+duplicating_group
+```
+
+Reviewing duplicates.
+
+```{r}
+dupe_02 <- 
+  dupe_01 %>% 
+  select(params$unique_identifier_1,all_of(duplicating_group %>% pull(variable))) %>% 
+  distinct() %>% 
+  get_dupes(params$unique_identifier_1)
+
+dupe_02
+```
+
+Check to see if the type codes are consistent to the description.
+
+```{r}
+prep_base %>% 
+  count(announcement_closing_type,announcement_closing_type_description)
+```
+
+Codes are consistent to description, but the code adds no new information. We will drop the code and transform the description into columns of indicators.
+
+We want to have this change to affect the whole dataframe so we address the duplicates off the original dataframe.
+
+```{r}
+prep_xx <- 
+  prep_base %>% 
+  character_to_indicator(params$unique_identifier_1,announcement_closing_type_description,"closing_type")
+
+prep_xx %>% 
+  glimpse()
+
+prep_xx %>% 
+  skim()
+```
+
+Rename dataframe and count rows.
+
+```{r}
+prep_xx %>% 
+  count()
+```
+
+Do the number of in this dataframe match the number of unique identifiers?
+
+```{r}
+prep_xx %>% 
+  count() %>% 
+  pull() ==
+  prep_uniq %>% 
+  count() %>% 
+  pull()
+```
+
+Rename dataframe
+
+```{r}
+prep_04 <- prep_xx
+
+```
+
+
+```{r}
+step_n <- step_n + 1
+```
+
+
+#### Step `r step_n`
+
+Removing duplicates produced by:
+
+```{r}
+duplicating_group <- 
+  duplicating_variables %>% 
+  filter(group == duplicating_groups[step_n])
+duplicating_group
+```
+
+Reviewing duplicates.
+
+```{r}
+dupe_02 <- 
+  dupe_01 %>% 
+  select(params$unique_identifier_1,all_of(duplicating_group %>% pull(variable))) %>% 
+  distinct() %>% 
+  get_dupes(params$unique_identifier_1)
+
+dupe_02
+```
+
+Announcements have multiple open statuses. 
+
+First count the statuses across the original data.
+
+```{r}
+prep_base %>% count(position_opening_status)
+```
+
+Not too many of them. Like above, we will transform these into indicator columns. 
+
+We want to have this change to affect the whole dataframe so we address the duplicates off the original dataframe.
+
+```{r}
+prep_xx <- 
+  prep_base %>% 
+  character_to_indicator(params$unique_identifier_1,position_opening_status,"position_opening_status")
+
+prep_xx %>% 
+  glimpse()
+
+prep_xx %>% 
+  skim()
+```
+
+Count rows.
+
+```{r}
+prep_xx %>% 
+  count()
+```
+
+Do the number of in this dataframe match the number of unique identifiers?
+
+```{r}
+prep_xx %>% 
+  count() %>% 
+  pull() ==
+  prep_uniq %>% 
+  count() %>% 
+  pull()
+```
+Rename dataframe
+
+```{r}
+prep_05 <- prep_xx
+
+```
+
+
+```{r}
+step_n <- step_n + 1
+```
+
+
+#### Step `r step_n`
+
+Removing duplicates produced by:
+
+```{r}
+duplicating_group <- 
+  duplicating_variables %>% 
+  filter(group == duplicating_groups[step_n])
+duplicating_group
+```
+
+Reviewing duplicates.
+
+```{r}
+dupe_02 <- 
+  dupe_01 %>% 
+  select(params$unique_identifier_1,all_of(duplicating_group %>% pull(variable))) %>% 
+  distinct() %>% 
+  get_dupes(params$unique_identifier_1)
+
+dupe_02
+```
+
+Not too many. It appears that `application_limit_set` is "N" when `application_limit` is "Applicant Cut-Off".
+
+First count the statuses across the original data.
+
+```{r}
+prep_base %>% count(application_limit,application_limit_set)
+```
+
+All NA `application_limit` are "N" `application_limit_set`.
+
+We will consider "Y" the correct response for all and we will change this into an indicator.
+
+We want to have this change to affect the whole dataframe so we address the duplicates off the original dataframe.
+
+```{r}
+prep_xx <- 
+  prep_base %>% 
+  character_to_indicator(params$unique_identifier_1,application_limit_set,"application_limit_set") %>% 
+  # Drop the "N" column
+  select(-application_limit_set_n)
+
+prep_xx %>% 
+  glimpse()
+
+prep_xx %>% 
+  skim()
+```
+
+
+Count rows.
+
+```{r}
+prep_xx %>% 
+  count()
+```
+
+Do the number of in this dataframe match the number of unique identifiers?
+
+```{r}
+prep_xx %>% 
+  count() %>% 
+  pull() ==
+  prep_uniq %>% 
+  count() %>% 
+  pull()
+```
+
+Rename dataframe
+
+```{r}
+prep_06 <- prep_xx
+```
+
+
+```{r}
+step_n <- step_n + 1
+```
+
+#### Step `r step_n`
+
+Removing duplicates produced by:
+
+```{r}
+duplicating_group <- 
+  duplicating_variables %>% 
+  filter(group == duplicating_groups[step_n])
+duplicating_group
+```
+
+Reviewing duplicates.
+
+```{r}
+dupe_02 <- 
+  dupe_01 %>% 
+  select(params$unique_identifier_1,all_of(duplicating_group %>% pull(variable))) %>% 
+  distinct() %>% 
+  get_dupes(params$unique_identifier_1)
+
+dupe_02
+```
+
+Not too many. It appears that `work_schedule` might have different.
+
+First count the statuses across the original data.
+
+```{r}
+prep_base %>% count(work_schedule)
+```
+
+There are just a few, but we'll want to transform these into indicators.
+
+We want to have this change to affect the whole dataframe so we address the duplicates off the original dataframe.
+
+```{r}
+prep_xx <- 
+  prep_base %>% 
+  character_to_indicator(params$unique_identifier_1,work_schedule,"work_schedule")
+
+prep_xx %>% 
+  glimpse()
+
+prep_xx %>% 
+  skim()
+```
+
+
+Count rows.
+
+```{r}
+prep_xx %>% 
+  count()
+```
+
+Do the number of in this dataframe match the number of unique identifiers?
+
+```{r}
+prep_xx %>% 
+  count() %>% 
+  pull() ==
+  prep_uniq %>% 
+  count() %>% 
+  pull()
+```
+
+Rename dataframe
+
+```{r}
+prep_07 <- prep_xx
+```
+
+
+```{r}
+step_n <- step_n + 1
+```
+
+#### Step `r step_n`
+
+Removing duplicates produced by:
+
+```{r}
+duplicating_group <- 
+  duplicating_variables %>% 
+  filter(group == duplicating_groups[step_n])
+duplicating_group
+```
+
+Reviewing duplicates.
+
+```{r}
+dupe_02 <- 
+  dupe_01 %>% 
+  select(params$unique_identifier_1,all_of(duplicating_group %>% pull(variable))) %>% 
+  distinct() %>% 
+  get_dupes(params$unique_identifier_1)
+
+dupe_02
+```
+
+Not too many. It appears that `disable_apply_online` might have different.
+
+First count the statuses across the original data.
+
+```{r}
+prep_base %>% count(disable_apply_online)
+```
+
+There are just a few, but we'll want to transform these into indicators.
+
+We want to have this change to affect the whole dataframe so we address the duplicates off the original dataframe.
+
+Since there is only one instance of this type of duplication, we will still drop the no column. 
+
+```{r}
+prep_xx <- 
+  prep_base %>% 
+  character_to_indicator(params$unique_identifier_1,disable_apply_online,"disable_apply_online") %>% 
+  # Drop the "N" column
+  select(-disable_apply_online_n)
+
+prep_xx %>% 
+  glimpse()
+
+prep_xx %>% 
+  skim()
+```
+
+
+Count rows.
+
+```{r}
+prep_xx %>% 
+  count()
+```
+
+Do the number of in this dataframe match the number of unique identifiers?
+
+```{r}
+prep_xx %>% 
+  count() %>% 
+  pull() ==
+  prep_uniq %>% 
+  count() %>% 
+  pull()
+```
+
+Rename dataframe
+
+```{r}
+prep_08 <- prep_xx
+```
+
+
+```{r}
+step_n <- step_n + 1
+```
+
+#### Step `r step_n`
+
+Removing duplicates produced by:
+
+```{r}
+duplicating_group <- 
+  duplicating_variables %>% 
+  filter(group == duplicating_groups[step_n])
+duplicating_group
+```
+
+Reviewing duplicates.
+
+```{r}
+dupe_02 <- 
+  dupe_01 %>% 
+  select(params$unique_identifier_1,all_of(duplicating_group %>% pull(variable))) %>% 
+  distinct() %>% 
+  get_dupes(params$unique_identifier_1)
+
+dupe_02
+```
+
+Not too many.
+
+First count the statuses across the original data.
+
+```{r}
+prep_base %>% count(appointment_type)
+```
+
+There are just a few, but we'll want to transform these into indicators.
+
+We want to have this change to affect the whole dataframe so we address the duplicates off the original dataframe.
+
+Since there is only one instance of this type of duplication, we will still drop the no column. 
+
+```{r}
+prep_xx <- 
+  prep_base %>% 
+  character_to_indicator(params$unique_identifier_1,appointment_type,"appointment_type")
+
+prep_xx %>% 
+  glimpse()
+
+prep_xx %>% 
+  skim()
+```
+
+
+Count rows.
+
+```{r}
+prep_xx %>% 
+  count()
+```
+
+Do the number of in this dataframe match the number of unique identifiers?
+
+```{r}
+prep_xx %>% 
+  count() %>% 
+  pull() ==
+  prep_uniq %>% 
+  count() %>% 
+  pull()
+```
+
+Rename dataframe
+
+```{r}
+prep_09 <- prep_xx
+```
+
+
+```{r}
+step_n <- step_n + 1
+```
+
+#### Step `r step_n`
+
+Removing duplicates produced by:
+
+```{r}
+duplicating_group <- 
+  duplicating_variables %>% 
+  filter(group == duplicating_groups[step_n])
+duplicating_group
+```
+
+Reviewing duplicates.
+
+```{r}
+dupe_02 <- 
+  dupe_01 %>% 
+  select(params$unique_identifier_1,all_of(duplicating_group %>% pull(variable))) %>% 
+  distinct() %>% 
+  get_dupes(params$unique_identifier_1)
+
+dupe_02
+```
+
+A few things going on here:
+
+1.    Department of Defense agencies are duplicated because sometimes sub-departments (e.i. Department of Navy) are considered the *Department*
+2.    Many duplicates are caused by blank values in hiring agency code
+
+First let's remove duplicates because of department. To do this, we'll use the maximum agency level to limit to just the entries with the most levels.
+
+```{r}
+dupe_01 %>% 
+  select(params$unique_identifier_1,all_of(duplicating_group %>% pull(variable))) %>% 
+  group_by(usajobs_control_number) %>% 
+  filter(agency_level == max(agency_level)) %>% 
+  distinct() %>% 
+  get_dupes(params$unique_identifier_1)
+```
+
+We can still see the duplications from blank hiring agency codes. We'll drop those.
+
+```{r}
+dupe_01 %>% 
+  select(params$unique_identifier_1,all_of(duplicating_group %>% pull(variable))) %>% 
+  group_by(usajobs_control_number) %>% 
+  filter(agency_level == max(agency_level)) %>% 
+  filter(!is.na(hiring_department_code)) %>% 
+  distinct() %>% 
+  get_dupes(params$unique_identifier_1)
+```
+
+We still have one duplicate remaining. For this we'll, select the entry with the later position closing date.
+
+```{r}
+dupe_01 %>% 
+  select(params$unique_identifier_1,all_of(duplicating_group %>% pull(variable)),position_close_date) %>% 
+  group_by(usajobs_control_number) %>% 
+  filter(agency_level == max(agency_level)) %>% 
+  filter(!is.na(hiring_department_code)) %>% 
+  filter(position_close_date == max(position_close_date)) %>% 
+  distinct() %>% 
+  get_dupes(params$unique_identifier_1)
+```
+
+Now we will apply all of these to the duplicated rows. 
+
+```{r}
+dedupe <- 
+  dupe_01 %>% 
+  select(params$unique_identifier_1,all_of(duplicating_group %>% pull(variable)),position_close_date) %>% 
+  group_by(usajobs_control_number) %>% 
+  filter(agency_level == max(agency_level)) %>% 
+  filter(!is.na(hiring_department_code)) %>% 
+  filter(position_close_date == max(position_close_date)) %>% 
+  distinct() %>% 
+  ungroup() %>% 
+  select(-position_close_date)
+ 
+dedupe %>% 
+  get_dupes(params$unique_identifier_1)
+```
+
+Creating a deduplicated dataframe of `r params$unique_identifier_1` and `r duplicating_groups[step_n]`.
+
+First create a dataframe of distinct rows of the variables from the original data. 
+
+```{r}
+working_01 <- 
+  prep_base %>% 
+  select(params$unique_identifier_1,all_of(duplicating_group %>% pull(variable))) %>% 
+  distinct()
+
+working_01 %>% 
+  glimpse()
+
+working_01 %>% 
+  skim()
+```
+
+Next remove rows that dataframe that were found to be duplicated and save that as a new dataframe. 
+
+```{r}
+working_02 <- 
+  working_01 %>% 
+  anti_join(dedupe %>% select(params$unique_identifier_1))
+
+working_02 %>% 
+  glimpse()
+
+working_02 %>% 
+  skim()
+```
+
+Last bind this dataframe to the deduplicated set above.
+
+```{r}
+prep_xx <- 
+  working_02 %>% 
+  bind_rows(dedupe)
+
+prep_xx %>% 
+  glimpse()
+
+prep_xx %>% 
+  skim()
+```
+
+Count rows.
+
+```{r}
+prep_xx %>% 
+  count()
+```
+
+Do the number of in this dataframe match the number of unique identifiers?
+
+```{r}
+prep_xx %>% 
+  count() %>% 
+  pull() ==
+  prep_uniq %>% 
+  count() %>% 
+  pull()
+```
+
+Rename dataframe
+
+```{r}
+prep_10 <- prep_xx
+```
+
+
+```{r}
+step_n <- step_n + 1
+```
+
+#### Step `r step_n`
+
+Removing duplicates produced by:
+
+```{r}
+duplicating_group <- 
+  duplicating_variables %>% 
+  filter(group == duplicating_groups[step_n])
+duplicating_group
+```
+
+Reviewing duplicates.
+
+```{r}
+dupe_02 <- 
+  dupe_01 %>% 
+  select(params$unique_identifier_1,all_of(duplicating_group %>% pull(variable))) %>% 
+  distinct() %>% 
+  get_dupes(params$unique_identifier_1)
+
+dupe_02
+```
+
+Count types.
+
+```{r}
+prep_base %>% 
+  count(hiring_subelement_name)
+```
+
+Many blank entries and a level of detail we don't need. We will drop this column.  
+
+```{r}
+step_n <- step_n + 1
+```
+
+#### Step `r step_n`
+
+Removing duplicates produced by:
+
+```{r}
+duplicating_group <- 
+  duplicating_variables %>% 
+  filter(group == duplicating_groups[step_n])
+duplicating_group
+```
+
+Reviewing duplicates.
+
+```{r}
+dupe_02 <- 
+  dupe_01 %>% 
+  select(params$unique_identifier_1,all_of(duplicating_group %>% pull(variable))) %>% 
+  distinct() %>% 
+  get_dupes(params$unique_identifier_1)
+
+dupe_02
+```
+
+Appears like this comes from posting the job again with revised salary information. 
+
+Like above we decide to retain the later dates as determined by the close date.
+
+```{r}
+dedupe <- 
+  dupe_01 %>% 
+  select(params$unique_identifier_1,all_of(duplicating_group %>% pull(variable)),position_close_date) %>%
+  arrange(params$unique_identifier_1, position_close_date) %>% 
+  group_by(usajobs_control_number) %>% 
+  summarise(
+    across(
+      .cols = all_of(duplicating_group %>% pull(variable)),
+      .fns = last
+    )
+  )
+ 
+
+dedupe %>% 
+  get_dupes(params$unique_identifier_1)
+```
+
+Creating a deduplicated dataframe of `r params$unique_identifier_1` and `r duplicating_groups[step_n]`.
+
+First create a dataframe of distinct rows of the variables from the original data. 
+
+```{r}
+working_01 <- 
+  prep_base %>% 
+  select(params$unique_identifier_1,all_of(duplicating_group %>% pull(variable))) %>% 
+  distinct()
+
+working_01 %>% 
+  glimpse()
+
+working_01 %>% 
+  skim()
+```
+
+Next remove rows that dataframe that were found to be duplicated and save that as a new dataframe. 
+
+```{r}
+working_02 <- 
+  working_01 %>% 
+  anti_join(dedupe %>% select(params$unique_identifier_1))
+
+working_02 %>% 
+  glimpse()
+
+working_02 %>% 
+  skim()
+```
+
+Last bind this dataframe to the deduplicated set above.
+
+```{r}
+prep_xx <- 
+  working_02 %>% 
+  bind_rows(dedupe)
+
+prep_xx %>% 
+  glimpse()
+
+prep_xx %>% 
+  skim()
+```
+
+Count rows.
+
+```{r}
+prep_xx %>% 
+  count()
+```
+
+Do the number of in this dataframe match the number of unique identifiers?
+
+```{r}
+prep_xx %>% 
+  count() %>% 
+  pull() ==
+  prep_uniq %>% 
+  count() %>% 
+  pull()
+```
+
+Rename dataframe
+
+```{r}
+prep_11 <- prep_xx
+```
+
+
+```{r}
+step_n <- step_n + 1
+```
+
+
+#### Step `r step_n`
+
+Removing duplicates produced by:
+
+```{r}
+duplicating_group <- 
+  duplicating_variables %>% 
+  filter(group == duplicating_groups[step_n])
+duplicating_group
+```
+
+Reviewing duplicates.
+
+```{r}
+dupe_02 <- 
+  dupe_01 %>% 
+  select(params$unique_identifier_1,all_of(duplicating_group %>% pull(variable))) %>% 
+  distinct() %>% 
+  get_dupes(params$unique_identifier_1)
+
+dupe_02
+```
+Count types.
+
+```{r}
+prep_base %>% 
+  count(series, series_title)
+```
+
+Many different titles and series.
+
+Check if the series numbers are duplicated.
+
+```{r}
+prep_base %>% 
+  count(series, series_title) %>% 
+  ungroup() %>% 
+  get_dupes(series)
+```
+
+None. 
+
+Now the titles. 
+
+```{r}
+prep_base %>% 
+  count(series, series_title) %>% 
+  ungroup() %>% 
+  get_dupes(series_title)
+```
+
+None.
+
+Since the `series` adds no information and is uniquely matched to the titles, we will drop `series`.
+
+There are too many series to want indicators, we'll use the last closing date to select the appropriate series. 
+
+Like above we decide to retain the later dates as determined by the close date.
+
+```{r}
+dedupe <- 
+  dupe_01 %>% 
+  select(params$unique_identifier_1,all_of(duplicating_group %>% pull(variable)),position_close_date) %>%
+  arrange(params$unique_identifier_1, position_close_date) %>% 
+  group_by(usajobs_control_number) %>% 
+  summarise(
+    across(
+      .cols = all_of(duplicating_group %>% pull(variable)),
+      .fns = last
+    )
+  )
+ 
+
+dedupe %>% 
+  get_dupes(params$unique_identifier_1)
+```
+
+Creating a deduplicated dataframe of `r params$unique_identifier_1` and `r duplicating_groups[step_n]`.
+
+First create a dataframe of distinct rows of the variables from the original data. 
+
+```{r}
+working_01 <- 
+  prep_base %>% 
+  select(params$unique_identifier_1,all_of(duplicating_group %>% pull(variable))) %>% 
+  distinct()
+
+working_01 %>% 
+  glimpse()
+
+working_01 %>% 
+  skim()
+```
+
+Next remove rows that dataframe that were found to be duplicated and save that as a new dataframe. 
+
+```{r}
+working_02 <- 
+  working_01 %>% 
+  anti_join(dedupe %>% select(params$unique_identifier_1))
+
+working_02 %>% 
+  glimpse()
+
+working_02 %>% 
+  skim()
+```
+
+Last bind this dataframe to the deduplicated set above.
+
+```{r}
+prep_xx <- 
+  working_02 %>% 
+  bind_rows(dedupe) %>% 
+  select(-series)
+
+prep_xx %>% 
+  glimpse()
+
+prep_xx %>% 
+  skim()
+```
+
+Count rows.
+
+```{r}
+prep_xx %>% 
+  count()
+```
+
+Do the number of in this dataframe match the number of unique identifiers?
+
+```{r}
+prep_xx %>% 
+  count() %>% 
+  pull() ==
+  prep_uniq %>% 
+  count() %>% 
+  pull()
+```
+
+Rename dataframe
+
+```{r}
+prep_12 <- prep_xx
+```
+
+
+```{r}
+step_n <- step_n + 1
+```
+
+#### Step `r step_n`
+
+Removing duplicates produced by:
+
+```{r}
+duplicating_group <- 
+  duplicating_variables %>% 
+  filter(group == duplicating_groups[step_n])
+duplicating_group
+```
+
+Reviewing duplicates.
+
+```{r}
+dupe_02 <- 
+  dupe_01 %>% 
+  select(params$unique_identifier_1,all_of(duplicating_group %>% pull(variable))) %>% 
+  distinct() %>% 
+  get_dupes(params$unique_identifier_1)
+
+dupe_02
+```
+
+Not too many duplicates. We'll follow the same procedure, taking the number from the row wiht the later closing date. 
+
+Like above we decide to retain the later dates as determined by the close date.
+
+```{r}
+dedupe <- 
+  dupe_01 %>% 
+  select(params$unique_identifier_1,all_of(duplicating_group %>% pull(variable)),position_close_date) %>%
+  arrange(params$unique_identifier_1, position_close_date) %>% 
+  group_by(usajobs_control_number) %>% 
+  summarise(
+    across(
+      .cols = all_of(duplicating_group %>% pull(variable)),
+      .fns = last
+    )
+  )
+ 
+
+dedupe %>% 
+  get_dupes(params$unique_identifier_1)
+```
+
+Creating a deduplicated dataframe of `r params$unique_identifier_1` and `r duplicating_groups[step_n]`.
+
+First create a dataframe of distinct rows of the variables from the original data. 
+
+```{r}
+working_01 <- 
+  prep_base %>% 
+  select(params$unique_identifier_1,all_of(duplicating_group %>% pull(variable))) %>% 
+  distinct()
+
+working_01 %>% 
+  glimpse()
+
+working_01 %>% 
+  skim()
+```
+
+Next remove rows that dataframe that were found to be duplicated and save that as a new dataframe. 
+
+```{r}
+working_02 <- 
+  working_01 %>% 
+  anti_join(dedupe %>% select(params$unique_identifier_1))
+
+working_02 %>% 
+  glimpse()
+
+working_02 %>% 
+  skim()
+```
+
+Last bind this dataframe to the deduplicated set above.
+
+```{r}
+prep_xx <- 
+  working_02 %>% 
+  bind_rows(dedupe)
+
+prep_xx %>% 
+  glimpse()
+
+prep_xx %>% 
+  skim()
+```
+
+Count rows.
+
+```{r}
+prep_xx %>% 
+  count()
+```
+
+Do the number of in this dataframe match the number of unique identifiers?
+
+```{r}
+prep_xx %>% 
+  count() %>% 
+  pull() ==
+  prep_uniq %>% 
+  count() %>% 
+  pull()
+```
+
+Rename dataframe
+
+```{r}
+prep_13 <- prep_xx
+```
+
+
+```{r}
+step_n <- step_n + 1
+```
+
+#### Step `r step_n`
+
+Removing duplicates produced by:
+
+```{r}
+duplicating_group <- 
+  duplicating_variables %>% 
+  filter(group == duplicating_groups[step_n])
+duplicating_group
+```
+
+Reviewing duplicates.
+
+```{r}
+dupe_02 <- 
+  dupe_01 %>% 
+  select(params$unique_identifier_1,all_of(duplicating_group %>% pull(variable))) %>% 
+  distinct() %>% 
+  get_dupes(params$unique_identifier_1)
+
+dupe_02
+```
+
+Not too many duplicates.
+
+
+Like above we decide to retain the later dates as determined by the close date.
+
+```{r}
+dedupe <- 
+  dupe_01 %>% 
+  select(params$unique_identifier_1,all_of(duplicating_group %>% pull(variable)),position_close_date) %>%
+  arrange(params$unique_identifier_1, position_close_date) %>% 
+  group_by(usajobs_control_number) %>% 
+  summarise(
+    across(
+      .cols = all_of(duplicating_group %>% pull(variable)),
+      .fns = last
+    )
+  )
+ 
+
+dedupe %>% 
+  get_dupes(params$unique_identifier_1)
+```
+
+Creating a deduplicated dataframe of `r params$unique_identifier_1` and `r duplicating_groups[step_n]`.
+
+First create a dataframe of distinct rows of the variables from the original data. 
+
+```{r}
+working_01 <- 
+  prep_base %>% 
+  select(params$unique_identifier_1,all_of(duplicating_group %>% pull(variable))) %>% 
+  distinct()
+
+working_01 %>% 
+  glimpse()
+
+working_01 %>% 
+  skim()
+```
+
+Next remove rows that dataframe that were found to be duplicated and save that as a new dataframe. 
+
+```{r}
+working_02 <- 
+  working_01 %>% 
+  anti_join(dedupe %>% select(params$unique_identifier_1))
+
+working_02 %>% 
+  glimpse()
+
+working_02 %>% 
+  skim()
+```
+
+Last bind this dataframe to the deduplicated set above.
+
+```{r}
+prep_xx <- 
+  working_02 %>% 
+  bind_rows(dedupe)
+
+prep_xx %>% 
+  glimpse()
+
+prep_xx %>% 
+  skim()
+```
+
+Count rows.
+
+```{r}
+prep_xx %>% 
+  count()
+```
+
+Do the number of in this dataframe match the number of unique identifiers?
+
+```{r}
+prep_xx %>% 
+  count() %>% 
+  pull() ==
+  prep_uniq %>% 
+  count() %>% 
+  pull()
+```
+
+Rename dataframe
+
+```{r}
+prep_14 <- prep_xx
+```
+
+
+```{r}
+step_n <- step_n + 1
+```
+
+#### Step `r step_n`
+
+Removing duplicates produced by:
+
+```{r}
+duplicating_group <- 
+  duplicating_variables %>% 
+  filter(group == duplicating_groups[step_n])
+duplicating_group
+```
+
+No more deplicated columns!!
+
+### Combinding deduplicated data
+
+#### Created dataframe on non-duplicating columns
+
+Collect column names of variables not creating duplicates.
+
+```{r}
+non_duplicating_variables <- 
+  column_meta_data %>% 
+  filter(!duplicates_by_variable) %>% 
+  pull(variable)
+
+non_duplicating_variables
+```
+
+Create dataframe of only these variables.
+
+```{r}
+prep_xx <- 
+  prep_base %>% 
+  select(any_of(non_duplicating_variables)) %>% 
+  distinct()
+
+prep_xx %>% 
+  glimpse()
+
+prep_xx %>% 
+  skim()
+```
+
+Count rows.
+
+```{r}
+prep_xx %>% 
+  count()
+```
+
+Do the number of in this dataframe match the number of unique identifiers?
+
+```{r}
+prep_xx %>% 
+  count() %>% 
+  pull() ==
+  prep_uniq %>% 
+  count() %>% 
+  pull()
+```
+
+Rename dataframe.
+
+```{r}
+prep_11 <- prep_xx
+```
+
+#### Join all deduplicated dataframes
+
+```{r}
+prep_xx <- 
+  ls(envir=.GlobalEnv) %>% 
+  as_tibble() %>% 
+  filter(str_detect(value, "prep_[0-9]")) %>% 
+  pull() %>% 
+  mget(envir=.GlobalEnv) %>% 
+  reduce(full_join)
+
+prep_xx %>% 
+  glimpse()
+
+prep_xx %>% 
+  skim()
+```
+
+Count rows.
+
+```{r}
+prep_xx %>% 
+  count()
+```
+
+Do the number of in this dataframe match the number of unique identifiers?
+
+```{r}
+prep_xx %>% 
+  count() %>% 
+  pull() ==
+  prep_uniq %>% 
+  count() %>% 
+  pull()
+```
+
+Rename dataframe.
+
+```{r}
+prep_dedup <- prep_xx
+```
+
+### Checking duplicating columns have been fixed
+
+Created a dataframe of variable metadata
+
+```{r}
+column_meta_data_dedupe <- 
+  prep_dedup %>% 
+  contents()
+
+column_meta_data_dedupe <- 
+  column_meta_data_dedupe$contents %>% 
+  as.data.frame()
+
+column_meta_data_dedupe <-
+  column_meta_data_dedupe %>% 
+  rownames_to_column(var = "variable")
+
+column_meta_data_dedupe
+```
+
+Checking duplicates for each variable in the dataframe.
+
+```{r}
+duplicates_by_variable <- 
+  column_meta_data_dedupe %>% 
+  pull(variable) %>% 
+  map_lgl(~dupe_check(in_data = prep_dedup, .))
+
+duplicates_by_variable
+```
+
+Add this to the column_meta_data dataframe. 
+
+```{r}
+column_meta_data_dedupe <- 
+  column_meta_data_dedupe %>% 
+  add_column(
+    duplicates_by_variable = duplicates_by_variable
+  )
+
+column_meta_data_dedupe
+```
+
+Create dataframe of only variables that cause duplicates.
+
+```{r}
+duplicating_variables <- 
+  column_meta_data_dedupe %>% 
+  filter(duplicates_by_variable)
+
+duplicating_variables
+```
+
+## Addressing blanks
+
+Created a dataframe of variable metadata for deduplicated data
+
+```{r}
+column_meta_data_dedupe <- 
+  prep_dedup %>% 
+  contents()
+
+column_meta_data_dedupe <- 
+  column_meta_data_dedupe$contents %>% 
+  as.data.frame()
+
+column_meta_data_dedupe <-
+  column_meta_data_dedupe %>% 
+  rownames_to_column(var = "variable")
+
+column_meta_data_dedupe
+```
+
+Function that checks whether there are duplicates for different variables
+
+```{r}
+blank_check <- function(in_data,in_variable_name)
+{
+  check_01 <- 
+  in_data %>% 
+    filter(!!sym(in_variable_name) == "") %>% 
+  distinct()
+
+out <- nrow(check_01) > 0 
+
+return(out)
+}
+```
+
+Checking duplicates for each variable in the dataframe.
+
+```{r}
+blanks_by_variable <- 
+  column_meta_data_dedupe %>% 
+  pull(variable) %>% 
+  map_lgl(~blank_check(in_data = prep_dedup,.))
+
+blanks_by_variable
+```
+
+Add this to the `column_meta_data_dedupe` dataframe. 
+
+```{r}
+column_meta_data_dedupe <- 
+  column_meta_data_dedupe %>% 
+  add_column(
+    blanks_by_variable = blanks_by_variable
+  )
+
+column_meta_data_dedupe
+```
+
+Create dataframe of only variables that have blanks. 
+
+```{r}
+blanking_variables <- 
+  column_meta_data_dedupe %>% 
+  filter(blanks_by_variable)
+
+blanking_variables
+```
+
+Grouping variables.
+
+```{r}
+blanking_variables <- 
+  blanking_variables %>% 
+  mutate(group = 
+           case_when(variable == "position_open_date" ~ "dates",
+                     variable == "position_close_date" ~ "dates",
+                     variable == "announcement_closing_type" ~ "announcement_closing_type",
+                     variable == "announcement_closing_type_description" ~ "announcement_closing_type",
+                     variable == "application_limit" ~ "application_limit",
+                     variable == "application_limit_set" ~ "application_limit",
+                     variable == "agency_level" ~ "agency_level",
+                     variable == "agency_level_sort" ~ "agency_level",
+                     variable == "hiring_agency_code" ~ "agency_level",
+                     variable == "hiring_agency_name" ~ "agency_level",
+                     variable == "hiring_department_code" ~ "agency_level",
+                     variable == "hiring_department_name" ~ "agency_level",
+                     variable == "maximum_salary" ~ "maximum_salary",
+                     variable == "minimum_salary" ~ "maximum_salary",
+                     variable == "maximum_grade" ~ "maximum_salary",
+                     variable == "minimum_grade" ~ "maximum_salary",
+                     variable == "series" ~ "series",
+                     variable == "series_title" ~ "series",
+                     TRUE ~ variable
+                     ))
+
+blanking_variables
+```
+
+Create list of groups.
+
+```{r}
+blanking_groups <- 
+  blanking_variables %>% 
+  select(group) %>% 
+  distinct() %>% 
+  pull()
+
+blanking_groups
+```
+
+### Blanks removal
+
+```{r}
+step_n <- 0
+```
+
+```{r}
+step_n <- step_n + 1
+```
+
+#### Step `r step_n`
+
+Removing blanks produced by:
+
+```{r}
+blanking_variable <- 
+  blanking_variables %>% 
+  filter(group == blanking_groups[step_n])
+
+blanking_variable
+```
+
+Reviewing blanks.
+
+```{r}
+blanks_01 <- 
+  prep_dedup %>% 
+  filter(if_any(all_of(blanking_variable %>% pull(variable)),  ~.x == "")) %>% 
+  select(all_of(blanking_variable %>% pull(variable)),everything())
+
+blanks_01
+```
+
+Blanks appear to be caused by a few columns:
+
+1.    `hiring_agency_code` appears to be blank for agencies that don't fall into departments
+2.    `hiring_agency_name` appears to be blank for the Air Force
+
+Let's count the extent of the issues.
+
+```{r}
+blanking_variable %>% 
+  pull(variable) %>% 
+  map(
+    ~blanks_01 %>% 
+  count(!!sym(.x)) %>% 
+  arrange(desc(n)) %>% 
+    filter(!!sym(.x) == "")
+  )
+```
+
+A lot of blanks in `hiring_agency_code`, some in `hiring_agency_name`, and very few in `hiring_department_name`.
+
+Let's test filling blanks in `hiring_agency_name` with `hiring_department_name`.
+
+```{r}
+blanks_02 <- 
+  blanks_01 %>% 
+    select(starts_with("hiring_agency_"),starts_with("hiring_department_name"),everything()) %>%
+  mutate(
+    hiring_agency_name = case_when(
+      hiring_agency_name == "" & !is.na(hiring_department_name) ~ hiring_department_name,
+      TRUE ~ hiring_agency_name
+      ),
+    ) 
+```
+
+Reviewing blanks.
+
+```{r}
+  blanks_02 %>% 
+  filter(if_any(all_of(blanking_variable %>% pull(variable)),  ~.x == "")) %>% 
+  select(all_of(blanking_variable %>% pull(variable)),everything())
+```
+
+Reduced a lot.
+
+Let's count the extent of the issues.
+
+```{r}
+blanking_variable %>% 
+  pull(variable) %>% 
+  map(
+    ~blanks_02 %>% 
+  count(!!sym(.x)) %>% 
+  arrange(desc(n)) %>% 
+    filter(!!sym(.x) == "")
+  )
+```
+
+All the `hiring_agency_name` are gone. 
+
+Let's look into the issues with `hiring_department_name`.
+
+```{r}
+blanks_02 %>%
+  filter(hiring_department_name == "")
+```
+
+Let's check what `hiring_department_name` this `hiring_agency_name` has in the larger data.
+
+```{r}
+prep_dedup %>% 
+  filter(hiring_agency_name == "Public Defender Service for the District of Columbia") %>% 
+  count(hiring_agency_name,hiring_department_name)
+```
+
+This suggests we should replace `hiring_department_name` this `hiring_agency_name`.
+
+Let's do both steps.
+
+```{r}
+blanks_03 <- 
+  blanks_01 %>% 
+    select(starts_with("hiring_agency_"),starts_with("hiring_department_name"),everything()) %>%
+  mutate(
+    hiring_agency_name = case_when(
+      hiring_agency_name == "" & !is.na(hiring_department_name) ~ hiring_department_name,
+      TRUE ~ hiring_agency_name
+      ),
+    hiring_department_name = case_when(
+      hiring_department_name == "" & !is.na(hiring_agency_name) ~ hiring_agency_name,
+      TRUE ~ hiring_department_name
+      ),
+    ) 
+```
+
+Reviewing blanks.
+
+```{r}
+  blanks_03 %>% 
+  filter(if_any(all_of(blanking_variable %>% pull(variable)),  ~.x == "")) %>% 
+  select(all_of(blanking_variable %>% pull(variable)),everything())
+```
+
+Reduced a lot.
+
+Let's count the extent of the issues.
+
+```{r}
+blanking_variable %>% 
+  pull(variable) %>% 
+  map(
+    ~blanks_03 %>% 
+  count(!!sym(.x)) %>% 
+  arrange(desc(n)) %>% 
+    filter(!!sym(.x) == "")
+  )
+```
+
+Still have many issues with the `hiring_agency_code`. `hiring_agency_name` appears to have all of the important information and is more complete. So we will drop `hiring_agency_code`.
+
+Now apply the steps above to the larger dataframe.
+
+```{r}
+prep_xx <- 
+  prep_dedup %>% 
+  mutate(
+    hiring_agency_name = case_when(
+      hiring_agency_name == "" & !is.na(hiring_department_name) ~ hiring_department_name,
+      TRUE ~ hiring_agency_name
+      ),
+    hiring_department_name = case_when(
+      hiring_department_name == "" & !is.na(hiring_agency_name) ~ hiring_agency_name,
+      TRUE ~ hiring_department_name
+      ),
+    ) %>% 
+  select(-hiring_agency_code)
+```
+
+Check for blanks.
+
+```{r}
+prep_xx %>% 
+  filter(if_any(all_of(blanking_variable %>% filter(variable != 'hiring_agency_code') %>%  pull(variable)),  ~.x == ""))
+```
+
+Rename dataframe
+
+```{r}
+prep_blank <- prep_xx
+```
+
+
+```{r}
+step_n <- step_n + 1
+```
+
+#### Step `r step_n`
+
+Removing blanks produced by:
+
+```{r}
+blanking_variable <- 
+  blanking_variables %>% 
+  filter(group == blanking_groups[step_n])
+
+blanking_variable
+```
+
+Reviewing blanks.
+
+```{r}
+blanks_01 <- 
+  prep_dedup %>% 
+  filter(if_any(all_of(blanking_variable %>% pull(variable)),  ~.x == "")) %>% 
+  select(all_of(blanking_variable %>% pull(variable)),everything())
+
+blanks_01
+```
+
+Looks like `who_may_apply` is just blank. 
+
+Let's count the extent of the issues.
+
+```{r}
+blanking_variable %>% 
+  pull(variable) %>% 
+  map(
+    ~blanks_01 %>% 
+  count(!!sym(.x)) %>% 
+  arrange(desc(n)) %>% 
+    filter(!!sym(.x) == "")
+  )
+```
+
+They are all blank. We will drop the `who_may_apply` column.
+
+```{r}
+prep_xx <- 
+  prep_blank %>% 
+  select(-who_may_apply)
+```
+
+
+Rename dataframe
+
+```{r}
+prep_blank <- prep_xx
+```
+
+
+```{r}
+step_n <- step_n + 1
+```
+
+### Check that blanks are removed
+
+Created a dataframe of variable metadata for deduplicated data
+
+```{r}
+column_meta_data_blank <- 
+  prep_blank %>% 
+  contents()
+
+column_meta_data_blank <- 
+  column_meta_data_blank$contents %>% 
+  as.data.frame()
+
+column_meta_data_blank <-
+  column_meta_data_blank %>% 
+  rownames_to_column(var = "variable")
+
+column_meta_data_blank
+```
+
+Checking duplicates for each variable in the dataframe.
+
+```{r}
+blanks_by_variable <- 
+  column_meta_data_blank %>% 
+  pull(variable) %>% 
+  map_lgl(~blank_check(in_data = prep_blank,.))
+
+blanks_by_variable
+```
+
+Add this to the `column_meta_data_dedupe` dataframe. 
+
+```{r}
+column_meta_data_blank <- 
+  column_meta_data_blank %>% 
+  add_column(
+    blanks_by_variable = blanks_by_variable
+  )
+
+column_meta_data_blank
+```
+
+Create dataframe of only variables that have blanks. 
+
+```{r}
+blanking_variables <- 
+  column_meta_data_blank %>% 
+  filter(blanks_by_variable)
+
+blanking_variables
+```
+
+## Addressing nulls
+
+Created a dataframe of variable metadata for blanks data
+
+```{r}
+column_meta_data_null <- 
+  prep_blank %>% 
+  contents()
+
+column_meta_data_null <- 
+  column_meta_data_null$contents %>% 
+  as.data.frame()
+
+column_meta_data_null <-
+  column_meta_data_null %>% 
+  rownames_to_column(var = "variable")
+
+column_meta_data_null
+```
+
+Function that checks whether there are duplicates for different variables
+
+```{r}
+null_check <- function(in_data,in_variable_name)
+{
+  check_01 <- 
+  in_data %>% 
+    filter(is.na(!!sym(in_variable_name))) %>% 
+  distinct()
+
+out <- nrow(check_01) > 0 
+
+return(out)
+}
+```
+
+Checking duplicates for each variable in the dataframe.
+
+```{r}
+nulls_by_variable <- 
+  column_meta_data_null %>% 
+  pull(variable) %>% 
+  map_lgl(~null_check(in_data = prep_dedup,.))
+
+nulls_by_variable
+```
+
+Add this to the `column_meta_data_null` dataframe. 
+
+```{r}
+column_meta_data_null <- 
+  column_meta_data_null %>% 
+  add_column(
+    nulls_by_variable = nulls_by_variable
+  )
+
+column_meta_data_null
+```
+
+Create dataframe of only variables that have blanks. 
+
+```{r}
+null_variables <- 
+  column_meta_data_null %>% 
+  filter(nulls_by_variable)
+
+null_variables
+```
+
+Grouping variables.
+
+```{r}
+null_variables <- 
+  null_variables %>% 
+  mutate(group = 
+           case_when(variable == "position_open_date" ~ "dates",
+                     variable == "position_close_date" ~ "dates",
+                     variable == "announcement_closing_type" ~ "announcement_closing_type",
+                     variable == "announcement_closing_type_description" ~ "announcement_closing_type",
+                     variable == "application_limit" ~ "application_limit",
+                     variable == "application_limit_set" ~ "application_limit",
+                     variable == "agency_level" ~ "agency_level",
+                     variable == "agency_level_sort" ~ "agency_level",
+                     variable == "hiring_agency_code" ~ "agency_level",
+                     variable == "hiring_agency_name" ~ "agency_level",
+                     variable == "hiring_department_code" ~ "agency_level",
+                     variable == "hiring_department_name" ~ "agency_level",
+                     variable == "maximum_salary" ~ "maximum_salary",
+                     variable == "minimum_salary" ~ "maximum_salary",
+                     variable == "maximum_grade" ~ "maximum_salary",
+                     variable == "minimum_grade" ~ "maximum_salary",
+                     variable == "series" ~ "series",
+                     variable == "series_title" ~ "series",
+                     TRUE ~ variable
+                     ))
+
+null_variables
+```
+
+Create list of groups.
+
+```{r}
+null_groups <- 
+  null_variables %>% 
+  select(group) %>% 
+  distinct() %>% 
+  pull()
+
+null_groups
+```
+
+### Nulls removal
+
+```{r}
+step_n <- 0
+```
+
+```{r}
+step_n <- step_n + 1
+```
+
+#### Step `r step_n`
+
+Removing nulls produced by:
+
+```{r}
+null_variable <- 
+  null_variables %>% 
+  filter(group == null_groups[step_n])
+
+null_variable
+```
+
+Reviewing blanks.
+
+```{r}
+null_01 <- 
+  prep_blank %>% 
+  filter(if_any(all_of(null_variable %>% pull(variable)),  ~is.na(.x))) %>% 
+  select(all_of(null_variable %>% pull(variable)),everything())
+
+null_01
+```
+
+Looks like the `hiring_department_code` is null for some rows. 
+
+Let's count the extent of the issues.
+
+```{r}
+null_variable %>% 
+  pull(variable) %>% 
+  map(
+    ~null_01 %>% 
+  count(!!sym(.x)) %>% 
+  arrange(desc(n)) %>% 
+    filter(is.na(!!sym(.x)))
+  )
+```
+
+Let's see how the hiring codes look in comparison to the department names. 
+
+```{r}
+prep_blank %>% 
+  count(hiring_department_code,hiring_department_name)
+```
+
+There are a lot of nulls, and 0s. 
+
+Check for any duplications in the codes. 
+
+```{r}
+prep_blank %>% 
+  count(hiring_department_code,hiring_department_name) %>% 
+  get_dupes(hiring_department_code)
+```
+
+Lots of 0, nulls, and 5s. 
+
+The department name appears more complete. We will drop `hiring_department_code`.
+
+```{r}
+prep_xx <- 
+  prep_blank %>% 
+  select(-hiring_department_code)
+```
+
+
+Rename dataframe
+
+```{r}
+prep_null <- prep_xx
+```
+
+```{r}
+step_n <- step_n + 1
+```
+
+#### Step `r step_n`
+
+Removing nulls produced by:
+
+```{r}
+null_variable <- 
+  null_variables %>% 
+  filter(group == null_groups[step_n])
+
+null_variable
+```
+
+Reviewing blanks.
+
+```{r}
+null_01 <- 
+  prep_blank %>% 
+  filter(if_any(all_of(null_variable %>% pull(variable)),  ~is.na(.x))) %>% 
+  select(all_of(null_variable %>% pull(variable)),everything())
+
+null_01
+```
+
+Looks like the `telework_eligibility_description` is null. 
+
+Let's count the extent of the issues.
+
+```{r}
+null_variable %>% 
+  pull(variable) %>% 
+  map(
+    ~null_01 %>% 
+  count(!!sym(.x)) %>% 
+  arrange(desc(n)) %>% 
+    filter(is.na(!!sym(.x)))
+  )
+```
+
+The whole column is null. We should drop. 
+
+```{r}
+prep_xx <- 
+  prep_null %>% 
+  select(-telework_eligibility_description)
+```
+
+Rename dataframe
+
+```{r}
+prep_null <- prep_xx
+```
+
+```{r}
+step_n <- step_n + 1
+```
+
+#### Step `r step_n`
+
+Removing nulls produced by:
+
+```{r}
+null_variable <- 
+  null_variables %>% 
+  filter(group == null_groups[step_n])
+
+null_variable
+```
+
+Reviewing blanks.
+
+```{r}
+null_01 <- 
+  prep_blank %>% 
+  filter(if_any(all_of(null_variable %>% pull(variable)),  ~is.na(.x))) %>% 
+  select(all_of(null_variable %>% pull(variable)),everything())
+
+null_01
+```
+
+Looks like the `second_announcement` is null. 
+
+Let's count the extent of the issues.
+
+```{r}
+null_variable %>% 
+  pull(variable) %>% 
+  map(
+    ~null_01 %>% 
+  count(!!sym(.x)) %>% 
+  arrange(desc(n)) %>% 
+    filter(is.na(!!sym(.x)))
+  )
+```
+
+The whole column is null. We should drop. 
+
+```{r}
+prep_xx <- 
+  prep_null %>% 
+  select(-second_announcement)
+```
+
+Rename dataframe
+
+```{r}
+prep_null <- prep_xx
+```
+
+```{r}
+step_n <- step_n + 1
+```
+
+#### Step `r step_n`
+
+Removing nulls produced by:
+
+```{r}
+null_variable <- 
+  null_variables %>% 
+  filter(group == null_groups[step_n])
+
+null_variable
+```
+
+Reviewing blanks.
+
+```{r}
+null_01 <- 
+  prep_blank %>% 
+  filter(if_any(all_of(null_variable %>% pull(variable)),  ~is.na(.x))) %>% 
+  select(all_of(null_variable %>% pull(variable)),everything())
+
+null_01
+```
+
+Looks like the `pay_scale` is null. 
+
+Let's count the extent of the issues.
+
+```{r}
+null_variable %>% 
+  pull(variable) %>% 
+  map(
+    ~null_01 %>% 
+  count(!!sym(.x)) %>% 
+  arrange(desc(n)) %>% 
+    filter(is.na(!!sym(.x)))
+  )
+```
+
+Let's see how the `pay_scale` look in comparison to the `pay_scale_description`. 
+
+```{r}
+prep_blank %>% 
+  count(pay_scale,pay_scale_description)
+```
+
+Looks like the NAs in `pay_scale` are "Nonappropriated Funds--Nonsupervisory And Nonleader--Federal Wage System." We'll retain `pay_scale_description`and drop `pay_scale`.
+
+```{r}
+prep_xx <- 
+  prep_null %>% 
+  select(-pay_scale)
+```
+
+Rename dataframe
+
+```{r}
+prep_null <- prep_xx
+```
+
+```{r}
+step_n <- step_n + 1
+```
+
+### Check that nulls are removed
+
+Created a dataframe of variable metadata for blanks data
+
+```{r}
+column_meta_data_null <- 
+  prep_null %>% 
+  contents()
+
+column_meta_data_null <- 
+  column_meta_data_null$contents %>% 
+  as.data.frame()
+
+column_meta_data_null <-
+  column_meta_data_null %>% 
+  rownames_to_column(var = "variable")
+
+column_meta_data_null
+```
+
+Checking duplicates for each variable in the dataframe.
+
+```{r}
+nulls_by_variable <- 
+  column_meta_data_null %>% 
+  pull(variable) %>% 
+  map_lgl(~null_check(in_data = prep_null,.))
+
+nulls_by_variable
+```
+
+Add this to the `column_meta_data_null` dataframe. 
+
+```{r}
+column_meta_data_null <- 
+  column_meta_data_null %>% 
+  add_column(
+    nulls_by_variable = nulls_by_variable
+  )
+
+column_meta_data_null
+```
+
+Create dataframe of only variables that have blanks. 
+
+```{r}
+null_variables <- 
+  column_meta_data_null %>% 
+  filter(nulls_by_variable)
+
+null_variables
+```
+
+## Other data cleaning
+
+Review the data.
+
+```{r}
+prep_null %>% 
+  skim()
+```
+
+Only two variables stand out: `telework_eligible` and `supervisory_status`. 
+
+First count them.
+
+```{r}
+prep_null %>% 
+  count(telework_eligible,supervisory_status)
+```
+
+No positions appear to be telework eligible, which is wrong. 
+
+<!-- Talk to Melissa about this. -->
+
+For supervisory status, it's preferable to transform this into an indicator.
+
+```{r}
+prep_xx <- 
+  prep_null %>% 
+  character_to_indicator(params$unique_identifier_1,supervisory_status,"supervisory_status") %>% 
+  select(-supervisory_status_n)
+
+prep_xx %>% 
+  glimpse()
+
+prep_xx %>% 
+  skim()
+```
+
+
+Count rows.
+
+```{r}
+prep_xx %>% 
+  count()
+```
+
+Do the number of in this dataframe match the number of unique identifiers?
+
+```{r}
+prep_xx %>% 
+  count() %>% 
+  pull() ==
+  prep_uniq %>% 
+  count() %>% 
+  pull()
+```
+
+Rename dataframe.
+
+```{r}
+prep_12 <- prep_xx
+```
+
+## Creating final data set
+
+Remove `supervisory_status` and attach `supervisory_status_y` the new data
+
+```{r}
+prep_xx <- 
+  prep_null %>% 
+  select(-supervisory_status) %>% 
+  left_join(prep_12)
+
+prep_xx %>% 
+  glimpse()
+
+prep_xx %>% 
+  skim()
+```
+
+
+Count rows.
+
+```{r}
+prep_xx %>% 
+  count()
+```
+
+Do the number of in this dataframe match the number of unique identifiers?
+
+```{r}
+prep_xx %>% 
+  count() %>% 
+  pull() ==
+  prep_uniq %>% 
+  count() %>% 
+  pull()
+```
+
+Rename dataframe.
+
+```{r}
+joas <- prep_xx
+```
+
+
+## Save data {.tabset .tabset-pills}
+
+```{r}
+save(joas, 
+     file = here::here("03. Data Collection",
+                       "prepared-data",
+                       glue::glue("joas-{today()}.rdata")))
+```
+
+## Extraction time {.tabset .tabset-pills}
+
+```{r}
+tictoc::toc()
+```
+
