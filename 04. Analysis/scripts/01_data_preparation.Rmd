@@ -181,6 +181,8 @@ duplicating_variables <-
   mutate(group = 
            case_when(variable == "short_id" ~ "short_id",
                      variable == "dept_id" ~ "short_id",
+                     variable == "supervisor_name" ~ "short_id",
+                     variable == "location" ~ "short_id",
                     TRUE ~ variable
                      ))
 
@@ -253,7 +255,6 @@ prep_xx %>%
   skim()
 ```
 
-
 Count rows.
 
 ```{r}
@@ -299,10 +300,10 @@ Reviewing duplicates.
 dupe_01 %>% 
   select(params$unique_identifier_1,all_of(duplicating_group %>% pull(variable))) %>% 
   distinct() %>% 
-  get_dupes(params$unique_identifier_1) %>% view()
+  get_dupes(params$unique_identifier_1)
 ```
 
-Quite a few duplicates here.
+Quite a few duplicates here and they are associated with supervisor and location.
 
 First count `short_id` and `dept_id` across the original data.
 
@@ -327,10 +328,112 @@ Too many options to create useful indicators.
 For lack better option, we'll select the rows with shorter ids.
 
 ```{r}
+dedupe <- 
+  dupe_01 %>% 
+  select(params$unique_identifier_1,all_of(duplicating_group %>% pull(variable))) %>% 
+  distinct() %>% 
+  arrange(!!!params$unique_identifier_1,length(short_id),length(dept_id)) %>% 
+  group_by(across(all_of(params$unique_identifier_1))) %>% 
+  summarise(
+    across(.fns = ~first(.))
+  ) 
+ 
+dedupe %>% 
+  get_dupes(params$unique_identifier_1)
+```
+
+Creating a deduplicated dataframe of `r params$unique_identifier_1` and `r duplicating_groups[step_n]`.
+
+First create a dataframe of distinct rows of the variables from the original data. 
+
+```{r}
+working_01 <- 
+  prep_base %>% 
+  select(params$unique_identifier_1,all_of(duplicating_group %>% pull(variable))) %>% 
+  distinct()
+
+working_01 %>% 
+  glimpse()
+
+working_01 %>% 
+  skim()
+```
+
+Next remove rows that dataframe that were found to be duplicated and save that as a new dataframe. 
+
+```{r}
+working_02 <- 
+  working_01 %>% 
+  anti_join(dedupe %>% select(params$unique_identifier_1))
+
+working_02 %>% 
+  glimpse()
+
+working_02 %>% 
+  skim()
+```
+
+Last bind this dataframe to the deduplicated set above.
+
+```{r}
+prep_xx <- 
+  working_02 %>% 
+  bind_rows(dedupe)
+
+prep_xx %>% 
+  glimpse()
+
+prep_xx %>% 
+  skim()
+```
+
+Count rows.
+
+```{r}
+prep_xx %>% 
+  count()
+```
+
+Do the number of in this dataframe match the number of unique identifiers?
+
+```{r}
+prep_xx %>% 
+  count() %>% 
+  pull() ==
+  prep_uniq %>% 
+  count() %>% 
+  pull()
+```
+
+Rename dataframe
+
+```{r}
+prep_02 <- prep_xx
+```
+
+
+```{r}
+step_n <- step_n + 1
+```
+
+#### Step `r step_n`
+
+Removing duplicates produced by:
+
+```{r}
+duplicating_group <- 
+  duplicating_variables %>% 
+  filter(group == duplicating_groups[step_n])
+duplicating_group
+```
+
+Reviewing duplicates.
+
+```{r}
 dupe_01 %>% 
   select(params$unique_identifier_1,all_of(duplicating_group %>% pull(variable))) %>% 
   distinct() %>% 
-  arrange(length(short_id),length(dept_id))
+  get_dupes(params$unique_identifier_1)
 ```
 
 
