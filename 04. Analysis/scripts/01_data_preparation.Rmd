@@ -13,6 +13,8 @@ params:
   google_drive_home: "G:/Shared drives/MSG Projects/1.0 Real Estate Solutions (LQ1)/2312 Occupancy Patterns"
   data_folder_1: "Occupancy Data Pull"
   unique_identifier_1: !r c("employee_name","date")
+  data_folder_2: "Rosters"
+  unique_identifier_2: !r c("snapshot_date","employee_e_mail_address")
 ---
 
 ```{r setup, include=FALSE}
@@ -27,6 +29,7 @@ library(DataExplorer)
 library(readr)
 library(arsenal)
 library(Hmisc)
+library(readxl)
 ```
 
 # Data preparation {.tabset .tabset-pills}
@@ -43,27 +46,162 @@ library(Hmisc)
 
 ## Load data {.tabset .tabset-pills}
 
-### Data from `r params$data_folder_1`
+### Data files
 
 Find the list of .csv files in the `r params$data_folder_1` data folder.
 
 ```{r}
-files <- 
+files_1 <- 
   list.files(file.path(params$google_drive_home,"03. Data Collection",params$data_folder_1), pattern = ".csv", full.names = TRUE)
-files
+files_1
+```
+
+Find the list of .csv files in the `r params$data_folder_2` data folder.
+
+```{r}
+files_2 <- 
+  list.files(file.path(params$google_drive_home,"03. Data Collection",params$data_folder_2), pattern = ".xlsx", full.names = TRUE)
+files_2
 ```
 
 Load all data files in the `r params$data_folder_1` data folder.
 
 ```{r}
-prep_base <- files %>% 
+prep_base_1 <- files_1[1] %>% 
   map_dfr(~mutate(.data = read_csv(., 
     col_types = cols(Date = col_date(format = "%m_%d_%Y"))), 
         file_name = str_remove(.,pattern = file.path(params$google_drive_home,"03. Data Collection"))
       )) %>% 
   clean_names() %>% 
+  distinct() %>% 
+  separate(supervisor_name,into = c("sup_last","sup_first"), sep = ",") %>% 
+  mutate(
+    across(
+      .cols = starts_with("sup_"),
+      .fns = ~word(.,1)
+    )
+  ) %>% 
+  unite(col = "supervisor_display_name",sup_first,sup_last, sep = " ") %>% 
+  rename(file_name_1 =file_name)
+```
+
+```{r}
+prep_base_1_names <- names(prep_base_1)
+```
+
+
+Load all data files in the `r params$data_folder_2` data folder.
+
+```{r}
+prep_base_2_1 <- files_2[1] %>% 
+  map_dfr(~mutate(.data = read_xlsx(path = ., 
+                                    col_types = c("date", "text", "text", 
+        "text", "text", "text", "text", "text", 
+        "text", "date", "text", "text", "text", 
+        "text", "text", "text", "text", "text", 
+        "text", "text", "text", "text", "text", 
+        "text", "text", "text", "text", "text")), 
+        file_name = str_remove(.,pattern = file.path(params$google_drive_home,"03. Data Collection"))
+      )) %>% 
+  clean_names() %>% 
   distinct()
 ```
+
+```{r}
+prep_base_2_2 <- files_2[2] %>% 
+  map_dfr(~mutate(.data = read_xlsx(path = ., 
+                                    col_types = c("date", "text", "text", 
+        "text", "text", "text", "text", "text", 
+        "text", "date", "text", "text", "text", 
+        "text", "text", "text", "text", "text", 
+        "text", "text", "text", "text", "text", 
+        "text", "text", "text", "text", "text")), 
+        file_name = str_remove(.,pattern = file.path(params$google_drive_home,"03. Data Collection"))
+      )) %>% 
+  clean_names() %>% 
+  distinct()
+```
+
+```{r}
+prep_base_2_3 <- files_2[3] %>% 
+  map_dfr(~mutate(.data = read_xlsx(path = ., 
+                                    col_types = c("date", "text", "text", 
+        "text", "text", "text", "text", "text", 
+        "text", "date", "text", "text", "text", 
+        "text", "text", "text", "text", "text", 
+        "text", "text", "text", "text", "text", 
+        "text", "text", "text", "text", "text")), 
+        file_name = str_remove(.,pattern = file.path(params$google_drive_home,"03. Data Collection"))
+      )) %>% 
+  clean_names() %>% 
+  distinct()
+```
+
+Joining data
+
+```{r}
+step_1 <- prep_base_1 %>% 
+   left_join(prep_base_2_1,
+            by = c("employee_name" = "full_name",
+                   "sso" = "gsa_sso",
+                   "dept_id" = "department_id",
+                   "supervisor_display_name" = "supervisor_display_name"
+                   )) %>% 
+  # filter(rollback(date) == snapshot_date |
+  #          rollforward(date) == snapshot_date) %>%
+  # select(-snapshot_date, -starts_with("file_name")) %>% 
+  distinct()
+  # skim()
+  # get_dupes(employee_e_mail_address,date)
+```
+
+```{r}
+step_2 <- 
+  step_1 %>% 
+  filter(is.na(employee_e_mail_address)) %>% 
+  select(all_of(prep_base_1_names)) %>% 
+  left_join(prep_base_2_2,
+            by = c("employee_name" = "full_name",
+                   "sso" = "gsa_sso",
+                   "dept_id" = "department_id",
+                   "supervisor_display_name" = "supervisor_display_name"
+                   )) %>% 
+  # filter(rollback(date) == snapshot_date |
+  #          rollforward(date) == snapshot_date) %>%
+  # select(-snapshot_date, -starts_with("file_name")) %>% 
+  distinct()
+```
+
+```{r}
+step_3 <- 
+  step_2 %>% 
+  filter(is.na(employee_e_mail_address)) %>% 
+  select(all_of(prep_base_1_names)) %>% 
+  left_join(prep_base_2_3,
+            by = c("employee_name" = "full_name",
+                   "sso" = "gsa_sso",
+                   "dept_id" = "department_id",
+                   "supervisor_display_name" = "supervisor_display_name"
+                   )) %>% 
+  # filter(rollback(date) == snapshot_date |
+  #          rollforward(date) == snapshot_date) %>%
+  # select(-snapshot_date, -starts_with("file_name")) %>% 
+  distinct()
+```
+
+```{r}
+step_3 %>% 
+  filter(!is.na(employee_e_mail_address))
+```
+
+
+
+```{r}
+rollback(ymd('2022-12-01'))
+rollforward(ymd('2022-12-01'))
+```
+
+
 
 ### Review data
 
