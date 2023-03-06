@@ -34,6 +34,28 @@ library(ggthemes)
 table_n <- 0
 ```
 
+
+# MIKES COMMENTS
+Proofread for typos
+
+Why start cohort in March? I believe because of data availability, but good to clarify in text.
+
+Not sure i follow the deduping logic. If two employees have the same name, then they may have different EOD Dates. But maybe there are no duplicates on full name so it’s not an issue.
+
+The analysis plan is a good place to define the rules for classification
+Re: missing supervisor name and some other values. It is possible that people change supervisors or departments. Do we care about this? And how should we deal with it? At a minimum, maybe we want a slightly different imputation like if supervisor is the same both with earlier and later nonmissing observations, use that value, otherwise use prior supervisor? 
+
+How are you doing team classification? Are you going to generate a team ID based on some rule? If so what is it, and to the prior point, how do you handle changing team composition over time? 
+
+Not sure about using percentiles for cutoffs. I would assume based on classifications that more that 5 percent of teams are fully remote. For individuals, i think there is more alignment on things like number of days in a pay period in the office because of policy definitions for people who are not remote and have to be in the office 2 days per pay period. For teams maybe an extension of that basic ideas (e.g., fewer than 2 days in office on average is fully remote)
+
+Are all of these taking averages over the whole time period (9 months or whatever)? Would we potentially want to know about things like people who have more specific weekly patterns?
+
+Why mention sq(num obs)/2 if you are not going to use that rule?
+
+The thing that is missing here that is potentially more complicated is figuring out more about how teams operate as collections of individuals. For example, you could I think in this approach have a team that is 20 percent average telework where everyone goes in person on Mondays and the rest of the time is distributed, or you could have a team that is 20 percent telework where people go in at random times and never see each other. I am interested to know the extent to which people are co-locating with their teams (and if some people are being left out—which may help motivate some equity questions about performance ratings for people who don’t get face time with the boss, for example). I think we are missing that level of analysis here.
+
+
 Project Name: `r params$project_name`
 
 Project Code: `r params$project_number`
@@ -118,15 +140,15 @@ tbl <- tibble("Variable Name" = c(
 "Description" = c(
   "Date of check-in",
   # Is SSO single sign on? What did we decide?
-"GSA offices",
+"Staff or service office",
 "2-digit department id",
 "Full department id code",
-"Employee name (Last,First Middle)",
-"Supervisor name (Last,First Middle)",
-"State abbreviation-City-Site (e.g., home or address); could string split and match state with roster, possibly city too.",
-"E.g., Teleworking, Leave, Supervisor Corrected, No Response, Reporting to Job Site, Other",
+"Employee name (Last, First Middle)",
+"Supervisor name (Last, First Middle)",
+"State abbreviation-City-Site (e.g. MA-WESTFORD-HOME and MA-BOSTON-FB Causeway St)",
+"Status of the staff on that day (e.g., Teleworking, Leave, Supervisor Corrected, No Response, Reporting to Job Site, Other)",
 # I think that this is an indicator for whether the supervisor corrected the record
-""
+"If daily status is Supervisor Corrected, then this is the work status entered by the supervisor"
 )
 )
 ```
@@ -152,65 +174,38 @@ Additional administrative data that may be useful for exploratory
 analysis includes:
 
 ```{r}
-tbl <- tibble("Variable Name" = c(
-"Snapshot.Date",
-"Department.ID",
-"Employee.Job.Business.Unit.Description",
-"Full.Name",
-"Employee.E.Mail.Address",
-"Position.Title",
-"Pay.Plan",
-"Occupational.Series",
-"Grade",
-"EOD.Date",
-"Supervisor.Level",
-"Supervisor.Level.Description",
-"Supervisor.Display.Name",
-"Supervisor.E.Mail.Address",
-"Business.Line.2.Letter.Department.ID.",
-"GSA.SSO",
-"Agency.Subelement.Code.Description",
-"GSA.Region",
-"GSA.Duty.Station.Region",
-"Location.City",
-"Location.State",
-"Duty.Station.Code",
-"Employee.Job.Bargaining.Unit.Description",
-"Employee.Summary.Bargaining.Unit",
-"Payroll.Accounting.Code",
-"Position.Number",
-"Position.Category.Code",
-"Position.Category.Description"
+tbl <- tibble("Variable Name" = c("snapshot_date", "department_id", "employee_job_business_unit_description", "full_name", "employee_e_mail_address", "position_title", "pay_plan", "occupational_series", "grade", "eod_date", "supervisor_level", "supervisor_level_description", "supervisor_display_name", "supervisor_e_mail_address", "business_line_2_letter_department_id", "gsa_sso", "agency_subelement_code_description", "gsa_region", "gsa_duty_station_region", "location_city", "location_state", "duty_station_code", "employee_job_bargaining_unit_description", "employee_summary_bargaining_unit", "payroll_accounting_code", "position_number", "position_category_code", "position_category_description"
+                                  # , "file_name"
 ),
 "Description" = c(
  "Date of data export",
-"Should align with check-in’s 'dept_id'",
-"",
-"Last,First Middle; should align with check-in’s 'employee_name'",
-"",
-"",
-"",
-"",
-"",
-"",
-"",
-"",
-"First, Last",
-"",
-"",
-"",
-"",
-"",
-"",
-"",
-"",
-"",
-"",
-"",
-"",
-"",
-"",
-"E.g., Onsite flexible, Offsite, Onsite required, Not specified, Position has changed"
+"GSA department ID",
+"Business unit of the staff person",
+"Employee name as Last,First Middle",
+"Email address of staff",
+"Position title",
+"Pay plan code",
+"Occupational series code",
+"Position grade",
+"Entry on duty i.e. staff's first day on the job",
+"Supervisor status code of staff",
+"Supervisor status description of staff",
+"Supervisor name as First Last",
+"Supervisor email address",
+"First two letters of GSA department ID",
+"Staff or service office code",
+"Staff or service office description",
+"GSA region number",
+"Duty station GSA region number",
+"Staff city",
+"Staff state",
+"Duty station number",
+"Staff bargaining unit descripton",
+"Staff bargaining unit number",
+"Payroll accounting code",
+"POsition number",
+"Position location category code",
+"Position location category description (e.g., Onsite flexible, Offsite, Onsite required, Not specified)"
 )
 )
 ```
