@@ -34,27 +34,44 @@ library(ggthemes)
 table_n <- 0
 ```
 
+<!-- # MIKES COMMENTS -->
 
-# MIKES COMMENTS
-Proofread for typos
+<!-- Proofread for typos -->
 
-Why start cohort in March? I believe because of data availability, but good to clarify in text.
+<!-- The analysis plan is a good place to define the rules for classification -->
+<!-- Re: missing supervisor name and some other values. It is possible that -->
+<!-- people change supervisors or departments. Do we care about this? And how -->
+<!-- should we deal with it? At a minimum, maybe we want a slightly different -->
+<!-- imputation like if supervisor is the same both with earlier and later -->
+<!-- nonmissing observations, use that value, otherwise use prior supervisor? -->
 
-Not sure i follow the deduping logic. If two employees have the same name, then they may have different EOD Dates. But maybe there are no duplicates on full name so it’s not an issue.
+<!-- How are you doing team classification? Are you going to generate a team -->
+<!-- ID based on some rule? If so what is it, and to the prior point, how do -->
+<!-- you handle changing team composition over time? -->
 
-The analysis plan is a good place to define the rules for classification
-Re: missing supervisor name and some other values. It is possible that people change supervisors or departments. Do we care about this? And how should we deal with it? At a minimum, maybe we want a slightly different imputation like if supervisor is the same both with earlier and later nonmissing observations, use that value, otherwise use prior supervisor? 
+<!-- Not sure about using percentiles for cutoffs. I would assume based on -->
+<!-- classifications that more that 5 percent of teams are fully remote. For -->
+<!-- individuals, i think there is more alignment on things like number of -->
+<!-- days in a pay period in the office because of policy definitions for -->
+<!-- people who are not remote and have to be in the office 2 days per pay -->
+<!-- period. For teams maybe an extension of that basic ideas (e.g., fewer -->
+<!-- than 2 days in office on average is fully remote) -->
 
-How are you doing team classification? Are you going to generate a team ID based on some rule? If so what is it, and to the prior point, how do you handle changing team composition over time? 
+<!-- Are all of these taking averages over the whole time period (9 months or -->
+<!-- whatever)? Would we potentially want to know about things like people -->
+<!-- who have more specific weekly patterns? -->
 
-Not sure about using percentiles for cutoffs. I would assume based on classifications that more that 5 percent of teams are fully remote. For individuals, i think there is more alignment on things like number of days in a pay period in the office because of policy definitions for people who are not remote and have to be in the office 2 days per pay period. For teams maybe an extension of that basic ideas (e.g., fewer than 2 days in office on average is fully remote)
-
-Are all of these taking averages over the whole time period (9 months or whatever)? Would we potentially want to know about things like people who have more specific weekly patterns?
-
-Why mention sq(num obs)/2 if you are not going to use that rule?
-
-The thing that is missing here that is potentially more complicated is figuring out more about how teams operate as collections of individuals. For example, you could I think in this approach have a team that is 20 percent average telework where everyone goes in person on Mondays and the rest of the time is distributed, or you could have a team that is 20 percent telework where people go in at random times and never see each other. I am interested to know the extent to which people are co-locating with their teams (and if some people are being left out—which may help motivate some equity questions about performance ratings for people who don’t get face time with the boss, for example). I think we are missing that level of analysis here.
-
+<!-- The thing that is missing here that is potentially more complicated is -->
+<!-- figuring out more about how teams operate as collections of individuals. -->
+<!-- For example, you could I think in this approach have a team that is 20 -->
+<!-- percent average telework where everyone goes in person on Mondays and -->
+<!-- the rest of the time is distributed, or you could have a team that is 20 -->
+<!-- percent telework where people go in at random times and never see each -->
+<!-- other. I am interested to know the extent to which people are -->
+<!-- co-locating with their teams (and if some people are being left -->
+<!-- out---which may help motivate some equity questions about performance -->
+<!-- ratings for people who don't get face time with the boss, for example). -->
+<!-- I think we are missing that level of analysis here. -->
 
 Project Name: `r params$project_name`
 
@@ -125,10 +142,16 @@ table_n <- table_n + 1
 
 #### Table `r table_n`. GSA Daily Check-In Data Variables Available Feb 2022-Dec 2022.
 
+<!-- Table 1 and 2 could use better updating of description column -->
+
+<!-- SSO=Staff or service office -->
+
+<!-- Done -->
+
 ```{r}
-tbl <- tibble("Variable Name" = c(
+tbl_daily_check_in <- tibble("Variable Name" = c(
   "date",
-"SSO",
+"sso",
 "short_id",
 "dept_id",
 "employee_name",
@@ -136,8 +159,15 @@ tbl <- tibble("Variable Name" = c(
 "location",
 "daily_status",
 "supervisor_correction"
-),
-"Description" = c(
+)
+)
+```
+
+```{r}
+tbl <- 
+  tbl_daily_check_in %>% 
+  add_column(
+    "Description" = c(
   "Date of check-in",
   # Is SSO single sign on? What did we decide?
 "Staff or service office",
@@ -174,9 +204,16 @@ Additional administrative data that may be useful for exploratory
 analysis includes:
 
 ```{r}
-tbl <- tibble("Variable Name" = c("snapshot_date", "department_id", "employee_job_business_unit_description", "full_name", "employee_e_mail_address", "position_title", "pay_plan", "occupational_series", "grade", "eod_date", "supervisor_level", "supervisor_level_description", "supervisor_display_name", "supervisor_e_mail_address", "business_line_2_letter_department_id", "gsa_sso", "agency_subelement_code_description", "gsa_region", "gsa_duty_station_region", "location_city", "location_state", "duty_station_code", "employee_job_bargaining_unit_description", "employee_summary_bargaining_unit", "payroll_accounting_code", "position_number", "position_category_code", "position_category_description"
+tbl_roster <- tibble("Variable Name" = c("snapshot_date", "department_id", "employee_job_business_unit_description", "full_name", "employee_e_mail_address", "position_title", "pay_plan", "occupational_series", "grade", "eod_date", "supervisor_level", "supervisor_level_description", "supervisor_display_name", "supervisor_e_mail_address", "business_line_2_letter_department_id", "gsa_sso", "agency_subelement_code_description", "gsa_region", "gsa_duty_station_region", "location_city", "location_state", "duty_station_code", "employee_job_bargaining_unit_description", "employee_summary_bargaining_unit", "payroll_accounting_code", "position_number", "position_category_code", "position_category_description"
                                   # , "file_name"
-),
+)
+)
+```
+
+```{r}
+tbl <- 
+  tbl_roster %>% 
+  add_column(
 "Description" = c(
  "Date of data export",
 "GSA department ID",
@@ -203,7 +240,7 @@ tbl <- tibble("Variable Name" = c("snapshot_date", "department_id", "employee_jo
 "Staff bargaining unit descripton",
 "Staff bargaining unit number",
 "Payroll accounting code",
-"POsition number",
+"Position number",
 "Position location category code",
 "Position location category description (e.g., Onsite flexible, Offsite, Onsite required, Not specified)"
 )
@@ -239,24 +276,70 @@ relationships between these and other factors.
 
 <!-- [Describe any plans to transform the structure of your data (e.g., from cross-sectional to panel).] -->
 
+<!-- Why start cohort in March? I believe because of data availability, but good to clarify in text. -->
+
+<!-- Done -->
+
 For all analysis, we will used a defined cohort of staff to examine work
 status over period of time. A cohort of staff employed in the month of
 March 2022 will be followed over six months. Teams will be defined by
-the supervisors of groups of staff in the beginning of March 2022. Any
-analysis we conduct may be reproduced on a separate cohort or may be
-combined with multiple cohorts depending on the data availability.
+the supervisors of groups of staff in the beginning of March 2022. We
+are choosing March 2022 because we were told by the data providers that
+earlier data was less reliable. We also wanted to have enough time to
+pass to examine work patterns. March 2022 is a good start for both data
+reliability and length of time to examine behavior. Any analysis we
+conduct may be reproduced on a separate cohort or may be combined with
+multiple cohorts depending on the data availability.
+
+<!-- Not sure i follow the deduping logic. If two employees have the same name, then they may have different EOD Dates. But maybe there are no duplicates on full name so it’s not an issue. -->
 
 Both data sources will be checked for duplication and deduplicated. The
-unique identifiers of the daily check-in data are `employee_name` and
-`date`. For the roster data the unique identifier is `Full.Name` and
-`Snapshot.Date`. The general approach to deduplication will be that
-categorical variables will be restructured as indicator variables taking
-on a one for each category associated with the duplicate. From the
-roster data, if the duplication is based off of `EOD.Date`, the later
-date will be selected along with the other variables associated with
-that date. There appear to be no numeric variables.
+daily check-in data has no true unique identifier. The roster data is
+uniquely identified by `employee_e_mail_address` and `snapshot_date`.
+The roster data *should not* have any duplications on
+`employee_e_mail_address` and `snapshot_date`, but this will be checked.
+To create a unique identifier in the daily check-in data, we will
+following process:
 
-The analysis will be done for staff and teams separately and aggregated independently. The table below defines how we plan to aggregate for staff and teams.
+1.  Start with check-in data from one month (call this *month 1*)
+
+2.  Transform supervisor name to match format of the roster data
+
+3.  Join roster data from the previous month (call this *month 0*) on
+    employee name, staff or service office, department ID and supervisor
+    name
+
+4.  Check to see if any rows are missing `employee_e_mail_address` after
+    the join
+
+5.  For any rows missing `employee_e_mail_address`, join roster data
+    from data from *month 1*
+
+6.  Check to see if any rows are missing `employee_e_mail_address` after
+    the join
+
+7.  For any rows missing `employee_e_mail_address`, join roster data
+    from data from *month 2*
+
+8.  Repeat steps 5 and 6 until no new `employee_e_mail_address` entries
+    are found, or no roster data is available
+
+9.  Repeat steps 1 through 7 for all other months in observation window
+
+10. Bind all joined data across observation window.
+
+After this, the combined data *should* be uniquely identified by
+`employee_e_mail_address` and `date`. The data set will contain all the
+daily check-in and roster information across the observation window.
+
+If any duplicates remain after the steps above, the general approach to
+deduplication will be that categorical variables will be restructured as
+indicator variables taking on a one for each category associated with
+the duplicate. There appear to be no numeric variables.
+
+The analysis will be done for staff and teams separately and aggregated
+independently. The table below defines how we plan to aggregate for
+staff and teams.
 
 ```{r}
 table_n <- table_n + 1
@@ -286,6 +369,7 @@ tbl %>%
 ```
 
 <!-- [I might be more discerning about using "staff" vs. "employees" vs. "teams" vs. "groups" vs. "clusters" -- we are grouping employees into teams, but also categorizing them.]  -->
+
 We will approach grouping staff and teams in two ways. First,
 rules-based groups will be formed. For these, definitions of different
 types of work will be defined. Second, groups will be formed using
@@ -341,7 +425,8 @@ will be defined:
 
 We have no plans to exclude any data.
 
-Missing data from daily check in will be treated as defined in the table below.
+Missing data from the combined data in will be treated as defined in the
+table below.
 
 ```{r}
 table_n <- table_n + 1
@@ -350,83 +435,26 @@ table_n <- table_n + 1
 #### Table `r table_n`. Treatment of missing data from daily check in
 
 ```{r}
-tbl <- tibble("Variable Name" = c(
-  "date",
-"SSO",
-"short_id",
-"dept_id",
-"employee_name",
-"supervisor_name",
-"location",
-"daily_status",
-"supervisor_correction"
-),
+tbl_combined <- 
+  tbl_daily_check_in %>% 
+  bind_rows(tbl_roster)
+# tbl_combined
+```
+
+```{r}
+tbl <- 
+tbl_combined %>% 
+add_column(
 "Treatment if missing" = c(
   "Drop observation",
-  "",
+  "Joined with gsa_sso from roster data, impute from other observations of same staff",
   "Impute from other observations of same staff",
-  "Impute from other observations of same staff",
-  "Drop observation",
-  "Impute from other observations of same staff",
+  "Joined with department_id from roster data, impute from other observations of same staff",
+  "Joined with full_name from roster data, drop observation",
+  "Joined with supervisor_display_name from roster data, impute from other observations of same staff",
   "Label as missing",
   "Label as missing",
-  "Label as missing"
-)
-)
-```
-
-```{r}
-tbl %>% 
-  flextable() %>% 
-  # add_header_row(values = c("","","Type of analysis", "Type of analysis")) %>% 
-  # set_header_labels(Group = "Level of analysis") %>% 
-  merge_h(part = "header") %>% 
-  merge_v(j = 1) %>% 
-  theme_vanilla() %>% 
-  autofit()
-```
-
-Missing data from the roster will be treated as show in the table below.
-
-```{r}
-table_n <- table_n + 1
-```
-
-#### Table `r table_n`. Treatment of missing data from roster
-
-```{r}
-tbl <- tibble("Variable Name" = c(
-"Snapshot.Date",
-"Department.ID",
-"Employee.Job.Business.Unit.Description",
-"Full.Name",
-"Employee.E.Mail.Address",
-"Position.Title",
-"Pay.Plan",
-"Occupational.Series",
-"Grade",
-"EOD.Date",
-"Supervisor.Level",
-"Supervisor.Level.Description",
-"Supervisor.Display.Name",
-"Supervisor.E.Mail.Address",
-"Business.Line.2.Letter.Department.ID.",
-"GSA.SSO",
-"Agency.Subelement.Code.Description",
-"GSA.Region",
-"GSA.Duty.Station.Region",
-"Location.City",
-"Location.State",
-"Duty.Station.Code",
-"Employee.Job.Bargaining.Unit.Description",
-"Employee.Summary.Bargaining.Unit",
-"Payroll.Accounting.Code",
-"Position.Number",
-"Position.Category.Code",
-"Position.Category.Description"
-),
-"Treatment if missing" = c(
-  "Label as missing",
+  "Label as missing", "Label as missing",
   "Label as missing",
   "Label as missing",
   "Drop observation",
@@ -455,7 +483,8 @@ tbl <- tibble("Variable Name" = c(
 "Label as missing",
 "Label as missing"
 )
-)
+) %>% 
+  filter(!(`Variable Name` %in% c("gsa_sso","department_id","full_name","supervisor_display_name")))
 ```
 
 ```{r}
@@ -559,15 +588,12 @@ For team clusters, the following variables will be used:
 All of the these variables will be scaled to reduce the effects of
 outliers should they be present.
 
+<!-- Why mention sq(num obs)/2 if you are not going to use that rule? -->
+
+<!-- Removed -->
+
 To determine the number appropriate number of clusters, several methods
-exist. A rule of thumb to identify the correct number is to use the
-number calculated from:
-
-$$
-\frac{\sqrt{NumberOfObservations}}{2}
-$$
-
-However, for this work, the *elbow method* will be used. To do this, the
+exist. For this work, the *elbow method* will be used. To do this, the
 k-means algorithm will be executed for different numbers of clusters
 from 1 to 20. For each number of clusters, a total within sum of squares
 will be calculated. As the number of number of clusters increases the
@@ -578,7 +604,8 @@ tapering off.
 The figure below shows an example of the this. The total within sum of
 squares decreases with the number of clusters. In this example, three
 clusters appears to be the point where the returns to more cluster
-diminishes. We will also construct silhouette charts to confirm the number of clusters.
+diminishes. We will also construct silhouette charts to confirm the
+number of clusters.
 
 #### Figure 1. Elbow method example
 
@@ -632,7 +659,6 @@ ggplot(clusterings, aes(k, tot.withinss)) +
   theme_minimal()
 
 ```
-
 
 After the optimal number of clusters is determine, the clusters from
 that iteration will be used to categorized the staff and team occupancy.
@@ -723,9 +749,11 @@ The descriptive statistics are:
 
     -   Number and proportion of staff by most frequent grade
 
-    -   Number and proportion of staff by most frequent occupational series
+    -   Number and proportion of staff by most frequent occupational
+        series
 
-    -   Number and proportion of staff by most frequent position category
+    -   Number and proportion of staff by most frequent position
+        category
 
     -   Number and proportion of staff by most frequent GSA region
 
@@ -736,22 +764,29 @@ The descriptive statistics are:
     -   Number and proportion of staff by most frequent city
 
     -   Number and proportion of staff by most frequent supervisor level
-    
+
 The staff statistics will be calculated for the following groups:
 
-1.    Whole cohort of staff
-2.    By rule-based categories of work pattern
-3.    By cluster defined categories of work pattern
+1.  Whole cohort of staff
+2.  By rule-based categories of work pattern
+3.  By cluster defined categories of work pattern
 
 The team statistics will be calculated for the following groups:
 
-1.    Whole cohort of teams
-2.    By rule-based categories of work pattern
-3.    By cluster defined categories of work pattern
+1.  Whole cohort of teams
+2.  By rule-based categories of work pattern
+3.  By cluster defined categories of work pattern
 
-To understand the relationship between staff work patterns and their supervisor, we will calculate the proportion of the staff that fall into the same rule-based and clusters as their supervisors overall, as well as by the above categories.
+To understand the relationship between staff work patterns and their
+supervisor, we will calculate the proportion of the staff that fall into
+the same rule-based and clusters as their supervisors overall, as well
+as by the above categories.
 
-The results will be presented in tables, and we will generate visualizations for a subset of the results for streamlined communication. We will use visualizations to validate the work pattern groupings and demonstrate any deviation between clusters, rules-based categories, and stated telework position.  
+The results will be presented in tables, and we will generate
+visualizations for a subset of the results for streamlined
+communication. We will use visualizations to validate the work pattern
+groupings and demonstrate any deviation between clusters, rules-based
+categories, and stated telework position.
 
 ### Confirmatory Analyses:
 
@@ -763,16 +798,20 @@ We plan no confirmatory analyses.
 
 <!-- [OPTIONAL: If you plan to explore your data set to look for unexpected differences or relationships, you may describe those tests here. An exploratory test is any test where a prediction is not made up front, or where there are multiple possible tests that you are going to use. A statistically significant finding in an exploratory test is a great way to form a new confirmatory hypothesis, which could then be tested using a pre-specified analysis at a later time. Note that exploratory analyses will not, by default, be included in reanalysis.] -->
 
-We plan no exploratory analyses. Though, all this work may be considered exploratory.
+We plan no exploratory analyses. Though, all this work may be considered
+exploratory.
 
 ### Inference Criteria, Including Any Adjustments for Multiple Comparisons:
 
 <!-- [What criteria will you use to make inferences? Please describe the information you will use (e.g., specify the p-values), as well as cut-off criteria, where appropriate. Will you be using one- or two-tailed tests for each of your analyses? If you are comparing multiple conditions or testing multiple hypotheses, what method will you use to correct for multiple tests? If you are taking into account practical significance, please specify a minimum effect size of interest.] -->
 
-We will not be making any inference. 
+We will not be making any inference.
 
 ### Limitations:
 
 <!-- [Describe any anticipated limitations associated with this analysis, if not previously identified in the Project Design document.] -->
 
-This is non causal research. The work will not demonstrate if changes or attributes caused differences, only if there are relationships. K-means clustering can be sensetive to the random locations of the first points selected to calculate differences and define clusters. 
+This is non causal research. The work will not demonstrate if changes or
+attributes caused differences, only if there are relationships. K-means
+clustering can be sensetive to the random locations of the first points
+selected to calculate differences and define clusters.
