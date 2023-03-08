@@ -67,7 +67,7 @@ files_2
 Load all data files in the `r params$data_folder_1` data folder.
 
 ```{r}
-prep_base_1 <- files_1[1] %>% 
+prep_base_1 <- files_1 %>% 
   map_dfr(~mutate(.data = read_csv(., 
     col_types = cols(Date = col_date(format = "%m_%d_%Y"))), 
         file_name = str_remove(.,pattern = file.path(params$google_drive_home,"03. Data Collection"))
@@ -82,12 +82,92 @@ prep_base_1 <- files_1[1] %>%
     )
   ) %>% 
   unite(col = "supervisor_display_name",sup_first,sup_last, sep = " ") %>% 
-  rename(file_name_1 =file_name)
+  rename(file_name_1 =file_name)%>% 
+  mutate(
+    date_month = floor_date(date,unit = "month"),
+    date_month_rollback = rollback(date_month),
+    date_month_forward = rollforward(date_month)
+  )
 ```
 
 ```{r}
 prep_base_1_names <- names(prep_base_1)
 ```
+
+```{r}
+prep_base_2 <- files_2 %>% 
+  map_dfr(~mutate(.data = read_xlsx(path = ., 
+                                    col_types = c("date", "text", "text", 
+        "text", "text", "text", "text", "text", 
+        "text", "date", "text", "text", "text", 
+        "text", "text", "text", "text", "text", 
+        "text", "text", "text", "text", "text", 
+        "text", "text", "text", "text", "text")), 
+        file_name = str_remove(.,pattern = file.path(params$google_drive_home,"03. Data Collection"))
+      )) %>% 
+  clean_names() %>% 
+  distinct() %>% 
+  mutate(
+    across(
+      .cols = where(is.POSIXct),
+      .fns = ~as_date(.)
+    )
+  )
+```
+
+
+
+```{r}
+step_1 <- prep_base_1 %>% 
+  inner_join(prep_base_2,
+            by =  c("employee_name" = "full_name"),
+            suffix = c("_daily","_roster")
+  ) %>% 
+  select(-starts_with("file_name")) %>% 
+  distinct() %>% 
+  filter(supervisor_display_name_daily == supervisor_display_name_roster) %>%
+  filter(dept_id == department_id) %>%
+  filter(date_month_rollback == snapshot_date)
+```
+
+
+```{r}
+step_1 %>%
+  get_dupes(date,employee_e_mail_address) %>%
+  arrange(desc(dupe_count))
+```
+
+```{r}
+step_2 <- 
+  prep_base_1 %>% 
+  anti_join(step_1) %>% 
+  inner_join(prep_base_2,
+            by =  c("employee_name" = "full_name"),
+            suffix = c("_daily","_roster")
+  ) %>% 
+  select(-starts_with("file_name")) %>% 
+  distinct() %>% 
+  filter(supervisor_display_name_daily == supervisor_display_name_roster) %>%
+  filter(dept_id == department_id) %>%
+  filter(date_month_forward == snapshot_date)
+```
+
+```{r}
+prep_base_1 %>% 
+  anti_join(step_1) %>%
+  anti_join(step_2) %>% 
+  inner_join(prep_base_2,
+            by =  c("employee_name" = "full_name"),
+            suffix = c("_daily","_roster")
+  ) %>% 
+  select(-starts_with("file_name")) %>% 
+  distinct() %>% 
+  filter(supervisor_display_name_daily == supervisor_display_name_roster) %>%
+  filter(dept_id == department_id) %>% 
+  select(-snapshot_date) %>% 
+  distinct()
+```
+
 
 
 Load all data files in the `r params$data_folder_2` data folder.
@@ -141,6 +221,8 @@ Joining data
 
 ```{r}
 step_1 <- prep_base_1 %>% 
+  # select(employee_name) %>% 
+  # distinct() %>% 
    left_join(prep_base_2_1,
             by = c("employee_name" = "full_name",
                    "sso" = "gsa_sso",
@@ -154,6 +236,56 @@ step_1 <- prep_base_1 %>%
   # skim()
   # get_dupes(employee_e_mail_address,date)
 ```
+
+```{r}
+step_1 %>% 
+  filter(!is.na(employee_e_mail_address)) %>% 
+  get_dupes(employee_name,date,sso, dept_id, supervisor_display_name)
+```
+
+```{r}
+step_1 %>% 
+  filter(!is.na(employee_e_mail_address)) %>% 
+  get_dupes(employee_e_mail_address,date)
+```
+
+
+```{r}
+step_2 <- 
+  step_1 %>% 
+  filter(!is.na(employee_e_mail_address)) %>% 
+  get_dupes(employee_name) %>% 
+  select(employee_name) %>% 
+  distinct()
+```
+
+```{r}
+step_3 <- 
+  step_2 %>% 
+  inner_join(prep_base_1 %>% 
+  select(employee_name,sso) %>% 
+    distinct()) %>% 
+  left_join(prep_base_2_1,
+            by = c("employee_name" = "full_name",
+                   "sso" = "gsa_sso"
+                   # ,
+                   # "dept_id" = "department_id",
+                   # "supervisor_display_name" = "supervisor_display_name"
+                   )) %>% 
+  # filter(rollback(date) == snapshot_date |
+  #          rollforward(date) == snapshot_date) %>%
+  # select(-snapshot_date, -starts_with("file_name")) %>% 
+  distinct()
+```
+
+```{r}
+step_3 %>% 
+  filter(!is.na(employee_e_mail_address)) %>% 
+  get_dupes(employee_name,employee_e_mail_address)
+```
+
+
+
 
 ```{r}
 step_2 <- 
