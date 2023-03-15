@@ -10,7 +10,7 @@ params:
   author: "Ben Jaques-Leslie"
   project_number: 2312
   project_name: "Occupancy Patterns"
-  google_drive_home: "G:/Shared drives/MSG Projects/1.0 Real Estate Solutions (LQ1)/2312 Occupancy Patterns"
+  google_drive_home: "G:/Shared drives/MSG Projects/1.0 Real Estate Solutions (LQ1)/2312 Work Patterns"
   data_folder_1: "Occupancy Data Pull"
   unique_identifier_1: !r c("employee_name","date")
   data_folder_2: "Rosters"
@@ -19,8 +19,14 @@ params:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-install.packages("arsenal")
-devtools::install_github(repo = "GSA/oesrrr")
+if(!("arsenal" %in% installed.packages()[,"Package"]))
+{
+  install.packages("arsenal")
+}
+if(!("oesrrr" %in% installed.packages()[,"Package"]))
+{
+  devtools::install_github(repo = "GSA/oesrrr")
+}
 library(oesrrr)
 library(tidyverse)
 library(janitor)
@@ -64,6 +70,8 @@ files_2 <-
 files_2
 ```
 
+### Load data
+
 Load all data files in the `r params$data_folder_1` data folder.
 
 ```{r}
@@ -90,9 +98,25 @@ prep_base_1 <- files_1 %>%
   )
 ```
 
+Review.
+
+```{r}
+prep_base_1 %>% 
+  skim()
+```
+
+Count number of unique employee_name.
+
+```{r}
+unique_name_base <- prep_base_1 %>% summarise(n_distinct(employee_name)) %>% pull()
+unique_name_base
+```
+
 ```{r}
 prep_base_1_names <- names(prep_base_1)
 ```
+
+Load all data files in the `r params$data_folder_2` data folder.
 
 ```{r}
 prep_base_2 <- files_2 %>% 
@@ -115,60 +139,261 @@ prep_base_2 <- files_2 %>%
   )
 ```
 
-
+Review.
 
 ```{r}
-step_1 <- prep_base_1 %>% 
+prep_base_2 %>% 
+  skim()
+```
+
+Count number of unique email addresses.
+
+```{r}
+unique_email_base <- prep_base_2 %>% summarise(n_distinct(employee_e_mail_address)) %>% pull()
+unique_email_base
+```
+
+### Join data
+
+First inner join by employee name, supervisor name, department id, and the last date, using the last day of the month before the daily checkin. 
+
+```{r}
+prep_xx <- prep_base_1 %>% 
   inner_join(prep_base_2,
-            by =  c("employee_name" = "full_name"),
+            by =  c("employee_name" = "full_name",
+                    "supervisor_display_name" = "supervisor_display_name",
+                    "dept_id" = "department_id",
+                    "date_month_rollback" = "snapshot_date"
+                    ),
             suffix = c("_daily","_roster")
   ) %>% 
   select(-starts_with("file_name")) %>% 
-  distinct() %>% 
-  filter(supervisor_display_name_daily == supervisor_display_name_roster) %>%
-  filter(dept_id == department_id) %>%
-  filter(date_month_rollback == snapshot_date)
+  distinct()
 ```
 
+Review.
 
 ```{r}
-step_1 %>%
+prep_xx %>% 
+  skim()
+```
+
+```{r}
+prep_xx %>%
   get_dupes(date,employee_e_mail_address) %>%
   arrange(desc(dupe_count))
 ```
 
-```{r}
-step_2 <- 
-  prep_base_1 %>% 
-  anti_join(step_1) %>% 
-  inner_join(prep_base_2,
-            by =  c("employee_name" = "full_name"),
-            suffix = c("_daily","_roster")
-  ) %>% 
-  select(-starts_with("file_name")) %>% 
-  distinct() %>% 
-  filter(supervisor_display_name_daily == supervisor_display_name_roster) %>%
-  filter(dept_id == department_id) %>%
-  filter(date_month_forward == snapshot_date)
-```
+Create building dataframe. 
 
 ```{r}
-prep_base_1 %>% 
-  anti_join(step_1) %>%
-  anti_join(step_2) %>% 
+prep_building <- prep_xx
+```
+
+Count unique email addresses in building dataframe. 
+
+```{r}
+unique_email_building <- prep_building %>% summarise(n_distinct(employee_e_mail_address)) %>% pull()
+unique_email_building
+```
+
+Test: This does not differ from the base.
+
+```{r}
+unique_email_base == unique_email_building
+```
+Review.
+
+```{r}
+prep_building %>%  skim()
+```
+
+Second, remove data from building dataframe, then inner join by employee name, supervisor name, department id, and the last date, using the last day of the month after the daily checkin. 
+
+```{r}
+prep_xx <- 
+  prep_base_1 %>% 
+  anti_join(prep_building) %>% 
   inner_join(prep_base_2,
-            by =  c("employee_name" = "full_name"),
+            by =  c("employee_name" = "full_name",
+                    "supervisor_display_name" = "supervisor_display_name",
+                    "dept_id" = "department_id",
+                    "date_month_forward" = "snapshot_date"
+                    ),
             suffix = c("_daily","_roster")
   ) %>% 
   select(-starts_with("file_name")) %>% 
-  distinct() %>% 
-  filter(supervisor_display_name_daily == supervisor_display_name_roster) %>%
-  filter(dept_id == department_id) %>% 
-  select(-snapshot_date) %>% 
   distinct()
 ```
 
+Review.
 
+```{r}
+prep_xx %>%  skim()
+```
+
+```{r}
+prep_xx %>%
+  get_dupes(date,employee_e_mail_address) %>%
+  arrange(desc(dupe_count))
+```
+
+Bind to buidling dataframe. 
+
+```{r}
+prep_building <- prep_building %>% 
+  bind_rows(prep_xx) %>% 
+  distinct()
+```
+
+Count unique email addresses
+
+```{r}
+unique_email_building <- prep_building %>% summarise(n_distinct(employee_e_mail_address)) %>% pull()
+unique_email_building
+```
+
+Test: This does not differ from the base.
+
+```{r}
+unique_email_base == unique_email_building
+```
+
+Review.
+
+```{r}
+prep_building %>%  skim()
+```
+
+
+```{r}
+prep_xx <- 
+  prep_base_1 %>% 
+  anti_join(prep_building) %>%
+  inner_join(prep_base_2,
+            by =  c("employee_name" = "full_name",
+                    "supervisor_display_name" = "supervisor_display_name",
+                    "dept_id" = "department_id"
+                    ),
+            suffix = c("_daily","_roster")
+  ) %>% 
+  select(-starts_with("file_name")) %>% 
+  distinct()
+```
+
+Review.
+
+```{r}
+prep_xx %>%  skim()
+```
+
+Bind to building dataframe.
+
+```{r}
+prep_building <- prep_building %>% 
+  bind_rows(prep_xx) %>% 
+  distinct()
+```
+
+```{r}
+unique_email_building <- prep_building %>% summarise(n_distinct(employee_e_mail_address)) %>% pull()
+unique_email_building
+```
+
+Test: This does not differ from the base.
+
+```{r}
+unique_email_base == unique_email_building
+```
+
+```{r}
+prep_building %>%  skim()
+```
+
+### Create unique person id
+
+```{r}
+prep_unique_id <- 
+  prep_building %>% 
+  select(employee_name,employee_e_mail_address) %>% 
+  distinct() %>% 
+  rownames_to_column(var = "person_id")
+```
+
+Review.
+
+```{r}
+prep_unique_id %>% 
+  skim()
+```
+
+### Join to building dataframe
+
+```{r}
+prep_building <- 
+  prep_building %>% 
+  left_join(prep_unique_id) %>% 
+  select(person_id,everything())
+```
+
+Review.
+
+```{r}
+prep_building %>% 
+  skim()
+```
+
+Check for duplicates on `person_id` and `date`.
+
+```{r}
+prep_building %>% 
+  get_dupes(person_id,date)
+```
+
+
+Third, remove data from building dataframe, then inner join by employee name. 
+
+```{r}
+prep_xx <- 
+  prep_base_1 %>% 
+  anti_join(prep_building) %>%
+  inner_join(prep_base_2,
+            by =  c("employee_name" = "full_name"
+                    ),
+            suffix = c("_daily","_roster")
+  ) %>% 
+  select(-starts_with("file_name")) %>% 
+  distinct()
+```
+
+Review.
+
+```{r}
+prep_xx %>%  skim()
+```
+
+Bind to building dataframe.
+
+```{r}
+prep_building <- prep_building %>% 
+  bind_rows(prep_xx) %>% 
+  distinct()
+```
+
+```{r}
+unique_email_building <- prep_building %>% summarise(n_distinct(employee_e_mail_address)) %>% pull()
+unique_email_building
+```
+
+Test: This does not differ from the base.
+
+```{r}
+unique_email_base == unique_email_building
+```
+
+```{r}
+prep_building %>%  skim()
+```
 
 Load all data files in the `r params$data_folder_2` data folder.
 
