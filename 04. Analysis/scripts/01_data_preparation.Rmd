@@ -265,51 +265,6 @@ Review.
 prep_building %>%  skim()
 ```
 
-
-```{r}
-prep_xx <- 
-  prep_base_1 %>% 
-  anti_join(prep_building) %>%
-  inner_join(prep_base_2,
-            by =  c("employee_name" = "full_name",
-                    "supervisor_display_name" = "supervisor_display_name",
-                    "dept_id" = "department_id"
-                    ),
-            suffix = c("_daily","_roster")
-  ) %>% 
-  select(-starts_with("file_name")) %>% 
-  distinct()
-```
-
-Review.
-
-```{r}
-prep_xx %>%  skim()
-```
-
-Bind to building dataframe.
-
-```{r}
-prep_building <- prep_building %>% 
-  bind_rows(prep_xx) %>% 
-  distinct()
-```
-
-```{r}
-unique_email_building <- prep_building %>% summarise(n_distinct(employee_e_mail_address)) %>% pull()
-unique_email_building
-```
-
-Test: This does not differ from the base.
-
-```{r}
-unique_email_base == unique_email_building
-```
-
-```{r}
-prep_building %>%  skim()
-```
-
 ### Create unique person id
 
 ```{r}
