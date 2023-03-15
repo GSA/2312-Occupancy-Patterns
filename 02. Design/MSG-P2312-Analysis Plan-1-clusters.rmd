@@ -34,44 +34,7 @@ library(ggthemes)
 table_n <- 0
 ```
 
-<!-- # MIKES COMMENTS -->
-
-<!-- Proofread for typos -->
-
-<!-- The analysis plan is a good place to define the rules for classification -->
-<!-- Re: missing supervisor name and some other values. It is possible that -->
-<!-- people change supervisors or departments. Do we care about this? And how -->
-<!-- should we deal with it? At a minimum, maybe we want a slightly different -->
-<!-- imputation like if supervisor is the same both with earlier and later -->
-<!-- nonmissing observations, use that value, otherwise use prior supervisor? -->
-
-<!-- How are you doing team classification? Are you going to generate a team -->
-<!-- ID based on some rule? If so what is it, and to the prior point, how do -->
-<!-- you handle changing team composition over time? -->
-
-<!-- Not sure about using percentiles for cutoffs. I would assume based on -->
-<!-- classifications that more that 5 percent of teams are fully remote. For -->
-<!-- individuals, i think there is more alignment on things like number of -->
-<!-- days in a pay period in the office because of policy definitions for -->
-<!-- people who are not remote and have to be in the office 2 days per pay -->
-<!-- period. For teams maybe an extension of that basic ideas (e.g., fewer -->
-<!-- than 2 days in office on average is fully remote) -->
-
-<!-- Are all of these taking averages over the whole time period (9 months or -->
-<!-- whatever)? Would we potentially want to know about things like people -->
-<!-- who have more specific weekly patterns? -->
-
-<!-- The thing that is missing here that is potentially more complicated is -->
-<!-- figuring out more about how teams operate as collections of individuals. -->
-<!-- For example, you could I think in this approach have a team that is 20 -->
-<!-- percent average telework where everyone goes in person on Mondays and -->
-<!-- the rest of the time is distributed, or you could have a team that is 20 -->
-<!-- percent telework where people go in at random times and never see each -->
-<!-- other. I am interested to know the extent to which people are -->
-<!-- co-locating with their teams (and if some people are being left -->
-<!-- out---which may help motivate some equity questions about performance -->
-<!-- ratings for people who don't get face time with the boss, for example). -->
-<!-- I think we are missing that level of analysis here. -->
+#Proofread for typos
 
 Project Name: `r params$project_name`
 
@@ -295,31 +258,25 @@ multiple cohorts depending on the data availability.
 
 Both data sources will be checked for duplication and deduplicated. The
 daily check-in data has no true unique identifier. The roster data is
-uniquely identified by `employee_e_mail_address` and `snapshot_date`.
+uniquely identified by `employee_e_mail_address` and `snapshot_date`, but some entries for `employee_e_mail_address` are null. 
 The roster data *should not* have any duplications on
 `employee_e_mail_address` and `snapshot_date`, but this will be checked.
 To create a unique identifier in the daily check-in data, we will
 following process:
 
-1.  Start with check-in data from one month (call this *month 1*)
+1.  Import all months of check-in data
 
-2.  Transform supervisor name to match format of the roster data
+2.  Transform supervisor name to match format of the roster data, and create new variables for the end of the month prior to the check-in date and the end of the month of the check-in date to match the `snapshot_date`
 
-3.  Join roster data from the previous month (call this *month 0*) on
-    employee name, staff or service office, department ID and supervisor
-    name
+3.  Inner join check-in and roster data  on employee name, department ID and supervisor name, and prior month, creating a new data set called `joined data 1`
 
-4.  Check to see if any rows are missing `employee_e_mail_address` after
-    the join
+4.  Remove rows in `joined data 1` from the check-in data (i.e. anti-join), then inner join check-in and roster data  on employee name, department ID and supervisor name, and current month, creating a new data set called `joined data 2`
 
-5.  For any rows missing `employee_e_mail_address`, join roster data
-    from data from *month 1*
+5.  Bind row from `joined data 1` and `joined data 2`, creating a new data set called `bound data`
 
-6.  Check to see if any rows are missing `employee_e_mail_address` after
-    the join
+6.  Select the distinct employee email addresses and names from `bound data` and assign a unique identifier to this called `person_id`, creating a new data set called `unique ID`
 
-7.  For any rows missing `employee_e_mail_address`, join roster data
-    from data from *month 2*
+7.  Join the `unique ID` to `bound data` on employee email addresses and names
 
 8.  Repeat steps 5 and 6 until no new `employee_e_mail_address` entries
     are found, or no roster data is available
@@ -329,7 +286,7 @@ following process:
 10. Bind all joined data across observation window.
 
 After this, the combined data *should* be uniquely identified by
-`employee_e_mail_address` and `date`. The data set will contain all the
+`person_id` and `date`. The data set will contain all the
 daily check-in and roster information across the observation window.
 
 If any duplicates remain after the steps above, the general approach to
@@ -369,6 +326,12 @@ tbl %>%
 ```
 
 <!-- [I might be more discerning about using "staff" vs. "employees" vs. "teams" vs. "groups" vs. "clusters" -- we are grouping employees into teams, but also categorizing them.]  -->
+
+<!-- How are you doing team classification? Are you going to generate a team -->
+<!-- ID based on some rule? If so what is it, and to the prior point, how do -->
+<!-- you handle changing team composition over time? -->
+
+ADD TEAM CLAFFICATION RULES FOR STAFF AND TEAM ANALYSIS
 
 We will approach grouping staff and teams in two ways. First,
 rules-based groups will be formed. For these, definitions of different
@@ -422,6 +385,13 @@ will be defined:
 ### Data Exclusion and Treatment of Missing Data:
 
 <!-- [Describe criteria you will use to determine whether any observations should be excluded from analysis (e.g., values that are likely data-recording errors, outliers, etc.).] -->
+
+<!-- The analysis plan is a good place to define the rules for classification -->
+<!-- Re: missing supervisor name and some other values. It is possible that -->
+<!-- people change supervisors or departments. Do we care about this? And how -->
+<!-- should we deal with it? At a minimum, maybe we want a slightly different -->
+<!-- imputation like if supervisor is the same both with earlier and later -->
+<!-- nonmissing observations, use that value, otherwise use prior supervisor? -->
 
 We have no plans to exclude any data.
 
@@ -510,6 +480,44 @@ anticipated prior to analysis.
 ### Study Design
 
 <!-- [prompt] -->
+
+<!-- Not sure about using percentiles for cutoffs. I would assume based on -->
+<!-- classifications that more that 5 percent of teams are fully remote. For -->
+<!-- individuals, i think there is more alignment on things like number of -->
+<!-- days in a pay period in the office because of policy definitions for -->
+<!-- people who are not remote and have to be in the office 2 days per pay -->
+<!-- period. For teams maybe an extension of that basic ideas (e.g., fewer -->
+<!-- than 2 days in office on average is fully remote) -->
+
+
+<!-- Are all of these taking averages over the whole time period (9 months or -->
+<!-- whatever)? Would we potentially want to know about things like people -->
+<!-- who have more specific weekly patterns? -->
+
+<!-- The thing that is missing here that is potentially more complicated is -->
+<!-- figuring out more about how teams operate as collections of individuals. -->
+<!-- For example, you could I think in this approach have a team that is 20 -->
+<!-- percent average telework where everyone goes in person on Mondays and -->
+<!-- the rest of the time is distributed, or you could have a team that is 20 -->
+<!-- percent telework where people go in at random times and never see each -->
+<!-- other. I am interested to know the extent to which people are -->
+<!-- co-locating with their teams (and if some people are being left -->
+<!-- out---which may help motivate some equity questions about performance -->
+<!-- ratings for people who don't get face time with the boss, for example). -->
+<!-- I think we are missing that level of analysis here. -->
+
+
+<!-- MD: There are policy definitions of remote. 100% of days could be classified as all remote (separate rule); policy rules if you are not a full-time worker (you are a teleworker) you report two days a pay period; could align cut-offs with policy type definitions. # of days cutoff.  -->
+<!-- Ben: the way I defined groups is mutually exclusive, but does not need to be that way -->
+<!-- Ben: Other rules to examine -->
+<!-- JB: policy side, missingness (whole groups of people missing on some dimension tells you something about data collection procedure) -->
+
+<!-- MD: other roster data might be relevant - position category could give diff patterns for people who are analysts vs. building inspectors or supervisors vs. non supervisors, pay grade; lower pay grade less likely to have remote option -->
+<!-- Ben: confusion matrix - assume that some group works in this sort of way but guess what they don’t! What is happening? -->
+
+<!-- MD: categories: onsite flexible, onsite, remote; but not sure of levels of going in within categories. What is the average of going in? -->
+<!-- MD: discretion of work patterns by regional commissioners  -->
+
 
 This is a descriptive study attempting to characterize the work patterns
 of GSA staff as individuals and as teams. Work patterns will be
