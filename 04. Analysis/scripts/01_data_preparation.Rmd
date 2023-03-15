@@ -36,6 +36,8 @@ library(readr)
 library(arsenal)
 library(Hmisc)
 library(readxl)
+library(flextable)
+library(ggthemes)
 ```
 
 # Data preparation {.tabset .tabset-pills}
@@ -153,7 +155,9 @@ unique_email_base <- prep_base_2 %>% summarise(n_distinct(employee_e_mail_addres
 unique_email_base
 ```
 
-### Join data
+## Joining data
+
+### Join 1
 
 First inner join by employee name, supervisor name, department id, and the last date, using the last day of the month before the daily checkin. 
 
@@ -207,6 +211,8 @@ Review.
 ```{r}
 prep_building %>%  skim()
 ```
+
+### Join 2
 
 Second, remove data from building dataframe, then inner join by employee name, supervisor name, department id, and the last date, using the last day of the month after the daily checkin. 
 
@@ -305,6 +311,605 @@ prep_building %>%
   get_dupes(person_id,date)
 ```
 
+## Compare to original dataframes
+
+```{r}
+prep_base_1_summary <- 
+  prep_base_1 %>% 
+  unite(employee_name_date,employee_name,date,remove = FALSE) %>% 
+  summarise(
+    rows = n(),
+    employee_name = n_distinct(employee_name),
+    employee_name_date = n_distinct(employee_name_date),
+  ) %>% 
+  mutate(dataframe = "prep_base_1")
+```
+
+```{r}
+prep_base_2_summary <- 
+  prep_base_2 %>% 
+  # unite(employee_name_date,employee_name,date,remove = FALSE) %>% 
+  summarise(
+    rows = n(),
+    employee_name = n_distinct(full_name),
+    employee_e_mail_address = n_distinct(employee_e_mail_address)
+  ) %>% 
+  mutate(dataframe = "prep_base_2")
+```
+
+```{r}
+prep_building_summary <- 
+  prep_building %>% 
+  unite(employee_name_date,employee_name,date,remove = FALSE) %>%
+  summarise(
+    rows = n(),
+    person_id = n_distinct(person_id),
+    employee_name = n_distinct(employee_name),
+    employee_e_mail_address = n_distinct(employee_e_mail_address),
+    employee_name_date = n_distinct(employee_name_date),
+  ) %>% 
+  mutate(dataframe = "prep_building")
+```
+
+```{r}
+prep_summary <- 
+  prep_base_1_summary %>% 
+  bind_rows(prep_base_2_summary) %>% 
+  bind_rows(prep_building_summary) %>% 
+  pivot_longer(-dataframe) %>% 
+  pivot_wider(names_from = dataframe,values_from = value)
+```
+
+```{r}
+prep_summary %>% 
+  flextable() %>% 
+  theme_zebra() %>% 
+  autofit()
+```
+
+```{r}
+prep_base_1_rows <- prep_summary %>% filter(name == 'rows') %>% pull(prep_base_1)
+
+prep_base_1_employee_name <- prep_summary %>% filter(name == 'employee_name') %>% pull(prep_base_1)
+
+diff_rows_count <- 
+  (prep_base_1_rows) -
+  (prep_summary %>% filter(name == 'rows') %>% pull(prep_building))
+
+diff_rows_prop <- 
+  diff_rows_count/prep_base_1_rows
+
+diff_employee_name_count <- 
+  (prep_base_1_employee_name) -
+  (prep_summary %>% filter(name == 'employee_name') %>% pull(prep_building))
+
+diff_employee_name_prop <- 
+  diff_employee_name_count/prep_base_1_employee_name
+```
+
+From this table, we find:
+
+1.    A loss of `r scales::comma(diff_rows_count)` rows between `prep_1_base` and `prep_building`, about `r scales::percent(diff_rows_prop)`
+2.    A loss of `r scales::comma(diff_employee_name_count)` rows between `prep_1_base` and `prep_building`, about `r scales::percent(diff_employee_name_prop)`
+
+These losses of data are reasonable. 
+
+Create a unique dataframe of just `date` and `person_id`.
+
+```{r}
+prep_uniq <- 
+  prep_building %>% 
+  select(date,person_id)
+```
+
+
+## Addressing blanks, nulls, and other values
+
+Created a dataframe of variable metadata.
+
+```{r}
+column_meta_data <- 
+  prep_building %>% 
+  contents()
+
+column_meta_data <- 
+  column_meta_data$contents %>% 
+  as.data.frame()
+
+column_meta_data <-
+  column_meta_data %>% 
+  rownames_to_column(var = "variable")
+
+column_meta_data <- 
+  column_meta_data %>% 
+  mutate(
+    nulls_by_variable = case_when(NAs > 0 ~ TRUE,
+                                  NAs == 0 ~ FALSE)
+  )
+
+column_meta_data
+```
+
+Counting top 10 values for all character or factor columns to identify other common values.
+
+```{r}
+values_count <- 
+  prep_building %>% 
+  select(where(is.character) | where(is.factor)) %>% 
+  names()
+
+values_count %>% 
+  map(~count(prep_building,!!sym(.)) %>% 
+  arrange(desc(n)) %>%
+  slice_head(n = 10))
+
+```
+
+No obvious values. 
+
+Function that checks whether there are blanks for different variables
+
+```{r}
+blank_check <- function(in_data,in_variable_name)
+{
+  check_01 <- 
+  in_data %>% 
+    filter(!!sym(in_variable_name) == "") %>% 
+  distinct()
+
+out <- nrow(check_01) > 0 
+
+return(out)
+}
+```
+
+Checking blanks for each variable in the dataframe.
+
+```{r}
+blanks_by_variable <- 
+  column_meta_data %>% 
+  pull(variable) %>% 
+  map_lgl(~blank_check(in_data = prep_building,.))
+
+blanks_by_variable
+```
+
+Add this to the `column_meta_data` dataframe. 
+
+```{r}
+column_meta_data <- 
+  column_meta_data %>% 
+  add_column(
+    blanks_by_variable = blanks_by_variable
+  )
+
+column_meta_data
+```
+
+Create dataframe of only variables that have blanks. 
+
+```{r}
+problem_variables <- 
+  column_meta_data %>% 
+  filter(blanks_by_variable | nulls_by_variable)
+
+problem_variables
+```
+
+Grouping variables.
+
+```{r}
+problem_variables <- 
+  problem_variables %>% 
+  mutate(group = 
+           case_when(variable == "position_category_code" ~ "position_category_code",
+                     variable == "position_category_description" ~ "position_category_code",
+                     TRUE ~ variable
+                     ))
+
+problem_variables
+```
+
+Create list of groups.
+
+```{r}
+problem_groups <- 
+  problem_variables %>% 
+  select(group) %>% 
+  distinct() %>% 
+  arrange(group) %>% 
+  pull()
+
+problem_groups
+```
+Also create a building dataframe to add other dataframes where missing have been removed.
+
+```{r}
+prep_problem <- prep_uniq
+```
+
+### Problems removal
+
+```{r}
+step_n <- 0
+```
+
+```{r}
+step_n <- step_n + 1
+```
+
+#### Step `r step_n`: `business_line_2_letter_department_id`
+
+Removing blanks produced by
+
+```{r}
+problem_variable <- 
+  problem_variables %>% 
+  filter(group == problem_groups[step_n])
+
+problem_variable
+```
+
+Reviewing blanks.
+
+```{r}
+nulls_01 <- 
+  prep_building %>% 
+  filter(if_any(all_of(problem_variable %>% pull(variable)),  ~is.na(.x))) %>% 
+  select(all_of(problem_variable %>% pull(variable)),everything())
+
+nulls_01
+```
+
+Let's count the extent of the issues.
+
+```{r}
+problem_variable %>% 
+  pull(variable) %>% 
+  map(
+    ~nulls_01 %>% 
+  count(!!sym(.x)) %>% 
+  arrange(desc(n)) %>% 
+    filter(is.na(!!sym(.x)))
+  )
+```
+
+Let's count the entries here.
+
+```{r}
+prep_building %>% 
+  group_by(across(all_of(problem_variable %>% pull(variable)))) %>% 
+  count() %>% 
+  arrange(desc(n))
+```
+
+Lot's of entries.
+
+Check relationship with time.
+
+```{r}
+prep_building %>% 
+  filter(if_any(all_of(problem_variable %>% pull(variable)),  ~is.na(.x))) %>% 
+  group_by(across(all_of(problem_variable %>% pull(variable))),date) %>% 
+  count() %>% 
+  ggplot(aes(x = date, y = n)) +
+  geom_point() +
+  geom_smooth()
+```
+
+Increase in July.
+
+Is this an important variable?
+
+No. We'll replace nulls with "(Missing)".
+
+```{r}
+prep_xx <- 
+  prep_building %>% 
+  select(date, person_id,all_of(problem_variable %>% pull(variable))) %>% 
+  distinct() %>% 
+  mutate(
+    across(
+      .cols = all_of(problem_variable %>% pull(variable)),
+      .fns = ~case_when(is.na(.) ~ "(Missing)",
+                        TRUE ~ .)
+    )
+  )
+
+prep_xx %>% skim()
+```
+
+Join to building dataframe.
+
+```{r}
+prep_problem <- prep_problem %>% 
+  left_join(prep_xx)
+```
+
+```{r}
+step_n <- step_n + 1
+```
+
+#### Step `r step_n`: `employee_e_mail_address`
+
+Removing problems produced by
+
+```{r}
+problem_variable <- 
+  problem_variables %>% 
+  filter(group == problem_groups[step_n])
+
+problem_variable
+```
+
+Reviewing blanks.
+
+```{r}
+nulls_01 <- 
+  prep_building %>% 
+  filter(if_any(all_of(problem_variable %>% pull(variable)),  ~is.na(.x))) %>% 
+  select(all_of(problem_variable %>% pull(variable)),everything())
+
+nulls_01
+```
+
+Let's count the extent of the issues.
+
+```{r}
+problem_variable %>% 
+  pull(variable) %>% 
+  map(
+    ~nulls_01 %>% 
+  count(!!sym(.x)) %>% 
+  arrange(desc(n)) %>% 
+    filter(is.na(!!sym(.x)))
+  )
+```
+
+Let's count the entries here.
+
+```{r}
+prep_building %>% 
+  group_by(across(all_of(problem_variable %>% pull(variable)))) %>% 
+  count() %>% 
+  arrange(desc(n))
+```
+
+Lot's of entries.
+
+Check relationship with time.
+
+```{r}
+prep_building %>% 
+  filter(if_any(all_of(problem_variable %>% pull(variable)),  ~is.na(.x))) %>% 
+  group_by(across(all_of(problem_variable %>% pull(variable))),date) %>% 
+  count() %>% 
+  ggplot(aes(x = date, y = n)) +
+  geom_jitter() +
+  geom_smooth() +
+  theme_fivethirtyeight()
+```
+
+Looks pretty random.
+
+Is this an important variable?
+
+Yes, but we won't be using it directly in the analysis. We'll replace nulls with "(Missing)".
+
+```{r}
+prep_xx <- 
+  prep_building %>% 
+  select(date, person_id,all_of(problem_variable %>% pull(variable))) %>% 
+  distinct() %>% 
+  mutate(
+    across(
+      .cols = all_of(problem_variable %>% pull(variable)),
+      .fns = ~case_when(is.na(.) ~ "(Missing)",
+                        TRUE ~ .)
+    )
+  )
+
+prep_xx %>% skim()
+```
+
+Join to building dataframe.
+
+```{r}
+prep_problem <- prep_problem %>% 
+  left_join(prep_xx)
+```
+
+```{r}
+step_n <- step_n + 1
+```
+
+#### Step `r step_n`: `location_city`
+
+Removing problems produced by
+
+```{r}
+problem_variable <- 
+  problem_variables %>% 
+  filter(group == problem_groups[step_n])
+
+problem_variable
+```
+
+Reviewing blanks.
+
+```{r}
+nulls_01 <- 
+  prep_building %>% 
+  filter(if_any(all_of(problem_variable %>% pull(variable)),  ~is.na(.x))) %>% 
+  select(all_of(problem_variable %>% pull(variable)),everything())
+
+nulls_01
+```
+
+Let's count the extent of the issues.
+
+```{r}
+problem_variable %>% 
+  pull(variable) %>% 
+  map(
+    ~nulls_01 %>% 
+  count(!!sym(.x)) %>% 
+  arrange(desc(n)) %>% 
+    filter(is.na(!!sym(.x)))
+  )
+```
+
+Let's count the entries here.
+
+```{r}
+prep_building %>% 
+  group_by(across(all_of(problem_variable %>% pull(variable)))) %>% 
+  count() %>% 
+  arrange(desc(n))
+```
+
+Lot's of entries.
+
+Check relationship with time.
+
+```{r}
+prep_building %>% 
+  filter(if_any(all_of(problem_variable %>% pull(variable)),  ~is.na(.x))) %>% 
+  group_by(across(all_of(problem_variable %>% pull(variable))),date) %>% 
+  count() %>% 
+  ggplot(aes(x = date, y = n)) +
+  geom_jitter() +
+  geom_smooth() +
+  theme_fivethirtyeight()
+```
+
+Weird that early in the year is low, then gets steady later. 
+
+Is this an important variable?
+
+Yes, but we have other location variables to rely on. We'll replace nulls with "(Missing)".
+
+```{r}
+prep_xx <- 
+  prep_building %>% 
+  select(date, person_id,all_of(problem_variable %>% pull(variable))) %>% 
+  distinct() %>% 
+  mutate(
+    across(
+      .cols = all_of(problem_variable %>% pull(variable)),
+      .fns = ~case_when(is.na(.) ~ "(Missing)",
+                        TRUE ~ .)
+    )
+  )
+
+prep_xx %>% skim()
+```
+
+Join to building dataframe.
+
+```{r}
+prep_problem <- prep_problem %>% 
+  left_join(prep_xx)
+```
+
+```{r}
+step_n <- step_n + 1
+```
+
+#### Step `r step_n`: `location_state`
+
+Removing problems produced by
+
+```{r}
+problem_variable <- 
+  problem_variables %>% 
+  filter(group == problem_groups[step_n])
+
+problem_variable
+```
+
+Reviewing blanks.
+
+```{r}
+nulls_01 <- 
+  prep_building %>% 
+  filter(if_any(all_of(problem_variable %>% pull(variable)),  ~is.na(.x))) %>% 
+  select(all_of(problem_variable %>% pull(variable)),everything())
+
+nulls_01
+```
+
+Let's count the extent of the issues.
+
+```{r}
+problem_variable %>% 
+  pull(variable) %>% 
+  map(
+    ~nulls_01 %>% 
+  count(!!sym(.x)) %>% 
+  arrange(desc(n)) %>% 
+    filter(is.na(!!sym(.x)))
+  )
+```
+
+Let's count the entries here.
+
+```{r}
+prep_building %>% 
+  group_by(across(all_of(problem_variable %>% pull(variable)))) %>% 
+  count() %>% 
+  arrange(desc(n))
+```
+
+Lot's of entries.
+
+Check relationship with time.
+
+```{r}
+prep_building %>% 
+  filter(if_any(all_of(problem_variable %>% pull(variable)),  ~is.na(.x))) %>% 
+  group_by(across(all_of(problem_variable %>% pull(variable))),date) %>% 
+  count() %>% 
+  ggplot(aes(x = date, y = n)) +
+  geom_jitter() +
+  geom_smooth() +
+  theme_fivethirtyeight()
+```
+
+Looks pretty random, and low numbers.  
+
+Is this an important variable?
+
+Yes, but we have other location variables to rely on. It appears from above that these are international locations. We'll replace nulls with "(International)".
+
+```{r}
+prep_xx <- 
+  prep_building %>% 
+  select(date, person_id,all_of(problem_variable %>% pull(variable))) %>% 
+  distinct() %>% 
+  mutate(
+    across(
+      .cols = all_of(problem_variable %>% pull(variable)),
+      .fns = ~case_when(is.na(.) ~ "(International)",
+                        TRUE ~ .)
+    )
+  )
+
+prep_xx %>% skim()
+```
+
+Join to building dataframe.
+
+```{r}
+prep_problem <- prep_problem %>% 
+  left_join(prep_xx)
+```
+
+```{r}
+step_n <- step_n + 1
+```
+
+# CONTINUE FROM HERE.
 
 Third, remove data from building dataframe, then inner join by employee name. 
 
