@@ -402,7 +402,6 @@ prep_uniq <-
   select(date,person_id)
 ```
 
-
 ## Addressing blanks, nulls, and other values
 
 Created a dataframe of variable metadata.
@@ -971,6 +970,8 @@ prep_building %>%
 
 Looks pretty random, and low numbers.  
 
+Let's investigate whether these employees ever have other values for `r problem_variable %>% pull(variable)`.
+
 ```{r}
 prep_01 <-
   prep_building %>% 
@@ -981,9 +982,13 @@ prep_01 <-
   arrange(person_id,date) %>% 
   select(person_id,date,all_of(problem_variable %>% pull(variable))) 
 
-prep_01
+prep_01 %>% 
+  DT::datatable(class = 'cell-border stripe')
 ```
 
+They do have some.
+
+Now let's look at how they change. 
 
 ```{r}
 prep_02 <- 
@@ -996,13 +1001,37 @@ prep_02 <-
   ) %>% 
   arrange(person_id,n)
 
-prep_02
+prep_02 %>% 
+  DT::datatable(class = 'cell-border stripe')
 ```
 
+It apprears that most start with nulls then became a category. 
+
+Let's check their position category at the earliest date and count. 
+
+```{r}
+prep_02 %>% 
+  group_by(person_id) %>% 
+  filter(date_first == min(date_first)) %>% 
+  ungroup() %>% 
+  count(position_category_code,position_category_description)
+```
+
+Most of this group are null at the beginning. Some not.
+
+Let's check the position category at the latest date and count.
+
+```{r}
+prep_02 %>% 
+  group_by(person_id) %>% 
+  filter(date_first == max(date_first)) %>% 
+  ungroup() %>% 
+  count(position_category_code,position_category_description)
+```
 
 Is this an important variable?
 
-Yes, but we have other location variables to rely on. It appears from above that these are international locations. We'll replace nulls with "(International)".
+Yes, but we want to use this in the analysis. We will fill the variable the most proximate value and create an indicator that these values were imputed. 
 
 ```{r}
 prep_xx <- 
@@ -1010,14 +1039,306 @@ prep_xx <-
   select(date, person_id,all_of(problem_variable %>% pull(variable))) %>% 
   distinct() %>% 
   mutate(
+    position_category_imputed = case_when(is.na(position_category_code) ~ 1,
+                                          is.na(position_category_description) ~ 1,
+                                          TRUE ~ 0) 
+  ) %>% 
+  arrange(person_id, date) %>% 
+  group_by(person_id) %>% 
+  fill(position_category_code, .direction = "downup") %>% 
+  fill(position_category_description, .direction = "downup") %>% 
+  ungroup() %>% 
+  mutate(
     across(
       .cols = all_of(problem_variable %>% pull(variable)),
-      .fns = ~case_when(is.na(.) ~ "(International)",
+      .fns = ~case_when(is.na(.) ~ "(Missing)",
                         TRUE ~ .)
     )
   )
+  )
 
-prep_xx %>% skim()
+prep_xx %>%
+  skim()
+```
+
+Compare against the identified cases above.
+
+```{r}
+prep_xx %>% 
+  inner_join(prep_01,
+            by =  c("person_id", "date"),
+            suffix = c("_xx","_01")
+  ) %>% 
+  DT::datatable(class = 'cell-border stripe')
+```
+
+Looks good. 
+
+Join to building dataframe.
+
+```{r}
+prep_problem <- prep_problem %>% 
+  left_join(prep_xx)
+```
+
+```{r}
+step_n <- step_n + 1
+```
+
+#### Step `r step_n`: `supervisor_correction`
+
+Removing problems produced by
+
+```{r}
+problem_variable <- 
+  problem_variables %>% 
+  filter(group == problem_groups[step_n])
+
+problem_variable
+```
+
+Reviewing blanks.
+
+```{r}
+nulls_01 <- 
+  prep_building %>% 
+  filter(if_any(all_of(problem_variable %>% pull(variable)),  ~is.na(.x))) %>% 
+  select(all_of(problem_variable %>% pull(variable)),everything())
+
+nulls_01
+```
+
+Let's count the extent of the issues.
+
+```{r}
+problem_variable %>% 
+  pull(variable) %>% 
+  map(
+    ~nulls_01 %>% 
+  count(!!sym(.x)) %>% 
+  arrange(desc(n)) %>% 
+    filter(is.na(!!sym(.x)))
+  )
+```
+
+Let's count the entries here.
+
+```{r}
+prep_building %>% 
+  group_by(across(all_of(problem_variable %>% pull(variable)))) %>% 
+  count() %>% 
+  arrange(desc(n)) %>% 
+   flextable() %>% 
+  theme_zebra() %>% 
+  autofit()
+```
+
+Lot's of entries.
+
+Check relationship with time.
+
+```{r}
+prep_building %>% 
+  filter(if_any(all_of(problem_variable %>% pull(variable)),  ~is.na(.x))) %>% 
+  group_by(across(all_of(problem_variable %>% pull(variable))),date) %>% 
+  count() %>% 
+  ggplot(aes(x = date, y = n)) +
+  geom_jitter() +
+  geom_smooth() +
+  theme_fivethirtyeight()
+```
+
+Some increase in the use of this over time. 
+
+Let's count this along side `daily_status`.
+
+```{r}
+prep_building %>% 
+  group_by(across(all_of(problem_variable %>% pull(variable))),daily_status) %>% 
+  count() %>% 
+   flextable() %>% 
+  theme_zebra() %>% 
+  autofit()
+```
+
+Is this an important variable?
+
+Yes, but we want to use this in the analysis. We will use with `daily_status` to define status.
+
+```{r}
+prep_xx <- 
+  prep_building %>% 
+  select(date, person_id,all_of(problem_variable %>% pull(variable)),daily_status) %>% 
+  distinct() %>% 
+  mutate(
+    daily_status_imputed = case_when(is.na(supervisor_correction) &
+                                       daily_status == "Supervisor Corrected" ~ "(Missing)",
+                                     is.na(supervisor_correction) ~ daily_status,
+                                     daily_status == "Supervisor Corrected" ~ supervisor_correction
+                                     ) 
+  )
+
+prep_xx %>%
+  skim()
+```
+
+Let's count these variables to make sure they are coming out correctly.
+
+```{r}
+prep_xx %>% 
+  count(supervisor_correction,daily_status,daily_status_imputed) %>% 
+  flextable() %>% 
+  theme_zebra() %>% 
+  autofit()
+```
+
+Looks good. 
+
+Join to building dataframe.
+
+```{r}
+prep_problem <- prep_problem %>% 
+  left_join(prep_xx)
+```
+
+```{r}
+step_n <- step_n + 1
+```
+
+#### Step `r step_n`: `supervisor_e_mail_address`
+
+Removing problems produced by
+
+```{r}
+problem_variable <- 
+  problem_variables %>% 
+  filter(group == problem_groups[step_n])
+
+problem_variable
+```
+
+Reviewing blanks.
+
+```{r}
+nulls_01 <- 
+  prep_building %>% 
+  filter(if_any(all_of(problem_variable %>% pull(variable)),  ~is.na(.x))) %>% 
+  select(all_of(problem_variable %>% pull(variable)),everything())
+
+nulls_01
+```
+
+Let's count the extent of the issues.
+
+```{r}
+problem_variable %>% 
+  pull(variable) %>% 
+  map(
+    ~nulls_01 %>% 
+  count(!!sym(.x)) %>% 
+  arrange(desc(n)) %>% 
+    filter(is.na(!!sym(.x)))
+  )
+```
+
+Not too many.
+
+Check relationship with time.
+
+```{r}
+prep_building %>% 
+  filter(if_any(all_of(problem_variable %>% pull(variable)),  ~is.na(.x))) %>% 
+  group_by(across(all_of(problem_variable %>% pull(variable))),date) %>% 
+  count() %>% 
+  ggplot(aes(x = date, y = n)) +
+  geom_jitter() +
+  geom_smooth() +
+  theme_fivethirtyeight()
+```
+
+Let's see if we can find these names in the roster data.
+
+```{r}
+nulls_01 %>% 
+  select(supervisor_display_name) %>% 
+  distinct() %>% 
+  separate(supervisor_display_name,c("supervisor_first_name","supervisor_last_name"), sep = " ") %>% 
+  mutate(
+    full_name = glue::glue("{supervisor_last_name},{supervisor_first_name}")
+  ) %>% 
+  inner_join(prep_base_2)
+```
+
+Let's see if anyone has the same last name. 
+
+```{r}
+prep_01 <- 
+  nulls_01 %>% 
+  select(supervisor_display_name) %>% 
+  distinct() %>% 
+  separate(supervisor_display_name,c("supervisor_first_name","supervisor_last_name"), sep = " ",
+           remove = FALSE) %>% 
+  mutate(
+    full_name = glue::glue("{supervisor_last_name},{supervisor_first_name}")
+  ) %>% 
+  inner_join(prep_base_2 %>% 
+               separate(full_name,c("supervisor_last_name","supervisor_first_name"), sep = ","),
+             by = "supervisor_last_name") %>% 
+  select(starts_with("supervisor_"), employee_e_mail_address,everything())
+
+prep_01
+```
+
+This looks like the right person. Let's collect her information.
+
+```{r}
+prep_02 <- 
+  prep_01 %>% 
+  select(supervisor_display_name.x,employee_e_mail_address) %>% 
+  distinct() %>% 
+  filter(!is.na(employee_e_mail_address)) %>% 
+  rename(supervisor_display_name = supervisor_display_name.x,
+         supervisor_e_mail_address = employee_e_mail_address)
+  
+prep_02
+```
+
+```{r}
+prep_xx <- 
+  prep_building %>% 
+  select(date, person_id,all_of(problem_variable %>% pull(variable)),supervisor_display_name) %>% 
+  distinct() %>% 
+  left_join(prep_02,by = "supervisor_display_name") %>% 
+  mutate(
+    supervisor_e_mail_address.z = 
+      case_when(is.na(supervisor_e_mail_address.x) ~ supervisor_e_mail_address.y,
+                TRUE ~supervisor_e_mail_address.x
+                                     )
+  )
+
+prep_xx %>%
+  skim()
+```
+
+Let's make sure it only effected this case.
+
+```{r}
+prep_xx %>% 
+  filter(supervisor_e_mail_address.y == supervisor_e_mail_address.z) %>% 
+  count(supervisor_display_name)
+  arrange(desc(supervisor_e_mail_address.z))
+```
+
+Looks good. Let's only use `person_id`, `date`, and rename `supervisor_e_mail_address.z`.
+
+```{r}
+prep_xx <- 
+  prep_xx %>% 
+  select(person_id,date,supervisor_e_mail_address.z) %>% 
+  rename(supervisor_e_mail_address = supervisor_e_mail_address.z)
+
+prep_xx %>%
+  skim()
 ```
 
 Join to building dataframe.
@@ -1029,6 +1350,84 @@ prep_problem <- prep_problem %>%
 
 ```{r}
 step_n <- step_n + 1
+```
+
+#### Step `r step_n`: Done!
+
+Removing problems produced by
+
+```{r}
+problem_variable <- 
+  problem_variables %>% 
+  filter(group == problem_groups[step_n])
+
+problem_variable
+```
+
+Done. 
+
+### Combining  data
+
+#### Create dataframe off non-null columns
+
+Collect column names of variables not creating duplicates.
+
+```{r}
+non_problem_variables <- 
+  column_meta_data  %>% 
+  filter(!(blanks_by_variable | nulls_by_variable)) %>% 
+  pull(variable)
+
+non_problem_variables
+```
+
+Create dataframe of only these variables.
+
+```{r}
+prep_xx <- 
+  prep_building %>% 
+  select(any_of(non_problem_variables)) %>% 
+  distinct()
+
+prep_xx %>% 
+  glimpse()
+
+prep_xx %>% 
+  skim()
+```
+
+Join to building dataframe.
+
+```{r}
+prep_building <- prep_problem %>% 
+  left_join(prep_xx)
+```
+
+### Checking problems
+
+Created a dataframe of variable metadata.
+
+```{r}
+column_meta_data <- 
+  prep_building %>% 
+  contents()
+
+column_meta_data <- 
+  column_meta_data$contents %>% 
+  as.data.frame()
+
+column_meta_data <-
+  column_meta_data %>% 
+  rownames_to_column(var = "variable")
+
+column_meta_data <- 
+  column_meta_data %>% 
+  mutate(
+    nulls_by_variable = case_when(NAs > 0 ~ TRUE,
+                                  NAs == 0 ~ FALSE)
+  )
+
+column_meta_data
 ```
 
 # CONTINUE FROM HERE.
