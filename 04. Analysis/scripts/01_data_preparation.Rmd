@@ -909,6 +909,128 @@ prep_problem <- prep_problem %>%
 step_n <- step_n + 1
 ```
 
+#### Step `r step_n`: `position_category_code`
+
+Removing problems produced by
+
+```{r}
+problem_variable <- 
+  problem_variables %>% 
+  filter(group == problem_groups[step_n])
+
+problem_variable
+```
+
+Reviewing blanks.
+
+```{r}
+nulls_01 <- 
+  prep_building %>% 
+  filter(if_any(all_of(problem_variable %>% pull(variable)),  ~is.na(.x))) %>% 
+  select(all_of(problem_variable %>% pull(variable)),everything())
+
+nulls_01
+```
+
+Let's count the extent of the issues.
+
+```{r}
+problem_variable %>% 
+  pull(variable) %>% 
+  map(
+    ~nulls_01 %>% 
+  count(!!sym(.x)) %>% 
+  arrange(desc(n)) %>% 
+    filter(is.na(!!sym(.x)))
+  )
+```
+
+Let's count the entries here.
+
+```{r}
+prep_building %>% 
+  group_by(across(all_of(problem_variable %>% pull(variable)))) %>% 
+  count() %>% 
+  arrange(desc(n))
+```
+
+Lot's of entries.
+
+Check relationship with time.
+
+```{r}
+prep_building %>% 
+  filter(if_any(all_of(problem_variable %>% pull(variable)),  ~is.na(.x))) %>% 
+  group_by(across(all_of(problem_variable %>% pull(variable))),date) %>% 
+  count() %>% 
+  ggplot(aes(x = date, y = n)) +
+  geom_jitter() +
+  geom_smooth() +
+  theme_fivethirtyeight()
+```
+
+Looks pretty random, and low numbers.  
+
+```{r}
+prep_01 <-
+  prep_building %>% 
+  filter(if_any(all_of(problem_variable %>% pull(variable)),  ~is.na(.x))) %>% 
+  select(person_id) %>% 
+  distinct() %>% 
+  inner_join(prep_building) %>% 
+  arrange(person_id,date) %>% 
+  select(person_id,date,all_of(problem_variable %>% pull(variable))) 
+
+prep_01
+```
+
+
+```{r}
+prep_02 <- 
+  prep_01 %>% 
+  group_by(across(all_of(problem_variable %>% pull(variable))),person_id) %>% 
+  summarise(
+    n = n(),
+    date_first = first(date),
+    date_last = last(date)
+  ) %>% 
+  arrange(person_id,n)
+
+prep_02
+```
+
+
+Is this an important variable?
+
+Yes, but we have other location variables to rely on. It appears from above that these are international locations. We'll replace nulls with "(International)".
+
+```{r}
+prep_xx <- 
+  prep_building %>% 
+  select(date, person_id,all_of(problem_variable %>% pull(variable))) %>% 
+  distinct() %>% 
+  mutate(
+    across(
+      .cols = all_of(problem_variable %>% pull(variable)),
+      .fns = ~case_when(is.na(.) ~ "(International)",
+                        TRUE ~ .)
+    )
+  )
+
+prep_xx %>% skim()
+```
+
+Join to building dataframe.
+
+```{r}
+prep_problem <- prep_problem %>% 
+  left_join(prep_xx)
+```
+
+```{r}
+step_n <- step_n + 1
+```
+
 # CONTINUE FROM HERE.
 
 Third, remove data from building dataframe, then inner join by employee name. 
