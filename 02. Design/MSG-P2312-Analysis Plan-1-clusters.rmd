@@ -295,7 +295,7 @@ indicator variables taking on a one for each category associated with
 the duplicate. There appear to be no numeric variables.
 
 The analysis will be done for staff and teams separately and aggregated
-independently. The table below defines how we plan to aggregate for
+independently. Employees will be categorized. Also, employees with be grouped into teams based on supervisor. These teams will also be categorized.  The table below defines how we plan to aggregate for
 staff and teams.
 
 ```{r}
@@ -327,9 +327,11 @@ tbl %>%
 
 <!-- [I might be more discerning about using "staff" vs. "employees" vs. "teams" vs. "groups" vs. "clusters" -- we are grouping employees into teams, but also categorizing them.]  -->
 
-<!-- How are you doing team classification? Are you going to generate a team -->
-<!-- ID based on some rule? If so what is it, and to the prior point, how do -->
-<!-- you handle changing team composition over time? -->
+<!-- Done -->
+
+
+
+
 
 ADD TEAM CLAFFICATION RULES FOR STAFF AND TEAM ANALYSIS
 
@@ -356,9 +358,15 @@ person. From the raw data, the following variables will be defined:
 
 -   Indicator for an exit from employment
 
--   Indicator for a switch in supervisor
+-   Number of supervisors
 
 -   Size of team over observation window
+
+<!-- How are you doing team classification? Are you going to generate a team -->
+<!-- ID based on some rule? If so what is it, and to the prior point, how do -->
+<!-- you handle changing team composition over time? -->
+
+Teams will be defined based on the supervisors in March 2022. The unique identifier for teams will be the `supervisor_e_mail_address`. All employees under those supervisors will be defined as part of the team. Employees may join and leave a team over the observation window.
 
 For both rules-based and cluster classification of teams, the daily
 check-in data will be transformed so that each row is one team as
@@ -366,7 +374,9 @@ defined by the supervisor. Supervisors may be in multiple teams as
 supervisor and subordinate. From the raw data, the following variables
 will be defined:
 
--   Size of team over observation window
+-   Average size of team over observation window
+
+-   Total employees in team over observation window
 
 -   Proportion of staff working days onsite
 
