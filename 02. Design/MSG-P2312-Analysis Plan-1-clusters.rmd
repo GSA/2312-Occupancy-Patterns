@@ -256,27 +256,41 @@ multiple cohorts depending on the data availability.
 
 <!-- Not sure i follow the deduping logic. If two employees have the same name, then they may have different EOD Dates. But maybe there are no duplicates on full name so it’s not an issue. -->
 
+<!--# Done -->
+
 Both data sources will be checked for duplication and deduplicated. The
 daily check-in data has no true unique identifier. The roster data is
-uniquely identified by `employee_e_mail_address` and `snapshot_date`, but some entries for `employee_e_mail_address` are null. 
-The roster data *should not* have any duplications on
-`employee_e_mail_address` and `snapshot_date`, but this will be checked.
-To create a unique identifier in the daily check-in data, we will
-following process:
+uniquely identified by `employee_e_mail_address` and `snapshot_date`,
+but some entries for `employee_e_mail_address` are null. The roster data
+*should not* have any duplications on `employee_e_mail_address` and
+`snapshot_date`, but this will be checked. To create a unique identifier
+in the daily check-in data, we will following process:
 
 1.  Import all months of check-in data
 
-2.  Transform supervisor name to match format of the roster data, and create new variables for the end of the month prior to the check-in date and the end of the month of the check-in date to match the `snapshot_date`
+2.  Transform supervisor name to match format of the roster data, and
+    create new variables for the end of the month prior to the check-in
+    date and the end of the month of the check-in date to match the
+    `snapshot_date`
 
-3.  Inner join check-in and roster data  on employee name, department ID and supervisor name, and prior month, creating a new data set called `joined data 1`
+3.  Inner join check-in and roster data on employee name, department ID
+    and supervisor name, and prior month, creating a new data set called
+    `joined data 1`
 
-4.  Remove rows in `joined data 1` from the check-in data (i.e. anti-join), then inner join check-in and roster data  on employee name, department ID and supervisor name, and current month, creating a new data set called `joined data 2`
+4.  Remove rows in `joined data 1` from the check-in data (i.e.
+    anti-join), then inner join check-in and roster data on employee
+    name, department ID and supervisor name, and current month, creating
+    a new data set called `joined data 2`
 
-5.  Bind row from `joined data 1` and `joined data 2`, creating a new data set called `bound data`
+5.  Bind row from `joined data 1` and `joined data 2`, creating a new
+    data set called `bound data`
 
-6.  Select the distinct employee email addresses and names from `bound data` and assign a unique identifier to this called `person_id`, creating a new data set called `unique ID`
+6.  Select the distinct employee email addresses and names from
+    `bound data` and assign a unique identifier to this called
+    `person_id`, creating a new data set called `unique ID`
 
-7.  Join the `unique ID` to `bound data` on employee email addresses and names
+7.  Join the `unique ID` to `bound data` on employee email addresses and
+    names
 
 8.  Repeat steps 5 and 6 until no new `employee_e_mail_address` entries
     are found, or no roster data is available
@@ -286,8 +300,8 @@ following process:
 10. Bind all joined data across observation window.
 
 After this, the combined data *should* be uniquely identified by
-`person_id` and `date`. The data set will contain all the
-daily check-in and roster information across the observation window.
+`person_id` and `date`. The data set will contain all the daily check-in
+and roster information across the observation window.
 
 If any duplicates remain after the steps above, the general approach to
 deduplication will be that categorical variables will be restructured as
@@ -295,8 +309,10 @@ indicator variables taking on a one for each category associated with
 the duplicate. There appear to be no numeric variables.
 
 The analysis will be done for staff and teams separately and aggregated
-independently. Employees will be categorized. Also, employees with be grouped into teams based on supervisor. These teams will also be categorized.  The table below defines how we plan to aggregate for
-staff and teams.
+independently. Employees will be categorized. Also, employees with be
+grouped into teams based on supervisor. These teams will also be
+categorized. The table below defines how we plan to aggregate for staff
+and teams.
 
 ```{r}
 table_n <- table_n + 1
@@ -329,10 +345,6 @@ tbl %>%
 
 <!-- Done -->
 
-
-
-
-
 ADD TEAM CLAFFICATION RULES FOR STAFF AND TEAM ANALYSIS
 
 We will approach grouping staff and teams in two ways. First,
@@ -362,11 +374,26 @@ person. From the raw data, the following variables will be defined:
 
 -   Size of team over observation window
 
+For staff-level analysis, the team will be defined by the employee's
+supervisor. Changes in supervisors will come from staff moving teams or
+an existing team changing supervisors. The size of the team will be
+caluculated with the mode of staff with the supervisor over the
+observations window. For employees with multiple supervisors, the size
+of the team will be the average of the modes of team sizes for each
+supervisor.
+
 <!-- How are you doing team classification? Are you going to generate a team -->
+
 <!-- ID based on some rule? If so what is it, and to the prior point, how do -->
+
 <!-- you handle changing team composition over time? -->
 
-Teams will be defined based on the supervisors in March 2022. The unique identifier for teams will be the `supervisor_e_mail_address`. All employees under those supervisors will be defined as part of the team. Employees may join and leave a team over the observation window.
+<!--# Done -->
+
+Teams will be defined based on the supervisors in March 2022. The unique
+identifier for teams will be the `supervisor_e_mail_address`. All
+employees under those supervisors will be defined as part of the team.
+Employees may join and leave a team over the observation window.
 
 For both rules-based and cluster classification of teams, the daily
 check-in data will be transformed so that each row is one team as
@@ -397,11 +424,18 @@ will be defined:
 <!-- [Describe criteria you will use to determine whether any observations should be excluded from analysis (e.g., values that are likely data-recording errors, outliers, etc.).] -->
 
 <!-- The analysis plan is a good place to define the rules for classification -->
+
 <!-- Re: missing supervisor name and some other values. It is possible that -->
+
 <!-- people change supervisors or departments. Do we care about this? And how -->
+
 <!-- should we deal with it? At a minimum, maybe we want a slightly different -->
+
 <!-- imputation like if supervisor is the same both with earlier and later -->
+
 <!-- nonmissing observations, use that value, otherwise use prior supervisor? -->
+
+<!--# Done -->
 
 We have no plans to exclude any data.
 
@@ -427,11 +461,11 @@ tbl_combined %>%
 add_column(
 "Treatment if missing" = c(
   "Drop observation",
-  "Joined with gsa_sso from roster data, impute from other observations of same staff",
-  "Impute from other observations of same staff",
-  "Joined with department_id from roster data, impute from other observations of same staff",
+  "Joined with gsa_sso from roster data, impute from earlier observations of same staff",
+  "Impute from earlier observations of same staff",
+  "Joined with department_id from roster data, impute from earlier observations of same staff",
   "Joined with full_name from roster data, drop observation",
-  "Joined with supervisor_display_name from roster data, impute from other observations of same staff",
+  "Joined with supervisor_display_name from roster data, impute from earlier observations of same staff",
   "Label as missing",
   "Label as missing",
   "Label as missing", "Label as missing",
@@ -492,42 +526,62 @@ anticipated prior to analysis.
 <!-- [prompt] -->
 
 <!-- Not sure about using percentiles for cutoffs. I would assume based on -->
+
 <!-- classifications that more that 5 percent of teams are fully remote. For -->
+
 <!-- individuals, i think there is more alignment on things like number of -->
+
 <!-- days in a pay period in the office because of policy definitions for -->
+
 <!-- people who are not remote and have to be in the office 2 days per pay -->
+
 <!-- period. For teams maybe an extension of that basic ideas (e.g., fewer -->
+
 <!-- than 2 days in office on average is fully remote) -->
 
-
 <!-- Are all of these taking averages over the whole time period (9 months or -->
+
 <!-- whatever)? Would we potentially want to know about things like people -->
+
 <!-- who have more specific weekly patterns? -->
 
 <!-- The thing that is missing here that is potentially more complicated is -->
+
 <!-- figuring out more about how teams operate as collections of individuals. -->
+
 <!-- For example, you could I think in this approach have a team that is 20 -->
+
 <!-- percent average telework where everyone goes in person on Mondays and -->
+
 <!-- the rest of the time is distributed, or you could have a team that is 20 -->
+
 <!-- percent telework where people go in at random times and never see each -->
+
 <!-- other. I am interested to know the extent to which people are -->
+
 <!-- co-locating with their teams (and if some people are being left -->
+
 <!-- out---which may help motivate some equity questions about performance -->
+
 <!-- ratings for people who don't get face time with the boss, for example). -->
+
 <!-- I think we are missing that level of analysis here. -->
 
-
 <!-- MD: There are policy definitions of remote. 100% of days could be classified as all remote (separate rule); policy rules if you are not a full-time worker (you are a teleworker) you report two days a pay period; could align cut-offs with policy type definitions. # of days cutoff.  -->
+
 <!-- Ben: the way I defined groups is mutually exclusive, but does not need to be that way -->
+
 <!-- Ben: Other rules to examine -->
+
 <!-- JB: policy side, missingness (whole groups of people missing on some dimension tells you something about data collection procedure) -->
 
 <!-- MD: other roster data might be relevant - position category could give diff patterns for people who are analysts vs. building inspectors or supervisors vs. non supervisors, pay grade; lower pay grade less likely to have remote option -->
+
 <!-- Ben: confusion matrix - assume that some group works in this sort of way but guess what they don’t! What is happening? -->
 
 <!-- MD: categories: onsite flexible, onsite, remote; but not sure of levels of going in within categories. What is the average of going in? -->
-<!-- MD: discretion of work patterns by regional commissioners  -->
 
+<!-- MD: discretion of work patterns by regional commissioners  -->
 
 This is a descriptive study attempting to characterize the work patterns
 of GSA staff as individuals and as teams. Work patterns will be
@@ -538,25 +592,28 @@ For the rules based approach, the portion of working days remote will be
 the key variable to determine what category a staff or team will be in.
 Staff will be grouped as follows:
 
-1.  **All remote** - Staff who work remotely above the 95th percentile
-    <!-- could be 75th -->
-2.  **Mostly remote** - Staff who work remotely between the median and
+1.  **All remote** - A policy definition for staff that are 100% remote.
+2.  **Teleworker** - A policy definition for staff that require two days
+    per pay period onsite.
+3.  **Primarily remote** - Staff who work remotely above the 95th
+    percentile <!-- could be 75th -->
+4.  **Mostly remote** - Staff who work remotely between the median and
     the 95th percentile <!-- could be 75th -->
-3.  **Mostly onsite** - Staff who work remotely between 5th percentile
+5.  **Mostly onsite** - Staff who work remotely between 5th percentile
     and the median <!-- could be 25th -->
-4.  **All onsite** - Staff who work remotely below the 5th percentile
-    <!-- could be 75th -->
+6.  **Primarly onsite** - Staff who work remotely below the 5th
+    percentile <!-- could be 75th -->
 
 Teams will be categorized similarly:
 
-1.  **All remote** - Teams that work remotely above the 95th percentile
-    <!-- could be 75th -->
+1.  **Primarily remote** - Teams that work remotely above the 95th
+    percentile <!-- could be 75th -->
 2.  **Mostly remote** - Teams that work remotely between the median and
     the 95th percentile <!-- could be 75th -->
 3.  **Mostly onsite** - Teams that work remotely between 5th percentile
     and the median <!-- could be 25th -->
-4.  **All onsite** - Teams that work remotely below the 5th percentile
-    <!-- could be 75th -->
+4.  **Primarily onsite** - Teams that work remotely below the 5th
+    percentile <!-- could be 75th -->
 
 For the second categorization, a k-means clustering algorithm will be
 used. We follow the methods layed out in:
