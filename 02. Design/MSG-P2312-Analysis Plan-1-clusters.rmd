@@ -34,7 +34,7 @@ library(ggthemes)
 table_n <- 0
 ```
 
-#Proofread for typos
+<!-- #Proofread for typos -->
 
 Project Name: `r params$project_name`
 
@@ -65,7 +65,6 @@ patterns with GSA roster data and describe rates of telework and on site
 work across employment and personal demographics. We will also determine
 the rates at which teams work together onsite, remotely, or in a hybrid
 environment.
-
 
 ```{r}
 table_n <- table_n + 1
@@ -126,7 +125,6 @@ tbl %>%
 ```{r}
 table_n <- table_n + 1
 ```
-
 
 ### Pre Registration Details
 
@@ -370,10 +368,11 @@ deduplication will be that categorical variables will be restructured as
 indicator variables taking on a one for each category associated with
 the duplicate. There appear to be no numeric variables.
 
-The analysis will be done for employees and teams separately and aggregated
-independently. Employees will be categorized. Also, team members will be defined as belonging to a team based on supervisor. These teams will also be
-categorized. The table below defines how we plan to aggregate for staff
-and teams.
+The analysis will be done for employees and teams separately and
+aggregated independently. Employees will be categorized. Also, team
+members will be defined as belonging to a team based on supervisor.
+These teams will also be categorized. The table below defines how we
+plan to aggregate for staff and teams.
 
 ```{r}
 table_n <- table_n + 1
@@ -406,27 +405,17 @@ tbl %>%
 
 <!-- Done -->
 
-# CONTINUE REVIEWING TERMS FROM HERE.
-
-# Update based on notes from conversation with Jake 3-23-23 
-
-<!-- scaling variables -->
-<!--  - use rank -->
-<!--  - demean and divide by std deviation -->
-<!-- compare clustering results -->
-<!-- check variable distribution -->
-<!-- check pairwise plots of variables -->
-
-We will categorize employees and teams in two ways. First,
-rules-based groups will be formed. For these, definitions of different
-types of work will be defined based on the proportion of work done remotely, by policy rules, and by position category. Second, groups will be formed using
+We will categorize employees and teams in two ways. First, rules-based
+groups will be formed. For these, definitions of different types of work
+will be defined based on the proportion of work done remotely, by policy
+rules, and by position category. Second, groups will be formed using
 k-means clustering. This unsupervised machine learning method produces a
 defined number of groups (or clusters) minimizing the distance between
 the members.
 
-For both rules-based and cluster classification of individual staff, the
-daily check-in data will be transformed so that each row is one staff
-person. From the raw data, the following variables will be defined:
+For both rules-based and cluster classification of employee, the daily
+check-in data will be transformed so that each row is one employee. From
+the raw data, the following variables will be defined:
 
 -   Proportion of days onsite
 
@@ -453,10 +442,10 @@ person. From the raw data, the following variables will be defined:
 
 -   Proportion of working days entire team is remote
 
-For staff-level analysis, the team will be defined by the employee's
-supervisor. Changes in supervisors will come from staff moving teams or
-an existing team changing supervisors. The size of the team will be
-calculated with the mode of staff with the supervisor over the
+For employee analysis, the team will be defined by the employee's
+supervisor. Changes in supervisors will come from employees moving teams
+or an existing team changing supervisors. The size of the team will be
+calculated with the mode of team members with the supervisor over the
 observations window. For employees with multiple supervisors, the size
 of the team will be the average of the modes of team sizes for each
 supervisor.
@@ -470,29 +459,30 @@ supervisor.
 <!--# Done -->
 
 Teams will be defined based on the supervisors in March 2022. The unique
-identifier for teams will be the `supervisor_e_mail_address`. All
-employees under those supervisors will be defined as part of the team.
-Employees may join and leave a team over the observation window.
+identifier for teams will be the `supervisor_e_mail_address`. All team
+members under those supervisors will be defined as part of the team.
+Team members may join and leave a team over the observation window.
 
 For both rules-based and cluster classification of teams, the daily
 check-in data will be transformed so that each row is one team as
 defined by the supervisor. Supervisors may be in multiple teams as
-supervisor and subordinate. From the raw data, the following variables
+supervisor and team member. From the raw data, the following variables
 will be defined:
 
 -   Average size of team over observation window
 
 -   Total employees in team over observation window
 
--   Proportion of staff working days onsite
+-   Proportion of team members working days onsite
 
--   Proportion of staff working days remote
+-   Proportion of team members working days remote
 
--   Proportion of staff working days remote by the day of the week
+-   Proportion of team members working days remote by the day of the
+    week
 
--   Proportion of staff exiting team
+-   Proportion of team members exiting team
 
--   Number of staff working days
+-   Number of team members working days
 
 -   Proportion of working days at least two team member co-located
 
@@ -686,13 +676,13 @@ be in. Staff will be grouped as follows:
     roster data
 5.  **Onsite Required** - Defined by `position_category_description` in
     the roster data
-6.  **Primarily remote** - Staff who work remotely above the 95th
+6.  **Primarily remote** - Employees who work remotely above the 95th
     percentile <!-- could be 75th -->
-7.  **Mostly remote** - Staff who work remotely between the median and
-    the 95th percentile <!-- could be 75th -->
-8.  **Mostly onsite** - Staff who work remotely between 5th percentile
-    and the median <!-- could be 25th -->
-9.  **Primarily onsite** - Staff who work remotely below the 5th
+7.  **Mostly remote** - Employees who work remotely between the median
+    and the 95th percentile <!-- could be 75th -->
+8.  **Mostly onsite** - Employees who work remotely between 5th
+    percentile and the median <!-- could be 25th -->
+9.  **Primarily onsite** - Employees who work remotely below the 5th
     percentile <!-- could be 75th -->
 
 Teams will be categorized similarly:
@@ -702,8 +692,8 @@ Teams will be categorized similarly:
     onsite.
 3.  **Onsite Flexible** - All team members are *Onsite Flexible* as
     defined by `position_category_description` in the roster data
-4.  **Offsite** - All team members are *Offsite* as defined by
-    `position_category_description` in the roster data
+4.  **Offsite** - All team members are *Offsite* as defined byteam
+    members `position_category_description` in the roster data
 5.  **Onsite Required** - All team members are *Onsite Required* as
     defined by `position_category_description` in the roster data
 6.  Mixed position categories - Team members are different position
@@ -758,15 +748,16 @@ For team clusters, the following variables will be used:
 
 -   Modal size of team over observation window
 
--   Proportion of staff working days onsite
+-   Proportion of team members working days onsite
 
--   Proportion of staff working days remote
+-   Proportion of team members working days remote
 
--   Proportion of staff working days remote by the day of the week
+-   Proportion of team members working days remote by the day of the
+    week
 
--   Proportion of staff exiting team
+-   Proportion of team members exiting team
 
--   Number of staff working days
+-   Number of team members working days
 
 -   Proportion of working days at least two team member co-located
 
@@ -777,8 +768,34 @@ For team clusters, the following variables will be used:
 
 -   Proportion of working days entire team is remote
 
+<!-- # Update based on notes from conversation with Jake 3-23-23 -->
+
+<!-- scaling variables -->
+
+<!--  - use rank -->
+
+<!--  - demean and divide by std deviation -->
+
+<!-- compare clustering results -->
+
+<!-- check variable distribution -->
+
+<!-- check pairwise plots of variables -->
+
 All of the these variables will be scaled to reduce the effects of
-outliers should they be present.
+outliers should they be present. Two scaling methods will be used:
+
+1.  Normalize - Data will have the mean that that element subtracted and
+    then divided by the standard deviation, using the `scale()`
+    function[^1]
+
+2.  Rank - The rank of each element will be used instead of the element.
+
+[^1]: [Documentation for the scale
+    function.](https://www.rdocumentation.org/packages/base/versions/3.6.2/topics/scale)
+
+The scaled elements will be compared to the true data by reviewing their
+distributions and comparing the results of the clusters.
 
 <!-- Why mention sq(num obs)/2 if you are not going to use that rule? -->
 
@@ -883,17 +900,17 @@ patterns and descriptive data.
 
 The principle work pattern statistics are as follows:
 
--   Staff work pattern statistics:
+-   Employee work pattern statistics:
 
-    -   Proportion in staff time telework
+    -   Proportion in employee time telework
 
-    -   Proportion in staff time telework by the day of the week
+    -   Proportion in employee time telework by the day of the week
 
-    -   Proportion in staff time onsite
+    -   Proportion in employee time onsite
 
-    -   Proportion in staff time onsite by the day of the week
+    -   Proportion in employee time onsite by the day of the week
 
-    -   Correlations of by staff time between the days of the week
+    -   Correlations of by employee time between the days of the week
 
     -   Size of teams
 
@@ -914,13 +931,13 @@ The principle work pattern statistics are as follows:
 
 -   Team work pattern statistics:
 
-    -   Proportion in staff time telework
+    -   Proportion in team members time telework
 
-    -   Proportion in staff time onsite
+    -   Proportion in team members time onsite
 
     -   Size of teams
 
-    -   Number of staff working days
+    -   Number of team members working days
 
     -   Proportion of working days at least two team member co-located
 
@@ -933,47 +950,49 @@ The principle work pattern statistics are as follows:
 
 The descriptive statistics are:
 
--   Staff descriptive statistics
+-   Employee descriptive statistics
 
-    -   Number and proportion of staff by grade
+    -   Number and proportion of employees by grade
 
-    -   Number and proportion of staff by occupational series
+    -   Number and proportion of employees by occupational series
 
-    -   Number and proportion of staff by position category
+    -   Number and proportion of employees by position category
 
-    -   Number and proportion of staff by GSA region
+    -   Number and proportion of employees by GSA region
 
-    -   Number and proportion of staff by SSO
+    -   Number and proportion of employees by SSO
 
-    -   Number and proportion of staff by state
+    -   Number and proportion of employees by state
 
-    -   Number and proportion of staff by city
+    -   Number and proportion of employees by city
 
-    -   Number and proportion of staff by supervisor level
+    -   Number and proportion of employees by supervisor level
 
 -   Team descriptive statistics
 
-    -   Number and proportion of staff by most frequent grade
+    -   Number and proportion of team members by most frequent grade
 
-    -   Number and proportion of staff by most frequent occupational
-        series
+    -   Number and proportion of team members by most frequent
+        occupational series
 
-    -   Number and proportion of staff by most frequent position
+    -   Number and proportion of team members by most frequent position
         category
 
-    -   Number and proportion of staff by most frequent GSA region
+    -   Number and proportion of team members by most frequent GSA
+        region
 
-    -   Number and proportion of staff by most frequent SSO
+    -   Number and proportion of team members by most frequent SSO
 
-    -   Number and proportion of staff by most frequent state
+    -   Number and proportion of team members by most frequent state
 
-    -   Number and proportion of staff by most frequent city
+    -   Number and proportion of team members by most frequent city
 
-    -   Number and proportion of staff by most frequent supervisor level
+    -   Number and proportion of team members by most frequent
+        supervisor level
 
-The staff statistics will be calculated for the following groups:
+The employees statistics will be calculated for the following groups:
 
-1.  Whole cohort of staff
+1.  Whole cohort of employees
 2.  By rule-based categories of work pattern
 3.  By cluster defined categories of work pattern
 
@@ -983,10 +1002,10 @@ The team statistics will be calculated for the following groups:
 2.  By rule-based categories of work pattern
 3.  By cluster defined categories of work pattern
 
-To understand the relationship between staff work patterns and their
-supervisor, we will calculate the proportion of the staff that fall into
-the same rule-based and clusters as their supervisors overall, as well
-as by the above categories.
+To understand the relationship between employees work patterns and their
+supervisor, we will calculate the proportion of the employees that fall
+into the same rule-based and clusters as their supervisors overall, as
+well as by the above categories.
 
 The results will be presented in tables, and we will generate
 visualizations for a subset of the results for streamlined
