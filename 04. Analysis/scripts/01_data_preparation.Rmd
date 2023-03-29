@@ -1055,7 +1055,7 @@ prep_xx <-
                         TRUE ~ .)
     )
   )
-  )
+  
 
 prep_xx %>%
   skim()
@@ -1326,7 +1326,6 @@ Let's make sure it only effected this case.
 prep_xx %>% 
   filter(supervisor_e_mail_address.y == supervisor_e_mail_address.z) %>% 
   count(supervisor_display_name)
-  arrange(desc(supervisor_e_mail_address.z))
 ```
 
 Looks good. Let's only use `person_id`, `date`, and rename `supervisor_e_mail_address.z`.
@@ -1428,6 +1427,100 @@ column_meta_data <-
   )
 
 column_meta_data
+```
+
+
+Counting top 10 values for all character or factor columns to identify other common values.
+
+```{r}
+values_count <- 
+  prep_building %>% 
+  select(where(is.character) | where(is.factor)) %>% 
+  names()
+
+values_count %>% 
+  map(~count(prep_building,!!sym(.)) %>% 
+  arrange(desc(n)) %>%
+  slice_head(n = 10))
+
+```
+
+No obvious values. 
+
+Function that checks whether there are blanks for different variables
+
+```{r}
+blank_check <- function(in_data,in_variable_name)
+{
+  check_01 <- 
+  in_data %>% 
+    filter(!!sym(in_variable_name) == "") %>% 
+  distinct()
+
+out <- nrow(check_01) > 0 
+
+return(out)
+}
+```
+
+Checking blanks for each variable in the dataframe.
+
+```{r}
+blanks_by_variable <- 
+  column_meta_data %>% 
+  pull(variable) %>% 
+  map_lgl(~blank_check(in_data = prep_building,.))
+
+blanks_by_variable
+```
+
+Add this to the `column_meta_data` dataframe. 
+
+```{r}
+column_meta_data <- 
+  column_meta_data %>% 
+  add_column(
+    blanks_by_variable = blanks_by_variable
+  )
+
+column_meta_data
+```
+
+Create dataframe of only variables that have blanks. 
+
+```{r}
+problem_variables <- 
+  column_meta_data %>% 
+  filter(blanks_by_variable | nulls_by_variable)
+
+problem_variables
+```
+
+Grouping variables.
+
+```{r}
+problem_variables <- 
+  problem_variables %>% 
+  mutate(group = 
+           case_when(variable == "position_category_code" ~ "position_category_code",
+                     variable == "position_category_description" ~ "position_category_code",
+                     TRUE ~ variable
+                     ))
+
+problem_variables
+```
+
+Create list of groups.
+
+```{r}
+problem_groups <- 
+  problem_variables %>% 
+  select(group) %>% 
+  distinct() %>% 
+  arrange(group) %>% 
+  pull()
+
+problem_groups
 ```
 
 # CONTINUE FROM HERE.
