@@ -138,7 +138,7 @@ either main page or project-specific page].
 This work will address the following research questions: 1. What are the
 rates of telework since the federal return-to-office transition? 2. Do
 telework behaviors match position category (e.g., onsite, offsite, etc.)
-in the roster? 3. At what rates to teams work together onsite vs.
+in the roster? 3. At what rates do teams work together onsite vs.
 remotely? 4. Do the telework patterns of supervisors match the telework
 patterns of supervisees?
 
@@ -324,7 +324,7 @@ uniquely identified by `employee_e_mail_address` and `snapshot_date`,
 but some entries for `employee_e_mail_address` are null. The roster data
 *should not* have any duplications on `employee_e_mail_address` and
 `snapshot_date`, but this will be checked. To create a unique identifier
-in the daily check-in data, we will following process:
+in the daily check-in data, we will use the following process:
 
 1.  Import all months of check-in data
 
