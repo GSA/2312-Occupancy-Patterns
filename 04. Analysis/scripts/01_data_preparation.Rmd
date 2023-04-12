@@ -17,6 +17,10 @@ params:
   unique_identifier_2: !r c("snapshot_date","employee_e_mail_address")
 ---
 
+```{r}
+tictoc::tic()
+```
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 if(!("arsenal" %in% installed.packages()[,"Package"]))
@@ -51,6 +55,31 @@ library(ggthemes)
 **Data folder 1**: `r params$data_folder_`'
 
 **Unique identifier for data folder 1**: `r params$unique_identifier_1`
+
+## Functions
+
+Function to display datatable.
+
+```{r}
+datatable_with_sampling <- function(in_data, in_max_rows)
+{
+  if(nrow(in_data) > in_max_rows)
+{
+  print(glue::glue("Big dataframe. Sampling {scales::comma(in_max_rows)} rows. {Sys.time()}"))
+  prep_01 <- 
+    in_data %>% 
+    sample_n(size = in_max_rows)
+}
+
+if(nrow(in_data) <= in_max_rows)
+{
+  prep_01 <- 
+    in_data
+}
+prep_01 %>% 
+  DT::datatable(class = 'cell-border stripe')
+}
+```
 
 ## Load data {.tabset .tabset-pills}
 
@@ -185,7 +214,8 @@ prep_xx %>%
 ```{r}
 prep_xx %>%
   get_dupes(date,employee_e_mail_address) %>%
-  arrange(desc(dupe_count))
+  arrange(desc(dupe_count)) %>% 
+  datatable_with_sampling(in_max_rows = 5000)
 ```
 
 Create building dataframe. 
@@ -241,7 +271,8 @@ prep_xx %>%  skim()
 ```{r}
 prep_xx %>%
   get_dupes(date,employee_e_mail_address) %>%
-  arrange(desc(dupe_count))
+  arrange(desc(dupe_count)) %>% 
+  datatable_with_sampling(in_max_rows = 5000)
 ```
 
 Bind to buidling dataframe. 
@@ -308,7 +339,8 @@ Check for duplicates on `person_id` and `date`.
 
 ```{r}
 prep_building %>% 
-  get_dupes(person_id,date)
+  get_dupes(person_id,date) %>% 
+  datatable_with_sampling(in_max_rows = 5000)
 ```
 
 ## Compare to original dataframes
@@ -521,6 +553,7 @@ problem_groups <-
 
 problem_groups
 ```
+
 Also create a building dataframe to add other dataframes where missing have been removed.
 
 ```{r}
@@ -983,7 +1016,7 @@ prep_01 <-
   select(person_id,date,all_of(problem_variable %>% pull(variable))) 
 
 prep_01 %>% 
-  DT::datatable(class = 'cell-border stripe')
+  datatable_with_sampling(in_max_rows = 5000)
 ```
 
 They do have some.
@@ -1002,10 +1035,10 @@ prep_02 <-
   arrange(person_id,n)
 
 prep_02 %>% 
-  DT::datatable(class = 'cell-border stripe')
+  datatable_with_sampling(in_max_rows = 5000)
 ```
 
-It apprears that most start with nulls then became a category. 
+It appears that most start with nulls then became a category. 
 
 Let's check their position category at the earliest date and count. 
 
@@ -1069,7 +1102,7 @@ prep_xx %>%
             by =  c("person_id", "date"),
             suffix = c("_xx","_01")
   ) %>% 
-  DT::datatable(class = 'cell-border stripe')
+  datatable_with_sampling(in_max_rows = 5000)
 ```
 
 Looks good. 
@@ -1105,7 +1138,8 @@ nulls_01 <-
   filter(if_any(all_of(problem_variable %>% pull(variable)),  ~is.na(.x))) %>% 
   select(all_of(problem_variable %>% pull(variable)),everything())
 
-nulls_01
+nulls_01 %>% 
+  datatable_with_sampling(in_max_rows = 5000)
 ```
 
 Let's count the extent of the issues.
@@ -1194,6 +1228,15 @@ prep_xx %>%
 
 Looks good. 
 
+Let's remove `supervisor_correction`.
+
+```{r}
+prep_xx <- 
+  prep_xx %>% 
+  select(-supervisor_correction)
+```
+
+
 Join to building dataframe.
 
 ```{r}
@@ -1225,7 +1268,8 @@ nulls_01 <-
   filter(if_any(all_of(problem_variable %>% pull(variable)),  ~is.na(.x))) %>% 
   select(all_of(problem_variable %>% pull(variable)),everything())
 
-nulls_01
+nulls_01 %>% 
+  datatable_with_sampling(in_max_rows = 5000)
 ```
 
 Let's count the extent of the issues.
@@ -1286,7 +1330,8 @@ prep_01 <-
              by = "supervisor_last_name") %>% 
   select(starts_with("supervisor_"), employee_e_mail_address,everything())
 
-prep_01
+prep_01 %>% 
+  datatable_with_sampling(in_max_rows = 5000)
 ```
 
 This looks like the right person. Let's collect her information.
@@ -1300,7 +1345,8 @@ prep_02 <-
   rename(supervisor_display_name = supervisor_display_name.x,
          supervisor_e_mail_address = employee_e_mail_address)
   
-prep_02
+prep_02 %>% 
+  datatable_with_sampling(in_max_rows = 5000)
 ```
 
 ```{r}
@@ -1419,12 +1465,24 @@ column_meta_data <-
   column_meta_data %>% 
   rownames_to_column(var = "variable")
 
-column_meta_data <- 
+if("NAs" %in% names(column_meta_data))
+{
+  column_meta_data <- 
   column_meta_data %>% 
   mutate(
     nulls_by_variable = case_when(NAs > 0 ~ TRUE,
                                   NAs == 0 ~ FALSE)
   )
+}
+
+if(!("NAs" %in% names(column_meta_data)))
+{
+  column_meta_data <- 
+  column_meta_data %>% 
+  mutate(
+    nulls_by_variable = FALSE
+  )
+}
 
 column_meta_data
 ```
@@ -1496,684 +1554,44 @@ problem_variables <-
 problem_variables
 ```
 
-Grouping variables.
+## Other data issues
+
+Review the data.
 
 ```{r}
-problem_variables <- 
-  problem_variables %>% 
-  mutate(group = 
-           case_when(variable == "position_category_code" ~ "position_category_code",
-                     variable == "position_category_description" ~ "position_category_code",
-                     TRUE ~ variable
-                     ))
-
-problem_variables
-```
-
-Create list of groups.
-
-```{r}
-problem_groups <- 
-  problem_variables %>% 
-  select(group) %>% 
-  distinct() %>% 
-  arrange(group) %>% 
-  pull()
-
-problem_groups
-```
-
-# CONTINUE FROM HERE.
-
-Third, remove data from building dataframe, then inner join by employee name. 
-
-```{r}
-prep_xx <- 
-  prep_base_1 %>% 
-  anti_join(prep_building) %>%
-  inner_join(prep_base_2,
-            by =  c("employee_name" = "full_name"
-                    ),
-            suffix = c("_daily","_roster")
-  ) %>% 
-  select(-starts_with("file_name")) %>% 
-  distinct()
-```
-
-Review.
-
-```{r}
-prep_xx %>%  skim()
-```
-
-Bind to building dataframe.
-
-```{r}
-prep_building <- prep_building %>% 
-  bind_rows(prep_xx) %>% 
-  distinct()
-```
-
-```{r}
-unique_email_building <- prep_building %>% summarise(n_distinct(employee_e_mail_address)) %>% pull()
-unique_email_building
-```
-
-Test: This does not differ from the base.
-
-```{r}
-unique_email_base == unique_email_building
-```
-
-```{r}
-prep_building %>%  skim()
-```
-
-Load all data files in the `r params$data_folder_2` data folder.
-
-```{r}
-prep_base_2_1 <- files_2[1] %>% 
-  map_dfr(~mutate(.data = read_xlsx(path = ., 
-                                    col_types = c("date", "text", "text", 
-        "text", "text", "text", "text", "text", 
-        "text", "date", "text", "text", "text", 
-        "text", "text", "text", "text", "text", 
-        "text", "text", "text", "text", "text", 
-        "text", "text", "text", "text", "text")), 
-        file_name = str_remove(.,pattern = file.path(params$google_drive_home,"03. Data Collection"))
-      )) %>% 
-  clean_names() %>% 
-  distinct()
-```
-
-```{r}
-prep_base_2_2 <- files_2[2] %>% 
-  map_dfr(~mutate(.data = read_xlsx(path = ., 
-                                    col_types = c("date", "text", "text", 
-        "text", "text", "text", "text", "text", 
-        "text", "date", "text", "text", "text", 
-        "text", "text", "text", "text", "text", 
-        "text", "text", "text", "text", "text", 
-        "text", "text", "text", "text", "text")), 
-        file_name = str_remove(.,pattern = file.path(params$google_drive_home,"03. Data Collection"))
-      )) %>% 
-  clean_names() %>% 
-  distinct()
-```
-
-```{r}
-prep_base_2_3 <- files_2[3] %>% 
-  map_dfr(~mutate(.data = read_xlsx(path = ., 
-                                    col_types = c("date", "text", "text", 
-        "text", "text", "text", "text", "text", 
-        "text", "date", "text", "text", "text", 
-        "text", "text", "text", "text", "text", 
-        "text", "text", "text", "text", "text", 
-        "text", "text", "text", "text", "text")), 
-        file_name = str_remove(.,pattern = file.path(params$google_drive_home,"03. Data Collection"))
-      )) %>% 
-  clean_names() %>% 
-  distinct()
-```
-
-Joining data
-
-```{r}
-step_1 <- prep_base_1 %>% 
-  # select(employee_name) %>% 
-  # distinct() %>% 
-   left_join(prep_base_2_1,
-            by = c("employee_name" = "full_name",
-                   "sso" = "gsa_sso",
-                   "dept_id" = "department_id",
-                   "supervisor_display_name" = "supervisor_display_name"
-                   )) %>% 
-  # filter(rollback(date) == snapshot_date |
-  #          rollforward(date) == snapshot_date) %>%
-  # select(-snapshot_date, -starts_with("file_name")) %>% 
-  distinct()
-  # skim()
-  # get_dupes(employee_e_mail_address,date)
-```
-
-```{r}
-step_1 %>% 
-  filter(!is.na(employee_e_mail_address)) %>% 
-  get_dupes(employee_name,date,sso, dept_id, supervisor_display_name)
-```
-
-```{r}
-step_1 %>% 
-  filter(!is.na(employee_e_mail_address)) %>% 
-  get_dupes(employee_e_mail_address,date)
-```
-
-
-```{r}
-step_2 <- 
-  step_1 %>% 
-  filter(!is.na(employee_e_mail_address)) %>% 
-  get_dupes(employee_name) %>% 
-  select(employee_name) %>% 
-  distinct()
-```
-
-```{r}
-step_3 <- 
-  step_2 %>% 
-  inner_join(prep_base_1 %>% 
-  select(employee_name,sso) %>% 
-    distinct()) %>% 
-  left_join(prep_base_2_1,
-            by = c("employee_name" = "full_name",
-                   "sso" = "gsa_sso"
-                   # ,
-                   # "dept_id" = "department_id",
-                   # "supervisor_display_name" = "supervisor_display_name"
-                   )) %>% 
-  # filter(rollback(date) == snapshot_date |
-  #          rollforward(date) == snapshot_date) %>%
-  # select(-snapshot_date, -starts_with("file_name")) %>% 
-  distinct()
-```
-
-```{r}
-step_3 %>% 
-  filter(!is.na(employee_e_mail_address)) %>% 
-  get_dupes(employee_name,employee_e_mail_address)
-```
-
-
-
-
-```{r}
-step_2 <- 
-  step_1 %>% 
-  filter(is.na(employee_e_mail_address)) %>% 
-  select(all_of(prep_base_1_names)) %>% 
-  left_join(prep_base_2_2,
-            by = c("employee_name" = "full_name",
-                   "sso" = "gsa_sso",
-                   "dept_id" = "department_id",
-                   "supervisor_display_name" = "supervisor_display_name"
-                   )) %>% 
-  # filter(rollback(date) == snapshot_date |
-  #          rollforward(date) == snapshot_date) %>%
-  # select(-snapshot_date, -starts_with("file_name")) %>% 
-  distinct()
-```
-
-```{r}
-step_3 <- 
-  step_2 %>% 
-  filter(is.na(employee_e_mail_address)) %>% 
-  select(all_of(prep_base_1_names)) %>% 
-  left_join(prep_base_2_3,
-            by = c("employee_name" = "full_name",
-                   "sso" = "gsa_sso",
-                   "dept_id" = "department_id",
-                   "supervisor_display_name" = "supervisor_display_name"
-                   )) %>% 
-  # filter(rollback(date) == snapshot_date |
-  #          rollforward(date) == snapshot_date) %>%
-  # select(-snapshot_date, -starts_with("file_name")) %>% 
-  distinct()
-```
-
-```{r}
-step_3 %>% 
-  filter(!is.na(employee_e_mail_address))
-```
-
-
-
-```{r}
-rollback(ymd('2022-12-01'))
-rollforward(ymd('2022-12-01'))
-```
-
-
-
-### Review data
-
-```{r}
-prep_base %>% skim()
-```
-
-## Addressing duplication
-
-We are using `r params$unique_identifier_1` as the unique identifier. 
-
-### Check for duplication
-
-```{r}
-dupe_01 <- 
-  prep_base %>%
-  get_dupes(params$unique_identifier_1)
-```
-
-#### Data review
-
-```{r}
-dupe_01 %>% 
+prep_building %>% 
   skim()
 ```
 
-
-### Dataframe of the unique identifier
-
-```{r}
-prep_uniq <- 
-  prep_base %>% 
-  select(params$unique_identifier_1) %>% 
-  distinct()
-
-prep_uniq %>% 
-  count()
-```
-
-### Identifying and categorizing columns
-
-Created a dataframe of variable metadata
+## Creating final dataframe
 
 ```{r}
-column_meta_data <- 
-  prep_base %>% 
-  contents()
-
-column_meta_data <- 
-  column_meta_data$contents %>% 
-  as.data.frame()
-
-column_meta_data <-
-  column_meta_data %>% 
-  rownames_to_column(var = "variable")
-
-column_meta_data
-```
-
-Function that checks whether there are duplicates for different variables
-
-```{r}
-dupe_check <- function(in_data,in_variable_name)
-{
-  check_01 <- 
-  in_data %>% 
-  select(params$unique_identifier_1,all_of(in_variable_name)) %>% 
-  distinct() %>% 
-  get_dupes(params$unique_identifier_1)
-
-out <- nrow(check_01) > 0 
-
-return(out)
-}
-```
-
-Checking duplicates for each variable in the dataframe.
-
-```{r}
-duplicates_by_variable <- 
-  column_meta_data %>% 
-  pull(variable) %>% 
-  map_lgl(~dupe_check(in_data = dupe_01, .))
-
-duplicates_by_variable
-```
-
-Add this to the column_meta_data dataframe. 
-
-```{r}
-column_meta_data <- 
-  column_meta_data %>% 
-  add_column(
-    duplicates_by_variable = duplicates_by_variable
-  )
-
-column_meta_data
-```
-
-Create dataframe of only variables that cause duplicates.
-
-```{r}
-duplicating_variables <- 
-  column_meta_data %>% 
-  filter(duplicates_by_variable)
-
-duplicating_variables
-```
-
-Grouping variables.
-
-```{r}
-duplicating_variables <- 
-  duplicating_variables %>% 
-  mutate(group = 
-           case_when(variable == "short_id" ~ "short_id",
-                     variable == "dept_id" ~ "short_id",
-                     variable == "supervisor_name" ~ "short_id",
-                     variable == "location" ~ "short_id",
-                    TRUE ~ variable
-                     ))
-
-duplicating_variables
-```
-
-Create list of groups.
-
-```{r}
-duplicating_groups <- 
-  duplicating_variables %>% 
-  select(group) %>% 
-  distinct() %>% 
-  pull()
-
-duplicating_groups
-```
-
-### Duplication removal
-
-```{r}
-step_n <- 0
+check_in_panel <- prep_building
 ```
 
 ```{r}
-step_n <- step_n + 1
+rm(prep_building)
 ```
 
-#### Step `r step_n`
-
-Removing duplicates produced by:
-
-```{r}
-duplicating_group <- 
-  duplicating_variables %>% 
-  filter(group == duplicating_groups[step_n])
-duplicating_group
-```
-
-Reviewing duplicates.
-
-```{r}
-dupe_01 %>% 
-  select(params$unique_identifier_1,all_of(duplicating_group %>% pull(variable))) %>% 
-  distinct() %>% 
-  get_dupes(params$unique_identifier_1)
-```
-
-Not too many duplicates here. 
-
-First count `sso` across the original data.
-
-```{r}
-prep_base %>% count(sso)
-```
-
-There are just a few, but we'll want to transform these into indicators.
-
-We want to have this change to affect the whole dataframe so we address the duplicates off the original dataframe.
-
-```{r}
-prep_xx <- 
-  prep_base %>% 
-  character_to_indicator(params$unique_identifier_1,sso,"sso")
-
-prep_xx %>% 
-  glimpse()
-
-prep_xx %>% 
-  skim()
-```
-
-Count rows.
-
-```{r}
-prep_xx %>% 
-  count()
-```
-
-Do the number of in this dataframe match the number of unique identifiers?
-
-```{r}
-prep_xx %>% 
-  count() %>% 
-  pull() ==
-  prep_uniq %>% 
-  count() %>% 
-  pull()
-```
-
-Rename dataframe.
-
-```{r}
-prep_01 <- prep_xx
-```
-
-```{r}
-step_n <- step_n + 1
-```
-
-#### Step `r step_n`
-
-Removing duplicates produced by:
-
-```{r}
-duplicating_group <- 
-  duplicating_variables %>% 
-  filter(group == duplicating_groups[step_n])
-duplicating_group
-```
-
-Reviewing duplicates.
-
-```{r}
-dupe_01 %>% 
-  select(params$unique_identifier_1,all_of(duplicating_group %>% pull(variable))) %>% 
-  distinct() %>% 
-  get_dupes(params$unique_identifier_1)
-```
-
-Quite a few duplicates here and they are associated with supervisor and location.
-
-First count `short_id` and `dept_id` across the original data.
-
-```{r}
-prep_base %>% count(short_id,dept_id)
-```
-
-Counting `short_id`.
-
-```{r}
-prep_base %>% count(short_id)
-```
-
-Counting `dept_id`.
-
-```{r}
-prep_base %>% count(dept_id)
-```
-
-Too many options to create useful indicators. 
-
-For lack better option, we'll select the rows with shorter ids.
-
-```{r}
-dedupe <- 
-  dupe_01 %>% 
-  select(params$unique_identifier_1,all_of(duplicating_group %>% pull(variable))) %>% 
-  distinct() %>% 
-  arrange(!!!params$unique_identifier_1,length(short_id),length(dept_id)) %>% 
-  group_by(across(all_of(params$unique_identifier_1))) %>% 
-  summarise(
-    across(.fns = ~first(.))
-  ) 
- 
-dedupe %>% 
-  get_dupes(params$unique_identifier_1)
-```
-
-Creating a deduplicated dataframe of `r params$unique_identifier_1` and `r duplicating_groups[step_n]`.
-
-First create a dataframe of distinct rows of the variables from the original data. 
-
-```{r}
-working_01 <- 
-  prep_base %>% 
-  select(params$unique_identifier_1,all_of(duplicating_group %>% pull(variable))) %>% 
-  distinct()
-
-working_01 %>% 
-  glimpse()
-
-working_01 %>% 
-  skim()
-```
-
-Next remove rows that dataframe that were found to be duplicated and save that as a new dataframe. 
-
-```{r}
-working_02 <- 
-  working_01 %>% 
-  anti_join(dedupe %>% select(params$unique_identifier_1))
-
-working_02 %>% 
-  glimpse()
-
-working_02 %>% 
-  skim()
-```
-
-Last bind this dataframe to the deduplicated set above.
-
-```{r}
-prep_xx <- 
-  working_02 %>% 
-  bind_rows(dedupe)
-
-prep_xx %>% 
-  glimpse()
-
-prep_xx %>% 
-  skim()
-```
-
-Count rows.
-
-```{r}
-prep_xx %>% 
-  count()
-```
-
-Do the number of in this dataframe match the number of unique identifiers?
-
-```{r}
-prep_xx %>% 
-  count() %>% 
-  pull() ==
-  prep_uniq %>% 
-  count() %>% 
-  pull()
-```
-
-Rename dataframe
-
-```{r}
-prep_02 <- prep_xx
-```
-
-
-```{r}
-step_n <- step_n + 1
-```
-
-#### Step `r step_n`
-
-Removing duplicates produced by:
-
-```{r}
-duplicating_group <- 
-  duplicating_variables %>% 
-  filter(group == duplicating_groups[step_n])
-duplicating_group
-```
-
-Reviewing duplicates.
-
-```{r}
-dupe_01 %>% 
-  select(params$unique_identifier_1,all_of(duplicating_group %>% pull(variable))) %>% 
-  distinct() %>% 
-  get_dupes(params$unique_identifier_1)
-```
-
-
-Create function to drop rows with null unique identifiers.
-
-```{r}
-filter_unique <- function(in_data, ...)
-{
-  in_data %>% 
-  filter(if_all(c(...),~!is.na(.)))
-}
-```
-
-Drop rows with null unique identifiers.
-
-```{r}
-prep_01 <- 
-  prep_01 %>% 
-  filter_unique(params$unique_identifier_1)
-```
-
-Review data.
-
-```{r}
-prep_01 %>% skim()
-```
-
-Identify columns with amounts unique values less than 30.
-
-```{r}
-low_unique_value_cols <- 
-  prep_01 %>% 
-  summarise(across(.fns = ~n_distinct(.))) %>% 
-  rownames_to_column() %>% 
-  pivot_longer(-rowname) %>% 
-  filter(value < 30) %>% 
-  pull(name)
-```
-
-**Unique low value columns**: `r low_unique_value_cols`
-
-Convert low unique value variables to factors.
-
-```{r}
-prep_01 <- 
-  prep_01 %>% 
-  mutate(across(all_of(low_unique_value_cols),as.factor))
-```
-
-Review data.
-
-```{r}
-prep_01 %>% skim()
-```
-
-## Join/bind data {.tabset .tabset-pills}
-
-No data to join or bind so far.
-
-```{r}
-d <- prep_01
-```
-
-Review data.
-
-```{r}
-d %>% skim()
-```
 
 ## Save data {.tabset .tabset-pills}
 
 ```{r}
-save(d, file = here::here("03. Data Collection",params$data_folder_1,"prepared_data.rdata"))
+save(check_in_panel, file = file.path(params$google_drive_home,"03. Data Collection","prepared-data",
+          glue::glue("check_in_panel_{Sys.Date()}.rdata")))
 ```
+
+Remove all data elements.
+
+```{r}
+rm(list = ls())
+gc()
+```
+
+
+## Extraction time {.tabset .tabset-pills}
+
+```{r}
+tictoc::toc()
+```
+
