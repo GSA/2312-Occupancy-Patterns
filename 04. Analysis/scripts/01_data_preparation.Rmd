@@ -17,12 +17,9 @@ params:
   unique_identifier_2: !r c("snapshot_date","employee_e_mail_address")
 ---
 
-```{r}
-tictoc::tic()
-```
-
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+tictoc::tic()
 if(!("arsenal" %in% installed.packages()[,"Package"]))
 {
   install.packages("arsenal")
@@ -55,31 +52,6 @@ library(ggthemes)
 **Data folder 1**: `r params$data_folder_`'
 
 **Unique identifier for data folder 1**: `r params$unique_identifier_1`
-
-## Functions
-
-Function to display datatable.
-
-```{r}
-datatable_with_sampling <- function(in_data, in_max_rows)
-{
-  if(nrow(in_data) > in_max_rows)
-{
-  print(glue::glue("Big dataframe. Sampling {scales::comma(in_max_rows)} rows. {Sys.time()}"))
-  prep_01 <- 
-    in_data %>% 
-    sample_n(size = in_max_rows)
-}
-
-if(nrow(in_data) <= in_max_rows)
-{
-  prep_01 <- 
-    in_data
-}
-prep_01 %>% 
-  DT::datatable(class = 'cell-border stripe')
-}
-```
 
 ## Load data {.tabset .tabset-pills}
 
