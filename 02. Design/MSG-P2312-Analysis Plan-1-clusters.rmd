@@ -493,6 +493,8 @@ will be defined:
 
 -   Proportion of working days entire team is remote
 
+-   Proportion of observation window the team existed
+
 ### Data Exclusion and Treatment of Missing Data:
 
 <!-- [Describe criteria you will use to determine whether any observations should be excluded from analysis (e.g., values that are likely data-recording errors, outliers, etc.).] -->
