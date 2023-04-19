@@ -770,6 +770,8 @@ For team clusters, the following variables will be used:
 
 -   Proportion of working days entire team is remote
 
+-   Proportion of observation window the team existed. 
+
 <!-- # Update based on notes from conversation with Jake 3-23-23 -->
 
 <!-- scaling variables -->
@@ -949,6 +951,8 @@ The principle work pattern statistics are as follows:
     -   Proportion of working days entire team is co-located
 
     -   Proportion of working days entire team is remote
+    
+    -   Proportion of observation window the team exists
 
 The descriptive statistics are:
 
