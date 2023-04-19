@@ -49,7 +49,6 @@ date_observation_window_month_start <- date_cohort_month_start %m+% months(param
 date_observation_window_month_end <- ceiling_date(date_observation_window_month_start,unit = "month") %>% rollbackward()
 ```
 
-
 # Data preparation {.tabset .tabset-pills}
 
 **Project number**: `r params$project_number`
@@ -81,6 +80,18 @@ Review.
 ```{r}
 check_in_panel %>% 
   skim()
+```
+
+Updated data type for check-in status.
+
+```{r}
+check_in_panel <- 
+  check_in_panel %>% mutate(
+    daily_status_imputed = factor(daily_status_imputed),
+    daily_status_imputed =
+      fct_recode(daily_status_imputed,
+                 permanent_departure = "This employee is no longer with the agency (retired, resigned, or other form of permanent departure)")
+  )
 ```
 
 ## Creating cohort
@@ -161,51 +172,127 @@ cohort_ids %>%
   cohort_first %>% 
   summarise(n_distinct(person_id)) %>% 
   pull()
-````
+```
+
+Set up `prep_building`.
+
+```{r}
+prep_building <- 
+  cohort_ids
+```
+
 
 ## Creating aggregated variables
 
-```{r}
-cohort_panel %>% 
-  summarise(working_days = n_distinct(date)) %>% 
-  ungroup()
-```
+### Employee, whole period variables
 
-```{r}
-cohort_panel %>% 
-  group_by(person_id) %>% 
-  filter(daily_status_imputed != "Leave") %>% 
-  summarise(working_days = n_distinct(date)) %>% 
-  ungroup()
-```
-
-```{r}
-cohort_panel %>%
-  mutate(daily_status_imputed = factor(daily_status_imputed)) %>% 
-  group_by(person_id,daily_status_imputed,.drop = FALSE) %>% 
-  summarise(working_days = n_distinct(date)) %>% 
-  ungroup() %>% 
-  pivot_wider(values_from = working_days, names_from = daily_status_imputed) %>% 
-  clean_names() %>% 
-  rename_with(~glue::glue("daily_status_imputed_{.}"), -person_id)
-```
-
-
+For following variables are aggregated for the whole period for each employee:
 
 -   Proportion of days onsite
 
 -   Proportion of days remote
 
+-   Number of working days
+
+First, calculating the number of days in the observation window.
+
+```{r}
+observation_window_days <- 
+  cohort_panel %>% 
+  summarise(observation_window_days = n_distinct(date)) %>% 
+  ungroup() %>% 
+  pull()
+
+observation_window_days
+```
+
+Now calculating the number of days per employee by `daily_status_imputed`. Proportions are caluculated for onsite and telework only. The calculations are made in two ways in two ways. First as a proportion of employee working days:
+
+$$
+\frac{DailyStatusDays}{WorkingDays}
+$$
+
+where
+
+$$
+WorkingDays = OnsiteDays + TeleworkDays
+$$
+
+Second as a proportion of days in the observations window:
+
+$$
+\frac{DailyStatusDays}{ObservationWindowDays}
+$$
+
+```{r}
+prep_xx <- 
+  cohort_panel %>%
+  group_by(person_id,daily_status_imputed,.drop = FALSE) %>% 
+  summarise(working_days = n_distinct(date)) %>% 
+  ungroup() %>% 
+  pivot_wider(values_from = working_days, names_from = daily_status_imputed) %>% 
+  clean_names() %>% 
+  rename_with(~glue::glue("daily_status_{.}"), -person_id) %>% 
+  mutate(
+    working_days = daily_status_reporting_to_job_site + daily_status_teleworking,
+    daily_status_reporting_to_job_site_working_prop = daily_status_reporting_to_job_site/working_days,
+    daily_status_teleworking_working_prop = daily_status_teleworking/working_days,
+    daily_status_reporting_to_job_site_observation_prop = daily_status_reporting_to_job_site/observation_window_days,
+    daily_status_teleworking_observation_prop = daily_status_teleworking/observation_window_days
+  ) %>% 
+  mutate(
+    across(
+      .cols = where(is.numeric),
+      .fns = ~replace_na(.,0)
+    )
+  )
+```
+
+Review data.
+
+```{r}
+prep_xx %>% 
+  skim()
+```
+Check: These have the same number of unique `person_id`.
+
+```{r}
+cohort_ids %>% 
+  summarise(n_distinct(person_id)) %>% 
+  pull() ==
+  prep_xx %>% 
+  summarise(n_distinct(person_id)) %>% 
+  pull()
+```
+
+Join to `prep_building`.
+
+```{r}
+prep_building <- 
+  prep_building %>% 
+  left_join(prep_xx)
+```
+
+
+```{r}
+prep_xx %>% 
+  pivot_longer(-person_id) %>% 
+  filter(str_detect(name, "_prop")) %>% 
+  ggplot(aes(x = value)) +
+  geom_histogram() +
+  facet_wrap(facets = vars(name))
+```
+
+
+
+
 -   Proportion of days remote by the day of the week
 
 -   Correlation of work status between days of the week
 
--   Number of working days
-
 -   Modal size of team over observation window
 
--   Proportion of working days co-located with at least one other team
-    member
+-   Proportion of working days co-located with at least one other team member
 
 -   Proportion of working days co-located with supervisor
 
@@ -265,7 +352,7 @@ unique_email_base
 
 ### Join 1
 
-First inner join by employee name, supervisor name, department id, and the last date, using the last day of the month before the daily checkin. 
+First inner join by employee name, supervisor name, department id, and the last date, using the last day of the month before the daily checkin.
 
 ```{r}
 prep_xx <- prep_base_1 %>% 
@@ -295,13 +382,13 @@ prep_xx %>%
   datatable_with_sampling(in_max_rows = 5000)
 ```
 
-Create building dataframe. 
+Create building dataframe.
 
 ```{r}
 prep_building <- prep_xx
 ```
 
-Count unique email addresses in building dataframe. 
+Count unique email addresses in building dataframe.
 
 ```{r}
 unique_email_building <- prep_building %>% summarise(n_distinct(employee_e_mail_address)) %>% pull()
@@ -313,6 +400,7 @@ Test: This does not differ from the base.
 ```{r}
 unique_email_base == unique_email_building
 ```
+
 Review.
 
 ```{r}
@@ -321,7 +409,7 @@ prep_building %>%  skim()
 
 ### Join 2
 
-Second, remove data from building dataframe, then inner join by employee name, supervisor name, department id, and the last date, using the last day of the month after the daily checkin. 
+Second, remove data from building dataframe, then inner join by employee name, supervisor name, department id, and the last date, using the last day of the month after the daily checkin.
 
 ```{r}
 prep_xx <- 
@@ -352,7 +440,7 @@ prep_xx %>%
   datatable_with_sampling(in_max_rows = 5000)
 ```
 
-Bind to buidling dataframe. 
+Bind to buidling dataframe.
 
 ```{r}
 prep_building <- prep_building %>% 
@@ -498,10 +586,10 @@ diff_employee_name_prop <-
 
 From this table, we find:
 
-1.    A loss of `r scales::comma(diff_rows_count)` rows between `prep_1_base` and `prep_building`, about `r scales::percent(diff_rows_prop)`
-2.    A loss of `r scales::comma(diff_employee_name_count)` rows between `prep_1_base` and `prep_building`, about `r scales::percent(diff_employee_name_prop)`
+1.  A loss of `r scales::comma(diff_rows_count)` rows between `prep_1_base` and `prep_building`, about `r scales::percent(diff_rows_prop)`
+2.  A loss of `r scales::comma(diff_employee_name_count)` rows between `prep_1_base` and `prep_building`, about `r scales::percent(diff_employee_name_prop)`
 
-These losses of data are reasonable. 
+These losses of data are reasonable.
 
 Create a unique dataframe of just `date` and `person_id`.
 
@@ -553,7 +641,7 @@ values_count %>%
 
 ```
 
-No obvious values. 
+No obvious values.
 
 Function that checks whether there are blanks for different variables
 
@@ -582,7 +670,7 @@ blanks_by_variable <-
 blanks_by_variable
 ```
 
-Add this to the `column_meta_data` dataframe. 
+Add this to the `column_meta_data` dataframe.
 
 ```{r}
 column_meta_data <- 
@@ -594,7 +682,7 @@ column_meta_data <-
 column_meta_data
 ```
 
-Create dataframe of only variables that have blanks. 
+Create dataframe of only variables that have blanks.
 
 ```{r}
 problem_variables <- 
@@ -892,7 +980,7 @@ prep_building %>%
   theme_fivethirtyeight()
 ```
 
-Weird that early in the year is low, then gets steady later. 
+Weird that early in the year is low, then gets steady later.
 
 Is this an important variable?
 
@@ -985,7 +1073,7 @@ prep_building %>%
   theme_fivethirtyeight()
 ```
 
-Looks pretty random, and low numbers.  
+Looks pretty random, and low numbers.
 
 Is this an important variable?
 
@@ -1078,7 +1166,7 @@ prep_building %>%
   theme_fivethirtyeight()
 ```
 
-Looks pretty random, and low numbers.  
+Looks pretty random, and low numbers.
 
 Let's investigate whether these employees ever have other values for `r problem_variable %>% pull(variable)`.
 
@@ -1098,7 +1186,7 @@ prep_01 %>%
 
 They do have some.
 
-Now let's look at how they change. 
+Now let's look at how they change.
 
 ```{r}
 prep_02 <- 
@@ -1115,9 +1203,9 @@ prep_02 %>%
   datatable_with_sampling(in_max_rows = 5000)
 ```
 
-It appears that most start with nulls then became a category. 
+It appears that most start with nulls then became a category.
 
-Let's check their position category at the earliest date and count. 
+Let's check their position category at the earliest date and count.
 
 ```{r}
 prep_02 %>% 
@@ -1141,7 +1229,7 @@ prep_02 %>%
 
 Is this an important variable?
 
-Yes, but we want to use this in the analysis. We will fill the variable the most proximate value and create an indicator that these values were imputed. 
+Yes, but we want to use this in the analysis. We will fill the variable the most proximate value and create an indicator that these values were imputed.
 
 ```{r}
 prep_xx <- 
@@ -1182,7 +1270,7 @@ prep_xx %>%
   datatable_with_sampling(in_max_rows = 5000)
 ```
 
-Looks good. 
+Looks good.
 
 Join to building dataframe.
 
@@ -1259,7 +1347,7 @@ prep_building %>%
   theme_fivethirtyeight()
 ```
 
-Some increase in the use of this over time. 
+Some increase in the use of this over time.
 
 Let's count this along side `daily_status`.
 
@@ -1303,7 +1391,7 @@ prep_xx %>%
   autofit()
 ```
 
-Looks good. 
+Looks good.
 
 Let's remove `supervisor_correction`.
 
@@ -1312,7 +1400,6 @@ prep_xx <-
   prep_xx %>% 
   select(-supervisor_correction)
 ```
-
 
 Join to building dataframe.
 
@@ -1390,7 +1477,7 @@ nulls_01 %>%
   inner_join(prep_base_2)
 ```
 
-Let's see if anyone has the same last name. 
+Let's see if anyone has the same last name.
 
 ```{r}
 prep_01 <- 
@@ -1486,9 +1573,9 @@ problem_variable <-
 problem_variable
 ```
 
-Done. 
+Done.
 
-### Combining  data
+### Combining data
 
 #### Create dataframe off non-null columns
 
@@ -1564,7 +1651,6 @@ if(!("NAs" %in% names(column_meta_data)))
 column_meta_data
 ```
 
-
 Counting top 10 values for all character or factor columns to identify other common values.
 
 ```{r}
@@ -1580,7 +1666,7 @@ values_count %>%
 
 ```
 
-No obvious values. 
+No obvious values.
 
 Function that checks whether there are blanks for different variables
 
@@ -1609,7 +1695,7 @@ blanks_by_variable <-
 blanks_by_variable
 ```
 
-Add this to the `column_meta_data` dataframe. 
+Add this to the `column_meta_data` dataframe.
 
 ```{r}
 column_meta_data <- 
@@ -1621,7 +1707,7 @@ column_meta_data <-
 column_meta_data
 ```
 
-Create dataframe of only variables that have blanks. 
+Create dataframe of only variables that have blanks.
 
 ```{r}
 problem_variables <- 
@@ -1650,7 +1736,6 @@ check_in_panel <- prep_building
 rm(prep_building)
 ```
 
-
 ## Save data {.tabset .tabset-pills}
 
 ```{r}
@@ -1665,10 +1750,8 @@ rm(list = ls())
 gc()
 ```
 
-
 ## Extraction time {.tabset .tabset-pills}
 
 ```{r}
 tictoc::toc()
 ```
-
