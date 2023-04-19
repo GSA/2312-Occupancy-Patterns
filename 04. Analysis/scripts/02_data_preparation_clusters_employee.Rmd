@@ -86,13 +86,23 @@ Updated data type for check-in status.
 
 ```{r}
 check_in_panel <- 
-  check_in_panel %>% mutate(
+  check_in_panel %>% 
+  mutate(
     daily_status_imputed = factor(daily_status_imputed),
     daily_status_imputed =
       fct_recode(daily_status_imputed,
                  permanent_departure = "This employee is no longer with the agency (retired, resigned, or other form of permanent departure)")
   )
 ```
+
+Create days of the week for dates.
+
+```{r}
+check_in_panel <- 
+  check_in_panel %>% 
+  mutate(date_day_of_week = wday(date, label = TRUE))
+```
+
 
 ## Creating cohort
 
@@ -273,6 +283,118 @@ prep_building <-
   left_join(prep_xx)
 ```
 
+### Employee, day of week variables
+
+For following variables are aggregated for the whole period by day of the week for each employee:
+
+-   Proportion of days remote by the day of the week
+
+-   Correlation of work status between days of the week
+
+First, calculating the number of days in the observation window.
+
+```{r}
+observation_window_days_day_of_week <- 
+  cohort_panel %>% 
+  group_by(date_day_of_week) %>% 
+  summarise(observation_window_days = n_distinct(date)) %>% 
+  ungroup()
+
+observation_window_days_day_of_week
+```
+
+We make the same calculations as above, but by the day of the week. 
+
+```{r}
+prep_xx <-
+  cohort_panel %>%
+  group_by(person_id,daily_status_imputed,date_day_of_week,) %>% 
+  summarise(working_days = n_distinct(date)) %>% 
+  ungroup() %>% 
+  pivot_wider(values_from = working_days, names_from = c(daily_status_imputed)) %>% 
+  left_join(observation_window_days_day_of_week) %>% 
+  clean_names() %>% 
+  rename_with(~glue::glue("daily_status_{.}"), c(-person_id,-date_day_of_week,-observation_window_days))  %>% 
+  mutate(
+    across(
+      .cols = where(is.numeric),
+      .fns = ~replace_na(.,0)
+    )
+  ) %>% 
+  mutate(
+    working_days = daily_status_reporting_to_job_site + daily_status_teleworking,
+    daily_status_reporting_to_job_site_working_prop = daily_status_reporting_to_job_site/working_days,
+    daily_status_teleworking_working_prop = daily_status_teleworking/working_days,
+    daily_status_reporting_to_job_site_observation_prop = daily_status_reporting_to_job_site/observation_window_days,
+    daily_status_teleworking_observation_prop = daily_status_teleworking/observation_window_days
+  )  %>% 
+  mutate(
+    across(
+      .cols = where(is.numeric),
+      .fns = ~replace_na(.,0)
+    )
+  )
+```
+
+```{r}
+cohort_panel %>% 
+  select(person_id,date,date_day_of_week,daily_status_imputed) %>% 
+  mutate(ind = 1) %>% 
+  pivot_wider(names_from = daily_status_imputed, values_from = ind) %>% 
+  clean_names() %>% 
+  select(person_id,date,date_day_of_week,teleworking) %>% 
+  mutate(
+    across(
+      .cols = where(is.numeric),
+      .fns = ~replace_na(.,0)
+    )
+  ) %>% 
+  mutate(
+    date_week_start = floor_date(date,unit = "week")) %>% 
+  select(-date) %>% 
+  pivot_wider(values_from = teleworking,names_from = date_day_of_week) %>% 
+  mutate(
+    across(
+      .cols = where(is.numeric),
+      .fns = ~replace_na(.,0)
+    )
+  ) %>% 
+  group_by(person_id) %>%
+  # filter(person_id == "10070")
+  summarise(cor = cor(Fri,Wed,method = "kendall", use = "complete.obs"))
+```
+
+
+Review data.
+
+```{r}
+prep_xx %>% 
+  skim()
+```
+
+Check: These have the same number of unique `person_id`.
+
+```{r}
+cohort_ids %>% 
+  summarise(n_distinct(person_id)) %>% 
+  pull() ==
+  prep_xx %>% 
+  summarise(n_distinct(person_id)) %>% 
+  pull()
+```
+
+Join to `prep_building`.
+
+```{r}
+prep_building <- 
+  prep_building %>% 
+  left_join(prep_xx)
+```
+
+```{r}
+cor(check_in_panel$daily_status_imputed,check_in_panel$date_day_of_week)
+```
+
 
 ```{r}
 prep_xx %>% 
@@ -286,9 +408,7 @@ prep_xx %>%
 
 
 
--   Proportion of days remote by the day of the week
 
--   Correlation of work status between days of the week
 
 -   Modal size of team over observation window
 
