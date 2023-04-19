@@ -900,7 +900,7 @@ Three broad parts of descriptive work are part of this analysis. First,
 the overall description of work patterns in the data. Then, differences
 in work patterns by rules-based group, and differences in descriptive
 data by those groups. Lastly, difference in k-means cluster by work
-patterns and descriptive data.
+patterns and descriptive data. The initial condition of descriptive variables will be used to calculate the statistics. That is, the values of these variables for employees and teams at the beginning of the observation window: March 2022.
 
 The principle work pattern statistics are as follows:
 
