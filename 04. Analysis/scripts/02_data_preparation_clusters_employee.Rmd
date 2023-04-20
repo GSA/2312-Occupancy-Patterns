@@ -336,7 +336,7 @@ prep_xx <-
   )
 ```
 
-```{r}
+```{r correlation remote only}
 cohort_panel %>% 
   select(person_id,date,date_day_of_week,daily_status_imputed) %>% 
   mutate(ind = 1) %>% 
@@ -363,6 +363,33 @@ cohort_panel %>%
   # filter(person_id == "10070")
   summarise(cor = cor(Fri,Wed,method = "kendall", use = "complete.obs"))
 ```
+
+```{r correlation ordered status}
+cohort_panel %>% 
+  select(person_id,date,date_day_of_week,daily_status_imputed) %>% 
+  mutate(
+    daily_status_imputed = fct_lump_prop(daily_status_imputed, prop = .1),
+    daily_status_imputed = fct_infreq(daily_status_imputed),
+    daily_status_imputed = factor(daily_status_imputed, ordered = TRUE)
+  )  %>% 
+  mutate(
+    date_week_start = floor_date(date,unit = "week")) %>% 
+  select(-date) %>% 
+  pivot_wider(values_from = daily_status_imputed,names_from = date_day_of_week) %>% 
+  mutate(
+    across(
+      .cols = where(is.factor),
+      .fns = ~replace_na(.,"Other")
+    )
+  ) %>% 
+  group_by(person_id) %>%
+  # filter(person_id == "10070")
+  summarise(cor = cor(as.numeric(Fri),as.numeric(Wed),method = "spearman", use = "complete.obs"))
+# %>% 
+  count(daily_status_imputed)
+```
+
+
 
 
 Review data.
