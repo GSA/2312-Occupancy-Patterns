@@ -386,10 +386,84 @@ cohort_panel %>%
   # filter(person_id == "10070")
   summarise(cor = cor(as.numeric(Fri),as.numeric(Wed),method = "spearman", use = "complete.obs"))
 # %>% 
-  count(daily_status_imputed)
+  # count(daily_status_imputed)
+```
+
+```{r proportion remote only prep dataframe}
+prep_a <- 
+  cohort_panel %>% 
+  select(person_id,date,date_day_of_week,daily_status_imputed) %>% 
+  mutate(ind = 1) %>% 
+  pivot_wider(names_from = daily_status_imputed, values_from = ind) %>% 
+  clean_names() %>% 
+  select(person_id,date,date_day_of_week,teleworking) %>% 
+  mutate(
+    across(
+      .cols = where(is.numeric),
+      .fns = ~replace_na(.,0)
+    )
+  ) %>% 
+  mutate(
+    date_week_start = floor_date(date,unit = "week")) %>% 
+  select(-date) %>% 
+  pivot_wider(values_from = teleworking,names_from = date_day_of_week) %>% 
+  mutate(
+    across(
+      .cols = where(is.numeric),
+      .fns = ~replace_na(.,0)
+    )
+  ) %>% 
+  clean_names()
 ```
 
 
+```{r proportion remote only function}
+day_to_day_proportions <- function(in_data,in_var)
+{
+  var_string <- rlang::as_name(enquo(in_var))
+
+  # print(person_id)
+  
+  out <- 
+    in_data %>% 
+  filter({{in_var}} == 1) %>% 
+  group_by(person_id) %>% 
+  summarise(
+    across(
+      .cols = where(is.numeric),
+      .fns = ~sum(.,na.rm = TRUE)
+  )) %>% 
+  mutate(
+    across(
+      .cols = c(-person_id,-{{in_var}}),
+      .fns = ~./{{in_var}},
+      .names = "{var_string}_{.col}"
+    )
+  ) %>% 
+  ungroup() %>% 
+    select(person_id,starts_with(var_string),-{{in_var}})
+  
+  return(out)
+}
+```
+
+
+```{r proportion remote only function}
+prep_a %>% 
+  day_to_day_proportions(mon)
+
+prep_a %>% 
+  select(thu:fri) %>%
+  names() %>% 
+  #na.omit() %>% 
+  map(~day_to_day_proportions(prep_a,!!sym(.))) %>% 
+  reduce(full_join, by = "person_id")
+
+%>% 
+  group_by(person_id) %>%
+  # filter(person_id == "10070")
+  summarise(cor = cor(Fri,Wed,method = "kendall", use = "complete.obs"))
+```
 
 
 Review data.
