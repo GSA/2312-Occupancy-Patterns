@@ -103,7 +103,6 @@ check_in_panel <-
   mutate(date_day_of_week = wday(date, label = TRUE))
 ```
 
-
 ## Creating cohort
 
 Collect `person_id` of employees that worked in `r nice_month_year(date_cohort_month_start)`.
@@ -191,7 +190,6 @@ prep_building <-
   cohort_ids
 ```
 
-
 ## Creating aggregated variables
 
 ### Employee, whole period variables
@@ -264,6 +262,7 @@ Review data.
 prep_xx %>% 
   skim()
 ```
+
 Check: These have the same number of unique `person_id`.
 
 ```{r}
@@ -291,6 +290,8 @@ For following variables are aggregated for the whole period by day of the week f
 
 -   Correlation of work status between days of the week
 
+#### Proportion of days remote by day of the week
+
 First, calculating the number of days in the observation window.
 
 ```{r}
@@ -303,10 +304,10 @@ observation_window_days_day_of_week <-
 observation_window_days_day_of_week
 ```
 
-We make the same calculations as above, but by the day of the week. 
+We make the same calculations as above, but by the day of the week.
 
 ```{r}
-prep_xx <-
+prep_day_of_week <-
   cohort_panel %>%
   group_by(person_id,daily_status_imputed,date_day_of_week,) %>% 
   summarise(working_days = n_distinct(date)) %>% 
@@ -336,8 +337,74 @@ prep_xx <-
   )
 ```
 
+Review data.
+
+```{r}
+prep_day_of_week %>% 
+  skim()
+```
+
+Now collect only the results for telework.
+
+```{r}
+prep_xx <- 
+  prep_day_of_week %>% 
+  select(person_id,date_day_of_week,daily_status_teleworking_working_prop,daily_status_teleworking_observation_prop) %>% 
+  pivot_longer(cols = starts_with("daily_status")) %>% 
+  mutate(date_day_of_week = str_to_lower(date_day_of_week)) %>% 
+  unite("name",date_day_of_week,name) %>% 
+  pivot_wider(values_from = value, names_from = name) %>% 
+  mutate(
+    across(
+      .cols = where(is.numeric),
+      .fns = ~replace_na(.,0)
+    )
+  )
+```
+
+Review data.
+
+```{r}
+prep_xx %>% 
+  skim()
+```
+
+Check: These have the same number of unique `person_id`.
+
+```{r}
+cohort_ids %>% 
+  summarise(n_distinct(person_id)) %>% 
+  pull() ==
+  prep_xx %>% 
+  summarise(n_distinct(person_id)) %>% 
+  pull()
+```
+
+Join to `prep_building`.
+
+```{r}
+prep_building <- 
+  prep_building %>% 
+  left_join(prep_xx)
+```
+
+#### Correlation of work status between days of the week
+
+Three strategies to captured relationships between day are below:
+
+1.  Correlation in telework between days of week
+
+2.  Correlation in status (as an ordered factor) between days of week
+
+3.  Proportion of telework on other days of week, if the employ teleworked on a specific day
+
+##### Correlation in telework between days of week
+
+The script below calculates the correlation in telework between days of the week.
+
 ```{r correlation remote only}
-cohort_panel %>% 
+prep_day_of_week_cor_telework <- 
+  cohort_panel %>% 
   select(person_id,date,date_day_of_week,daily_status_imputed) %>% 
   mutate(ind = 1) %>% 
   pivot_wider(names_from = daily_status_imputed, values_from = ind) %>% 
@@ -359,13 +426,64 @@ cohort_panel %>%
       .fns = ~replace_na(.,0)
     )
   ) %>% 
+  clean_names() %>% 
   group_by(person_id) %>%
   # filter(person_id == "10070")
-  summarise(cor = cor(Fri,Wed,method = "kendall", use = "complete.obs"))
+  summarise(
+    mon_tue_cor_telework = cor(mon,tue,method = "kendall", use = "complete.obs"),
+    mon_wed_cor_telework = cor(mon,wed,method = "kendall", use = "complete.obs"),
+    mon_thu_cor_telework = cor(mon,thu,method = "kendall", use = "complete.obs"),
+    mon_fri_cor_telework = cor(mon,fri,method = "kendall", use = "complete.obs"),
+    tue_wed_cor_telework = cor(tue,wed,method = "kendall", use = "complete.obs"),
+    tue_thu_cor_telework = cor(tue,thu,method = "kendall", use = "complete.obs"),
+    tue_fri_cor_telework = cor(tue,fri,method = "kendall", use = "complete.obs"),
+    wed_thu_cor_telework = cor(wed,thu,method = "kendall", use = "complete.obs"),
+    wed_fri_cor_telework = cor(wed,fri,method = "kendall", use = "complete.obs"),
+    thu_fri_cor_telework = cor(thu,fri,method = "kendall", use = "complete.obs")
+    ) %>% 
+  ungroup()
 ```
 
+Now rename to attach to `prep_building`.
+
+```{r}
+prep_xx <- 
+  prep_day_of_week_cor_telework
+```
+
+Review data.
+
+```{r}
+prep_xx %>% 
+  skim()
+```
+
+Check: These have the same number of unique `person_id`.
+
+```{r}
+cohort_ids %>% 
+  summarise(n_distinct(person_id)) %>% 
+  pull() ==
+  prep_xx %>% 
+  summarise(n_distinct(person_id)) %>% 
+  pull()
+```
+
+Join to `prep_building`.
+
+```{r}
+prep_building <- 
+  prep_building %>% 
+  left_join(prep_xx)
+```
+
+##### Correlation in status between days of week
+
+The script below calculates the correlation between work status.
+
 ```{r correlation ordered status}
-cohort_panel %>% 
+prep_day_of_week_cor_status <- 
+  cohort_panel %>% 
   select(person_id,date,date_day_of_week,daily_status_imputed) %>% 
   mutate(
     daily_status_imputed = fct_lump_prop(daily_status_imputed, prop = .1),
@@ -382,12 +500,59 @@ cohort_panel %>%
       .fns = ~replace_na(.,"Other")
     )
   ) %>% 
+  clean_names() %>% 
   group_by(person_id) %>%
-  # filter(person_id == "10070")
-  summarise(cor = cor(as.numeric(Fri),as.numeric(Wed),method = "spearman", use = "complete.obs"))
-# %>% 
-  # count(daily_status_imputed)
+  summarise(
+    mon_tue_cor_status = cor(as.numeric(mon),as.numeric(tue),method = "spearman", use = "complete.obs"),
+    mon_wed_cor_status = cor(as.numeric(mon),as.numeric(wed),method = "spearman", use = "complete.obs"),
+    mon_thu_cor_status = cor(as.numeric(mon),as.numeric(thu),method = "spearman", use = "complete.obs"),
+    mon_fri_cor_status = cor(as.numeric(mon),as.numeric(fri),method = "spearman", use = "complete.obs"),
+    tue_wed_cor_status = cor(as.numeric(tue),as.numeric(wed),method = "spearman", use = "complete.obs"),
+    tue_thu_cor_status = cor(as.numeric(tue),as.numeric(thu),method = "spearman", use = "complete.obs"),
+    tue_fri_cor_status = cor(as.numeric(tue),as.numeric(fri),method = "spearman", use = "complete.obs"),
+    wed_thu_cor_status = cor(as.numeric(wed),as.numeric(thu),method = "spearman", use = "complete.obs"),
+    wed_fri_cor_status = cor(as.numeric(wed),as.numeric(fri),method = "spearman", use = "complete.obs"),
+    thu_fri_cor_status = cor(as.numeric(thu),as.numeric(fri),method = "spearman", use = "complete.obs")
+    ) %>% 
+  ungroup()
 ```
+
+Now rename to attach to `prep_building`.
+
+```{r}
+prep_xx <- 
+  prep_day_of_week_cor_status
+```
+
+Review data.
+
+```{r}
+prep_xx %>% 
+  skim()
+```
+
+Check: These have the same number of unique `person_id`.
+
+```{r}
+cohort_ids %>% 
+  summarise(n_distinct(person_id)) %>% 
+  pull() ==
+  prep_xx %>% 
+  summarise(n_distinct(person_id)) %>% 
+  pull()
+```
+
+Join to `prep_building`.
+
+```{r}
+prep_building <- 
+  prep_building %>% 
+  left_join(prep_xx)
+```
+
+##### Proportion of telework week day pairs
+
+First, create a dataframe of telework by days of the week.
 
 ```{r proportion remote only prep dataframe}
 prep_a <- 
@@ -416,6 +581,7 @@ prep_a <-
   clean_names()
 ```
 
+Now, a function to calculate the proportion of telework on a different day, if the employee teleworked on a specific day.
 
 ```{r proportion remote only function}
 day_to_day_proportions <- function(in_data,in_var)
@@ -447,24 +613,27 @@ day_to_day_proportions <- function(in_data,in_var)
 }
 ```
 
+Iterated over the days of the week and join results.
 
 ```{r proportion remote only function}
-prep_a %>% 
-  day_to_day_proportions(mon)
-
-prep_a %>% 
+prep_day_of_week_proportion_pairs <- 
+  prep_a %>% 
   select(thu:fri) %>%
   names() %>% 
-  #na.omit() %>% 
   map(~day_to_day_proportions(prep_a,!!sym(.))) %>% 
   reduce(full_join, by = "person_id")
 
-%>% 
-  group_by(person_id) %>%
-  # filter(person_id == "10070")
-  summarise(cor = cor(Fri,Wed,method = "kendall", use = "complete.obs"))
 ```
 
+Now rename to attach to `prep_building`.
+
+```{r}
+prep_xx <- 
+  prep_day_of_week_proportion_pairs %>% 
+  rename_with(-person_id,
+              .fn = ~glue::glue("{.}_prop_pairs")
+  )
+```
 
 Review data.
 
@@ -493,11 +662,6 @@ prep_building <-
 ```
 
 ```{r}
-cor(check_in_panel$daily_status_imputed,check_in_panel$date_day_of_week)
-```
-
-
-```{r}
 prep_xx %>% 
   pivot_longer(-person_id) %>% 
   filter(str_detect(name, "_prop")) %>% 
@@ -505,11 +669,6 @@ prep_xx %>%
   geom_histogram() +
   facet_wrap(facets = vars(name))
 ```
-
-
-
-
-
 
 -   Modal size of team over observation window
 
