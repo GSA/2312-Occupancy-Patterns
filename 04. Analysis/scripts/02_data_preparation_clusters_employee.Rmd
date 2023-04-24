@@ -696,10 +696,52 @@ prep_b %>%
   skim()
 ```
 
+Calculate the mode team size for each employee.
 
+```{r}
+prep_xx <- 
+  prep_b %>% 
+  group_by(person_id) %>% 
+  summarise(team_size_mode = getmode(team_size)) %>% 
+  ungroup()
+```
 
+Review data.
+
+```{r}
+prep_xx %>% 
+  skim()
+```
+
+Check: These have the same number of unique `person_id`.
+
+```{r}
+cohort_ids %>% 
+  summarise(n_distinct(person_id)) %>% 
+  pull() ==
+  prep_xx %>% 
+  summarise(n_distinct(person_id)) %>% 
+  pull()
+```
+
+Join to `prep_building`.
+
+```{r}
+prep_building <- 
+  prep_building %>% 
+  left_join(prep_xx)
+```
 
 #### Proportion of working days co-located with at least one other team member
+
+```{r}
+prep_a <- 
+  cohort_panel %>% 
+  filter(daily_status_imputed)
+  select
+```
+
+
 #### Proportion of working days co-located with supervisor
 #### Proportion of working days co-located with entire team
 #### Proportion of working days entire team is remote
