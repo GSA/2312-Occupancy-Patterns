@@ -661,6 +661,50 @@ prep_building <-
   left_join(prep_xx)
 ```
 
+#### Modal size of team over observation window
+
+Calculate number of team members per day by supervisor email.
+
+```{r}
+prep_a <- 
+  cohort_panel %>% 
+  group_by(date,supervisor_e_mail_address) %>% 
+  summarise(team_size = n_distinct(person_id)) %>% 
+  ungroup()
+```
+
+Review data.
+
+```{r}
+prep_a %>% 
+  skim()
+```
+
+Join to `cohort_panel` only selecting, `person_id`, `date`, and `supervisor_e_mail_address`.
+
+```{r}
+prep_b <- 
+  cohort_panel %>% 
+  select(date,person_id,supervisor_e_mail_address) %>% 
+  left_join(prep_a)
+```
+
+Review data.
+
+```{r}
+prep_b %>% 
+  skim()
+```
+
+
+
+
+#### Proportion of working days co-located with at least one other team member
+#### Proportion of working days co-located with supervisor
+#### Proportion of working days co-located with entire team
+#### Proportion of working days entire team is remote
+
+
 ```{r}
 prep_xx %>% 
   pivot_longer(-person_id) %>% 
