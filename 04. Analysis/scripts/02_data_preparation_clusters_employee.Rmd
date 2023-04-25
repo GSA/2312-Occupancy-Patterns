@@ -734,18 +734,738 @@ prep_building <-
 
 #### Proportion of working days co-located with at least one other team member
 
+Identify employees who report to the site and collect `person_id`, `dates`, `location`, and `supervisor_e_mail_address`.
+
 ```{r}
-prep_a <- 
+prep_a <-
+  cohort_panel %>%
+  filter(daily_status_imputed == "Reporting to Job Site") %>%
+  select(person_id, date, location, supervisor_e_mail_address) %>%
+  distinct()
+```
+
+Review data.
+
+```{r}
+prep_a %>% 
+  skim()
+```
+
+Self left join on `dates`, `location`, and `supervisor_e_mail_address` and filter to rows where the `person_id`s do not match.
+
+```{r}
+prep_b <- 
+  prep_a %>% 
+  left_join(prep_a,
+            by = c("date", "location", "supervisor_e_mail_address"),
+            suffix = c("","_joined")) %>%
+  filter(person_id != person_id_joined)
+```
+
+Review data.
+
+```{r}
+prep_b %>% 
+  skim()
+```
+
+Count dates where co-location occurs by `person_id`.
+
+```{r}
+prep_c <- 
+  prep_b %>% 
+  group_by(person_id) %>% 
+  summarise(days_colocated_1 = n_distinct(date)) %>% 
+  ungroup()
+```
+
+Review data.
+
+```{r}
+prep_c %>% 
+  skim()
+```
+
+Full join `working_days` from `prep_building`, calculate proportion of co-located days with at least one team member by `working_days` and `observation_window_days`, replace nulls with 0, and remove `working_days`.
+
+```{r}
+prep_xx <- 
+  prep_c %>% 
+  full_join(prep_building %>% 
+              select(person_id,working_days)) %>% 
+  mutate(days_colocated_1_working_prop = days_colocated_1/working_days,
+         days_colocated_1_observation_prop = days_colocated_1/observation_window_days) %>% 
+  mutate(
+    across(
+      .cols = where(is.numeric),
+      .fns = ~replace_na(.,0)
+    )
+  ) %>% 
+  select(-working_days)
+```
+
+Review data.
+
+```{r}
+prep_xx %>% 
+  skim()
+```
+
+Check: These have the same number of unique `person_id`.
+
+```{r}
+cohort_ids %>% 
+  summarise(n_distinct(person_id)) %>% 
+  pull() ==
+  prep_xx %>% 
+  summarise(n_distinct(person_id)) %>% 
+  pull()
+```
+
+Join to `prep_building`.
+
+```{r}
+prep_building <- 
+  prep_building %>% 
+  left_join(prep_xx)
+```
+
+#### Proportion of working days co-located with supervisor
+
+Identify employees who report to the site and collect `person_id`, `dates`, `location`, `employee_e_mail_address`, and `supervisor_e_mail_address`.
+
+```{r}
+prep_a <-
+  cohort_panel %>%
+  filter(daily_status_imputed == "Reporting to Job Site") %>%
+  select(person_id, date, location, employee_e_mail_address, supervisor_e_mail_address) %>%
+  distinct()
+```
+
+Review data.
+
+```{r}
+prep_a %>% 
+  skim()
+```
+
+Self inner join on `dates`, `location`, and `supervisor_e_mail_address` equal to `employee_e_mail_address` in the right table, and filter to rows where the `person_id`s do not match.
+
+```{r}
+prep_b <- 
+  prep_a %>% 
+  inner_join(prep_a,
+            by = c("date", "location", "supervisor_e_mail_address" = "employee_e_mail_address"),
+            suffix = c("","_joined")) 
+```
+
+Review data.
+
+```{r}
+prep_b %>% 
+  skim()
+```
+
+Count dates where co-location with supervisor occurs by `person_id`.
+
+```{r}
+prep_c <- 
+  prep_b %>% 
+  group_by(person_id) %>% 
+  summarise(days_colocated_supervisor = n_distinct(date)) %>% 
+  ungroup()
+```
+
+Review data.
+
+```{r}
+prep_c %>% 
+  skim()
+```
+
+Full join `working_days` from `prep_building`, calculate proportion of co-located days with at least one team member by `working_days` and `observation_window_days`, replace nulls with 0, and remove `working_days`.
+
+```{r}
+prep_xx <- 
+  prep_c %>% 
+  full_join(prep_building %>% 
+              select(person_id,working_days)) %>% 
+  mutate(days_colocated_supervisor_working_prop = days_colocated_supervisor/working_days,
+         days_colocated_supervisor_observation_prop = days_colocated_supervisor/observation_window_days) %>% 
+  mutate(
+    across(
+      .cols = where(is.numeric),
+      .fns = ~replace_na(.,0)
+    )
+  ) %>% 
+  select(-working_days)
+```
+
+Review data.
+
+```{r}
+prep_xx %>% 
+  skim()
+```
+
+Check: These have the same number of unique `person_id`.
+
+```{r}
+cohort_ids %>% 
+  summarise(n_distinct(person_id)) %>% 
+  pull() ==
+  prep_xx %>% 
+  summarise(n_distinct(person_id)) %>% 
+  pull()
+```
+
+Join to `prep_building`.
+
+```{r}
+prep_building <- 
+  prep_building %>% 
+  left_join(prep_xx)
+```
+
+#### Proportion of working days co-located with entire team
+
+Identify employees who report to the site and collect `person_id`, `dates`, `location`, and `supervisor_e_mail_address`.
+
+```{r}
+prep_a <-
+  cohort_panel %>%
+  filter(daily_status_imputed == "Reporting to Job Site") %>%
+  select(person_id, date, location, supervisor_e_mail_address) %>%
+  distinct()
+```
+
+Review data.
+
+```{r}
+prep_a %>% 
+  skim()
+```
+
+Self left join on `dates`, `location`, and `supervisor_e_mail_address`.
+
+```{r}
+prep_b <- 
+  prep_a %>% 
+  left_join(prep_a,
+            by = c("date", "location", "supervisor_e_mail_address"),
+            suffix = c("","_joined"))
+```
+
+Review data.
+
+```{r}
+prep_b %>% 
+  skim()
+```
+
+Count number of team members co-located by `person_id` and `date` by counting unique `person_id_joined`.
+
+```{r}
+prep_c <- 
+  prep_b %>% 
+  group_by(person_id,date,supervisor_e_mail_address) %>% 
+  summarise(colocated_team_members = n_distinct(person_id_joined)) %>% 
+  ungroup()
+```
+
+Review data.
+
+```{r}
+prep_c %>% 
+  skim()
+```
+
+Calculate number of team members per day by supervisor email.
+
+```{r}
+prep_d <- 
   cohort_panel %>% 
-  filter(daily_status_imputed)
-  select
+  group_by(date,supervisor_e_mail_address) %>% 
+  summarise(team_size = n_distinct(person_id)) %>% 
+  ungroup()
+```
+
+Review data.
+
+```{r}
+prep_d %>% 
+  skim()
+```
+
+Left join co-located team members and teams size, but `date` and `supervisor_e_mail_address`, then filter to when co-located team members is the same size as the team
+
+```{r}
+prep_e <- 
+  prep_c %>% 
+  left_join(prep_d) %>% 
+  filter(colocated_team_members == team_size)
+```
+
+Review data.
+
+```{r}
+prep_e %>% 
+  skim()
 ```
 
 
-#### Proportion of working days co-located with supervisor
-#### Proportion of working days co-located with entire team
+Count dates where co-location with whole team occurs by `person_id`.
+
+```{r}
+prep_f <- 
+  prep_e %>% 
+  group_by(person_id) %>% 
+  summarise(days_colocated_team = n_distinct(date)) %>% 
+  ungroup()
+```
+
+Review data.
+
+```{r}
+prep_f %>% 
+  skim()
+```
+
+Full join `working_days` from `prep_building`, calculate proportion of co-located days with team member by `working_days` and `observation_window_days`, replace nulls with 0, and remove `working_days`.
+
+```{r}
+prep_xx <- 
+  prep_f %>% 
+  full_join(prep_building %>% 
+              select(person_id,working_days)) %>% 
+  mutate(days_colocated_team_working_prop = days_colocated_team/working_days,
+         days_colocated_team_observation_prop = days_colocated_team/observation_window_days) %>% 
+  mutate(
+    across(
+      .cols = where(is.numeric),
+      .fns = ~replace_na(.,0)
+    )
+  ) %>% 
+  select(-working_days)
+```
+
+Review data.
+
+```{r}
+prep_xx %>% 
+  skim()
+```
+
+Check: These have the same number of unique `person_id`.
+
+```{r}
+cohort_ids %>% 
+  summarise(n_distinct(person_id)) %>% 
+  pull() ==
+  prep_xx %>% 
+  summarise(n_distinct(person_id)) %>% 
+  pull()
+```
+
+Join to `prep_building`.
+
+```{r}
+prep_building <- 
+  prep_building %>% 
+  left_join(prep_xx)
+```
+
 #### Proportion of working days entire team is remote
 
+Identify employees who telework and collect `person_id`, `dates`, `location`, and `supervisor_e_mail_address`.
+
+```{r}
+prep_a <-
+  cohort_panel %>% 
+  filter(daily_status_imputed == "Teleworking") %>%
+  select(person_id, date, location, supervisor_e_mail_address) %>%
+  distinct()
+```
+
+Review data.
+
+```{r}
+prep_a %>% 
+  skim()
+```
+
+Self left join on `dates`, `location`, and `supervisor_e_mail_address`.
+
+```{r}
+prep_b <- 
+  prep_a %>% 
+  left_join(prep_a,
+            by = c("date", "location", "supervisor_e_mail_address"),
+            suffix = c("","_joined"))
+```
+
+Review data.
+
+```{r}
+prep_b %>% 
+  skim()
+```
+
+Count number of team members co-located by `person_id` and `date` by counting unique `person_id_joined`.
+
+```{r}
+prep_c <- 
+  prep_b %>% 
+  group_by(person_id,date,supervisor_e_mail_address) %>% 
+  summarise(telework_team_members = n_distinct(person_id_joined)) %>% 
+  ungroup()
+```
+
+Review data.
+
+```{r}
+prep_c %>% 
+  skim()
+```
+
+Calculate number of team members per day by supervisor email.
+
+```{r}
+prep_d <- 
+  cohort_panel %>% 
+  group_by(date,supervisor_e_mail_address) %>% 
+  summarise(team_size = n_distinct(person_id)) %>% 
+  ungroup()
+```
+
+Review data.
+
+```{r}
+prep_d %>% 
+  skim()
+```
+
+Left join telework team members and teams size, but `date` and `supervisor_e_mail_address`, then filter to when telework team members is the same size as the team
+
+```{r}
+prep_e <- 
+  prep_c %>% 
+  left_join(prep_d) %>% 
+  filter(telework_team_members == team_size)
+```
+
+Review data.
+
+```{r}
+prep_e %>% 
+  skim()
+```
+
+
+Count dates where telework with whole team occurs by `person_id`.
+
+```{r}
+prep_f <- 
+  prep_e %>% 
+  group_by(person_id) %>% 
+  summarise(days_telework_team = n_distinct(date)) %>% 
+  ungroup()
+```
+
+Review data.
+
+```{r}
+prep_f %>% 
+  skim()
+```
+
+Full join `working_days` from `prep_building`, calculate proportion of telework days with team member by `working_days` and `observation_window_days`, replace nulls with 0, and remove `working_days`.
+
+```{r}
+prep_xx <- 
+  prep_f %>% 
+  full_join(prep_building %>% 
+              select(person_id,working_days)) %>% 
+  mutate(days_telework_team_working_prop = days_telework_team/working_days,
+         days_telework_team_observation_prop = days_telework_team/observation_window_days) %>% 
+  mutate(
+    across(
+      .cols = where(is.numeric),
+      .fns = ~replace_na(.,0)
+    )
+  ) %>% 
+  select(-working_days)
+```
+
+Review data.
+
+```{r}
+prep_xx %>% 
+  skim()
+```
+
+Check: These have the same number of unique `person_id`.
+
+```{r}
+cohort_ids %>% 
+  summarise(n_distinct(person_id)) %>% 
+  pull() ==
+  prep_xx %>% 
+  summarise(n_distinct(person_id)) %>% 
+  pull()
+```
+
+Join to `prep_building`.
+
+```{r}
+prep_building <- 
+  prep_building %>% 
+  left_join(prep_xx)
+```
+
+## Define rule-based groups
+
+The analysis plan defines nine rule-based groups for analysis:
+
+1.  **All remote** - A policy definition for staff that are 100% remote
+2.  **Teleworker** - A policy definition for staff that require two days
+    per pay period onsite.
+3.  **Onsite Flexible** - Defined by `position_category_description` in
+    the roster data
+4.  **Offsite** - Defined by `position_category_description` in the
+    roster data
+5.  **Onsite Required** - Defined by `position_category_description` in
+    the roster data
+6.  **Primarily remote** - Employees who work remotely above the 95th
+    percentile <!-- could be 75th -->
+7.  **Mostly remote** - Employees who work remotely between the median
+    and the 95th percentile <!-- could be 75th -->
+8.  **Mostly onsite** - Employees who work remotely between 5th
+    percentile and the median <!-- could be 25th -->
+9.  **Primarily onsite** - Employees who work remotely below the 5th
+    percentile <!-- could be 75th -->
+    
+Below the variables for the groups are created. 
+
+### All remote
+
+Define workers with 100% of their time as **all remote**.
+
+```{r}
+prep_xx <- 
+  prep_building %>% 
+  mutate(
+    rule_based_all_remote = case_when(
+      daily_status_teleworking_working_prop == 1 ~ 1,
+                                      TRUE ~ 0)
+  ) %>% 
+  select(person_id,starts_with("rule_based_"))
+```
+
+Review data.
+
+```{r}
+prep_xx %>% 
+  skim()
+```
+
+Check: These have the same number of unique `person_id`.
+
+```{r}
+cohort_ids %>% 
+  summarise(n_distinct(person_id)) %>% 
+  pull() ==
+  prep_xx %>% 
+  summarise(n_distinct(person_id)) %>% 
+  pull()
+```
+
+Join to `prep_building`.
+
+```{r}
+prep_building <- 
+  prep_building %>% 
+  left_join(prep_xx)
+```
+### Teleworker
+
+First define pay periods based on this: https://www.gsa.gov/cdnstatic/GSA_Payroll_Calendar_2022_Revised.pdf. File is also saved in `r file.path(params$google_drive_home,"04. Analysis","documents")`.
+
+```{r}
+prep_a <- 
+  tibble(
+  date = seq.Date(from = ymd("2022-01-01"),
+         to = ymd("2022-12-31"),
+         by = "2 weeks")
+) %>% 
+  rownames_to_column(var = "period_number") 
+# %>% 
+#   mutate(
+#     date_pay_period_start_lead = lead(date_pay_period_start)
+  # )
+```
+
+```{r}
+prep_b <- 
+  tibble(
+  date = seq.Date(from = ymd("2022-01-01"),
+         to = ymd("2022-12-31"),
+         by = "days")
+)
+```
+
+```{r}
+prep_c <- 
+  prep_b %>% 
+  left_join(prep_a) %>% 
+  fill(period_number, .direction = "down")
+```
+
+```{r}
+prep_d <- 
+  cohort_panel %>% 
+  select(person_id,date, daily_status_imputed) %>% 
+  left_join(prep_c)
+```
+
+```{r}
+prep_e <- 
+      prep_d %>% 
+  group_by(person_id,daily_status_imputed,period_number) %>% 
+  summarise(days = n_distinct(date)) %>% 
+  ungroup()
+```
+
+#CONTINUE FROM HERE
+
+```{r}
+prep_e %>% 
+  filter(daily_status_imputed == "Reporting to Job Site") %>% 
+  mutate(
+    telework_onsite_minimum = case_when(days >= 2 ~ 1,
+                                        TRUE ~ 0)
+  ) %>% 
+  group_by(person_id) %>% 
+  summarise(
+    telework_onsite_minimum = mean(telework_onsite_minimum)
+  )
+```
+
+
+
+
+
+### Primarily, mostly onsite and remote
+
+First, calculate the quantiles for probabilities 0.50 and 0.95.
+
+```{r}
+prep_a <- 
+  prep_building %>% 
+  summarise(
+    across(
+      .cols = c(daily_status_reporting_to_job_site_working_prop,daily_status_teleworking_working_prop,
+                daily_status_reporting_to_job_site_observation_prop,daily_status_teleworking_observation_prop),
+      .fns = list(q_95 = ~quantile(.,probs = .95),
+                  q_50 = ~quantile(.,probs = .50))
+    )
+  )
+```
+
+Review data.
+
+```{r}
+prep_a %>% 
+  skim()
+```
+
+Use the quantiles above to create new variables for `primarily_` and `mostly_` working remote or onsite. 
+
+```{r}
+prep_xx <-
+  prep_building %>%
+  select(
+    person_id,
+    daily_status_reporting_to_job_site_working_prop,
+    daily_status_teleworking_working_prop,
+    daily_status_reporting_to_job_site_observation_prop,
+    daily_status_teleworking_observation_prop
+  ) %>%
+  mutate(
+    rule_based_primarily_reporting_to_job_site_working =
+      case_when(
+        daily_status_reporting_to_job_site_working_prop >= prep_a$daily_status_reporting_to_job_site_working_prop_q_95 ~ 1,
+        TRUE ~ 0
+      ),
+    rule_based_primarily_teleworking_working =
+      case_when(
+        daily_status_teleworking_working_prop >= prep_a$daily_status_teleworking_working_prop_q_95 ~ 1,
+        TRUE ~ 0
+      ),
+    rule_based_primarily_reporting_to_job_site_observation =
+      case_when(
+        daily_status_reporting_to_job_site_observation_prop >= prep_a$daily_status_reporting_to_job_site_observation_prop_q_95 ~ 1,
+        TRUE ~ 0
+      ),
+    rule_based_primarily_teleworking_observation =
+      case_when(
+        daily_status_teleworking_observation_prop >= prep_a$daily_status_teleworking_observation_prop_q_95 ~ 1,
+        TRUE ~ 0
+      ),
+    rule_based_mostly_reporting_to_job_site_working =
+      case_when(
+        daily_status_reporting_to_job_site_working_prop >= prep_a$daily_status_reporting_to_job_site_working_prop_q_50 ~ 1,
+        TRUE ~ 0
+      ),
+    rule_based_mostly_teleworking_working =
+      case_when(
+        daily_status_teleworking_working_prop >= prep_a$daily_status_teleworking_working_prop_q_50 ~ 1,
+        TRUE ~ 0
+      ),
+    rule_based_mostly_reporting_to_job_site_observation =
+      case_when(
+        daily_status_reporting_to_job_site_observation_prop >= prep_a$daily_status_reporting_to_job_site_observation_prop_q_50 ~ 1,
+        TRUE ~ 0
+      ),
+    rule_based_mostly_teleworking_observation =
+      case_when(
+        daily_status_teleworking_observation_prop >= prep_a$daily_status_teleworking_observation_prop_q_50 ~ 1,
+        TRUE ~ 0
+      ),
+  ) %>%
+  select(person_id, starts_with("rule_based_"))
+```
+
+Review data.
+
+```{r}
+prep_xx %>% 
+  skim()
+```
+
+Check: These have the same number of unique `person_id`.
+
+```{r}
+cohort_ids %>% 
+  summarise(n_distinct(person_id)) %>% 
+  pull() ==
+  prep_xx %>% 
+  summarise(n_distinct(person_id)) %>% 
+  pull()
+```
+
+Join to `prep_building`.
+
+```{r}
+prep_building <- 
+  prep_building %>% 
+  left_join(prep_xx)
+```
+
+
+
+
+#CONTINUE FROM HERE
 
 ```{r}
 prep_xx %>% 
