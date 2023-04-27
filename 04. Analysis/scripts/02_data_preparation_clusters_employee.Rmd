@@ -1299,11 +1299,9 @@ prep_a <-
          by = "2 weeks")
 ) %>% 
   rownames_to_column(var = "period_number") 
-# %>% 
-#   mutate(
-#     date_pay_period_start_lead = lead(date_pay_period_start)
-  # )
 ```
+
+Second, create a dataframe of all the days of the year.
 
 ```{r}
 prep_b <- 
@@ -1314,6 +1312,7 @@ prep_b <-
 )
 ```
 
+Third, left join the pay periods dataframe (`prep_a`) to the days of the year (`prep_b`), then fill the null `period_number` values with the entry above.
 ```{r}
 prep_c <- 
   prep_b %>% 
@@ -1336,10 +1335,11 @@ prep_e <-
   ungroup()
 ```
 
-#CONTINUE FROM HERE
+
 
 ```{r}
-prep_e %>% 
+prep_f <- 
+  prep_e %>% 
   filter(daily_status_imputed == "Reporting to Job Site") %>% 
   mutate(
     telework_onsite_minimum = case_when(days >= 2 ~ 1,
@@ -1347,9 +1347,16 @@ prep_e %>%
   ) %>% 
   group_by(person_id) %>% 
   summarise(
-    telework_onsite_minimum = mean(telework_onsite_minimum)
+    telework_onsite_minimum_mean = mean(telework_onsite_minimum)
+  ) %>% 
+  ungroup() %>% 
+  mutate(
+    telework_onsite_minimum = case_when(telework_onsite_minimum_mean == 1 ~ 1,
+                                        TRUE ~ 0)
   )
 ```
+
+#CONTINUE FROM HERE
 
 
 
@@ -1462,6 +1469,16 @@ prep_building <-
   left_join(prep_xx)
 ```
 
+### Position description categories
+
+```{r}
+prep_a <- 
+  cohort_first %>% 
+  select(person_id,position_category_description) %>% 
+  character_to_indicator(in_unique_identifier = person_id,
+                         position_category_description,
+                         in_prefix = "rules_based_position_category_")
+```
 
 
 
