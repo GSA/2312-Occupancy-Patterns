@@ -1228,7 +1228,7 @@ prep_building <-
 The analysis plan defines nine rule-based groups for analysis:
 
 1.  **All remote** - A policy definition for staff that are 100% remote
-2.  **Teleworker** - A policy definition for staff that require two days
+2.  **Routine teleworker** - Employees with position_category_description's *Onsite Flexible* or *Offsite* that work at least two two days per pay period onsite.
     per pay period onsite.
 3.  **Onsite Flexible** - Defined by `position_category_description` in
     the roster data
@@ -1287,80 +1287,6 @@ prep_building <-
   prep_building %>% 
   left_join(prep_xx)
 ```
-### Teleworker
-
-First define pay periods based on this: https://www.gsa.gov/cdnstatic/GSA_Payroll_Calendar_2022_Revised.pdf. File is also saved in `r file.path(params$google_drive_home,"04. Analysis","documents")`.
-
-```{r}
-prep_a <- 
-  tibble(
-  date = seq.Date(from = ymd("2022-01-01"),
-         to = ymd("2022-12-31"),
-         by = "2 weeks")
-) %>% 
-  rownames_to_column(var = "period_number") 
-```
-
-Second, create a dataframe of all the days of the year.
-
-```{r}
-prep_b <- 
-  tibble(
-  date = seq.Date(from = ymd("2022-01-01"),
-         to = ymd("2022-12-31"),
-         by = "days")
-)
-```
-
-Third, left join the pay periods dataframe (`prep_a`) to the days of the year (`prep_b`), then fill the null `period_number` values with the entry above.
-```{r}
-prep_c <- 
-  prep_b %>% 
-  left_join(prep_a) %>% 
-  fill(period_number, .direction = "down")
-```
-
-```{r}
-prep_d <- 
-  cohort_panel %>% 
-  select(person_id,date, daily_status_imputed) %>% 
-  left_join(prep_c)
-```
-
-```{r}
-prep_e <- 
-      prep_d %>% 
-  group_by(person_id,daily_status_imputed,period_number) %>% 
-  summarise(days = n_distinct(date)) %>% 
-  ungroup()
-```
-
-
-
-```{r}
-prep_f <- 
-  prep_e %>% 
-  filter(daily_status_imputed == "Reporting to Job Site") %>% 
-  mutate(
-    telework_onsite_minimum = case_when(days >= 2 ~ 1,
-                                        TRUE ~ 0)
-  ) %>% 
-  group_by(person_id) %>% 
-  summarise(
-    telework_onsite_minimum_mean = mean(telework_onsite_minimum)
-  ) %>% 
-  ungroup() %>% 
-  mutate(
-    telework_onsite_minimum = case_when(telework_onsite_minimum_mean == 1 ~ 1,
-                                        TRUE ~ 0)
-  )
-```
-
-#CONTINUE FROM HERE
-
-
-
-
 
 ### Primarily, mostly onsite and remote
 
@@ -1471,16 +1397,137 @@ prep_building <-
 
 ### Position description categories
 
+```{r, eval=FALSE}
+prep_b <- 
+  cohort_panel %>% 
+  group_by(person_id) %>% 
+  summarise(
+    across(
+      .cols = position_category_description,
+      .fns = getmode
+    )
+  )
+  
+prep_c <- 
+  cohort_first %>% 
+  select(person_id,position_category_description)
+
+prep_c %>% 
+  inner_join(prep_a, by = "person_id") %>% 
+  filter(position_category_description.x != position_category_description.y)
+```
+
+Identify the `position_category_description` at the beginning of the observation window and convert the categories into indicators.  
+
 ```{r}
-prep_a <- 
+prep_xx <- 
   cohort_first %>% 
   select(person_id,position_category_description) %>% 
-  character_to_indicator(in_unique_identifier = person_id,
+  character_to_indicator(in_unique_identifier = "person_id",
                          position_category_description,
                          in_prefix = "rules_based_position_category_")
 ```
 
+Review data.
 
+```{r}
+prep_xx %>% 
+  skim()
+```
+
+
+Check: These have the same number of unique `person_id`.
+
+```{r}
+cohort_ids %>% 
+  summarise(n_distinct(person_id)) %>% 
+  pull() ==
+  prep_xx %>% 
+  summarise(n_distinct(person_id)) %>% 
+  pull()
+```
+
+Join to `prep_building`.
+
+```{r}
+prep_building <- 
+  prep_building %>% 
+  left_join(prep_xx)
+```
+
+### Teleworker
+
+First define pay periods based on this: https://www.gsa.gov/cdnstatic/GSA_Payroll_Calendar_2022_Revised.pdf. File is also saved in `r file.path(params$google_drive_home,"04. Analysis","documents")`.
+
+```{r}
+prep_a <- 
+  tibble(
+  date = seq.Date(from = ymd("2022-01-01"),
+         to = ymd("2022-12-31"),
+         by = "2 weeks")
+) %>% 
+  rownames_to_column(var = "period_number") 
+```
+
+Second, create a dataframe of all the days of the year.
+
+```{r}
+prep_b <- 
+  tibble(
+  date = seq.Date(from = ymd("2022-01-01"),
+         to = ymd("2022-12-31"),
+         by = "days")
+)
+```
+
+Third, left join the pay periods dataframe (`prep_a`) to the days of the year (`prep_b`), then fill the null `period_number` values with the entry above.
+
+```{r}
+prep_c <- 
+  prep_b %>% 
+  left_join(prep_a) %>% 
+  fill(period_number, .direction = "down")
+```
+
+Fourth, take the cohort panel (`cohort_panel`) select `person_id`, `date`, and `daily_status_imputed` and left join to calendar dataframe with filled `period_number` (`prep_c`) on `date`. 
+
+```{r}
+prep_d <- 
+  cohort_panel %>% 
+  select(person_id,date, daily_status_imputed) %>% 
+  left_join(prep_c)
+```
+
+```{r}
+prep_e <- 
+      prep_d %>% 
+  group_by(person_id,daily_status_imputed,period_number) %>% 
+  summarise(days = n_distinct(date)) %>% 
+  ungroup()
+```
+
+
+
+```{r}
+prep_f <- 
+  prep_e %>% 
+  filter(daily_status_imputed == "Reporting to Job Site") %>% 
+  mutate(
+    telework_onsite_minimum = case_when(days >= 2 ~ 1,
+                                        TRUE ~ 0)
+  ) %>% 
+  group_by(person_id) %>% 
+  summarise(
+    telework_onsite_minimum_mean = mean(telework_onsite_minimum)
+  ) %>% 
+  ungroup() %>% 
+  mutate(
+    telework_onsite_minimum = case_when(telework_onsite_minimum_mean == 1 ~ 1,
+                                        TRUE ~ 0)
+  )
+```
+
+#CONTINUE FROM HERE
 
 #CONTINUE FROM HERE
 
