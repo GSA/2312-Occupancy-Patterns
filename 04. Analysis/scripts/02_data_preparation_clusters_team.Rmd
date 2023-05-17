@@ -346,7 +346,7 @@ prep_d %>%
   skim()
 ```
 
-Join working days, working days per status, and team members into one datafram by `supervisor_e_mail_address`.
+Join working days, working days per status, and team members into one dataframe by `supervisor_e_mail_address`.
 
 ```{r}
 prep_e <- 
@@ -407,27 +407,8 @@ prep_building <-
   prep_building %>% 
   left_join(prep_xx)
 ```
-# CONTINUE FROM HERE
 
--   Modal size of team over observation window
-
--   Proportion of team members working days remote by the day of the
-    week
-
--   Proportion of team members exiting team
-
--   Proportion of working days at least two team member co-located
-
--   Proportion of working days supervisor is co-located with at least
-    one team member
-
--   Proportion of working days entire team is co-located
-
--   Proportion of working days entire team is remote
-
--   Proportion of observation window the team existed.
-
-### Employee, day of week variables
+### Team, day of week variables
 
 For following variables are aggregated for the whole period by day of the week for the whole team:
 
@@ -448,31 +429,141 @@ observation_window_days_day_of_week <-
 observation_window_days_day_of_week
 ```
 
-We make the same calculations as above, but by the day of the week.
+
+First count the number of distinct days per `supervisor_e_mail_address`, `date_day_of_week`, `person_id`, and `daily_status_imputed`, then filter to daily status: *Reporting to Job Site* or *Teleworking*.
 
 ```{r}
-prep_day_of_week <-
+prep_a <-
   cohort_panel %>%
-  group_by(person_id,daily_status_imputed,date_day_of_week,) %>% 
+  group_by(supervisor_e_mail_address,person_id,daily_status_imputed,date_day_of_week,.drop = FALSE) %>% 
   summarise(working_days = n_distinct(date)) %>% 
   ungroup() %>% 
-  pivot_wider(values_from = working_days, names_from = c(daily_status_imputed)) %>% 
-  left_join(observation_window_days_day_of_week) %>% 
-  clean_names() %>% 
-  rename_with(~glue::glue("daily_status_{.}"), c(-person_id,-date_day_of_week,-observation_window_days))  %>% 
-  mutate(
-    across(
-      .cols = where(is.numeric),
-      .fns = ~replace_na(.,0)
-    )
+  filter(
+    daily_status_imputed == "Reporting to Job Site" |
+      daily_status_imputed == "Teleworking"
+  )
+```
+
+Review data.
+
+```{r}
+prep_a %>% 
+  skim()
+```
+
+Second, sum the number days by `supervisor_e_mail_address` and `date_day_of_week` from dataframe `prep_a`.
+
+```{r}
+prep_b <- 
+  prep_a %>% 
+  group_by(supervisor_e_mail_address,date_day_of_week) %>% 
+  summarise(
+    working_days = sum(working_days)
   ) %>% 
+  ungroup()
+```
+
+Review data.
+
+```{r}
+prep_b %>% 
+  skim()
+```
+
+Third, sum the number days by `supervisor_e_mail_address`, `date_day_of_week` and `daily_status_imputed` from dataframe `prep_a` and reshape the data wide so that statuses are in columns, `daily_status_*`.
+
+```{r}
+prep_c <- 
+  prep_a %>% 
+  group_by(supervisor_e_mail_address,daily_status_imputed,date_day_of_week) %>% 
+  summarise(
+    working_days = sum(working_days)
+  ) %>% 
+  ungroup() %>% 
+  pivot_wider(values_from = working_days, names_from = daily_status_imputed) %>% 
+  clean_names() %>% 
+  rename_with(~glue::glue("daily_status_{.}"), c(-supervisor_e_mail_address,-date_day_of_week))
+```
+
+Review data.
+
+```{r}
+prep_c %>% 
+  skim()
+```
+
+Fourth, count the number of unique team members per `supervisor_e_mail_address` and `date_day_of_week`.
+
+```{r}
+prep_d <-
+  cohort_panel %>%
+  group_by(supervisor_e_mail_address,date_day_of_week) %>% 
+  summarise(
+    team_members = n_distinct(person_id)
+  ) %>% 
+  ungroup()
+```
+
+Review data.
+
+```{r}
+prep_d %>% 
+  skim()
+```
+
+Join working days, working days per status, and team members into one dataframe by `supervisor_e_mail_address`.
+
+```{r}
+prep_e <- 
+  prep_b %>% 
+  full_join(prep_c) %>% 
+  full_join(prep_d) %>% 
+  left_join(observation_window_days_day_of_week)
+```
+
+Review data.
+
+```{r}
+prep_e %>% 
+  skim()
+```
+
+Review data by `date_day_of_week`.
+
+```{r}
+prep_e %>% 
+  group_by(date_day_of_week) %>% 
+  skim()
+```
+
+Filter out *Sat* and *Sun* as there are no working days. 
+
+```{r}
+prep_f <- 
+  prep_e %>% 
+  filter(date_day_of_week != "Sat" &
+           date_day_of_week != "Sun")
+```
+
+Review data.
+
+```{r}
+prep_f %>% 
+  skim()
+```
+
+Calucate `observation_window_days`, `daily_status_reporting_to_job_site_working_prop`, `daily_status_teleworking_working_prop`, `daily_status_reporting_to_job_site_observation_prop`, and `daily_status_teleworking_observation_prop`, then replace missing values with zero.
+
+```{r}
+prep_g <- 
+  prep_f %>% 
   mutate(
-    working_days = daily_status_reporting_to_job_site + daily_status_teleworking,
+    observation_window_days = team_members*observation_window_days,
     daily_status_reporting_to_job_site_working_prop = daily_status_reporting_to_job_site/working_days,
     daily_status_teleworking_working_prop = daily_status_teleworking/working_days,
     daily_status_reporting_to_job_site_observation_prop = daily_status_reporting_to_job_site/observation_window_days,
     daily_status_teleworking_observation_prop = daily_status_teleworking/observation_window_days
-  )  %>% 
+  ) %>% 
   mutate(
     across(
       .cols = where(is.numeric),
@@ -484,7 +575,7 @@ prep_day_of_week <-
 Review data.
 
 ```{r}
-prep_day_of_week %>% 
+prep_g %>% 
   skim()
 ```
 
@@ -492,8 +583,9 @@ Now collect only the results for telework.
 
 ```{r}
 prep_xx <- 
-  prep_day_of_week %>% 
-  select(person_id,date_day_of_week,daily_status_teleworking_working_prop,daily_status_teleworking_observation_prop) %>% 
+  prep_g %>% 
+  select(supervisor_e_mail_address,
+         date_day_of_week,daily_status_teleworking_working_prop,daily_status_teleworking_observation_prop) %>% 
   pivot_longer(cols = starts_with("daily_status")) %>% 
   mutate(date_day_of_week = str_to_lower(date_day_of_week)) %>% 
   unite("name",date_day_of_week,name) %>% 
@@ -513,14 +605,14 @@ prep_xx %>%
   skim()
 ```
 
-Check: These have the same number of unique `person_id`.
+Check: These have the same number of unique `supervisor_e_mail_address`.
 
 ```{r}
 cohort_ids %>% 
-  summarise(n_distinct(person_id)) %>% 
+  summarise(n_distinct(supervisor_e_mail_address)) %>% 
   pull() ==
   prep_xx %>% 
-  summarise(n_distinct(person_id)) %>% 
+  summarise(n_distinct(supervisor_e_mail_address)) %>% 
   pull()
 ```
 
@@ -531,6 +623,28 @@ prep_building <-
   prep_building %>% 
   left_join(prep_xx)
 ```
+
+
+
+# CONTINUE FROM HERE
+
+<!-- -   Modal size of team over observation window -->
+
+<!-- -   Proportion of team members working days remote by the day of the -->
+<!--     week -->
+
+<!-- -   Proportion of team members exiting team -->
+
+<!-- -   Proportion of working days at least two team member co-located -->
+
+<!-- -   Proportion of working days supervisor is co-located with at least -->
+<!--     one team member -->
+
+<!-- -   Proportion of working days entire team is co-located -->
+
+<!-- -   Proportion of working days entire team is remote -->
+
+<!-- -   Proportion of observation window the team existed. -->
 
 #### Correlation of work status between days of the week
 
