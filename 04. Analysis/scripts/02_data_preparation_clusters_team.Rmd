@@ -624,18 +624,315 @@ prep_building <-
   left_join(prep_xx)
 ```
 
+### Modal size of team over observation window
 
+Calculate number of team members per day by supervisor email.
+
+```{r}
+prep_a <- 
+  cohort_panel %>% 
+  group_by(date,supervisor_e_mail_address) %>% 
+  summarise(team_size = n_distinct(person_id)) %>% 
+  ungroup()
+```
+
+Review data.
+
+```{r}
+prep_a %>% 
+  skim()
+```
+
+Calculate the mode team size for each `supervisor_e_mail_address`.
+
+```{r}
+prep_xx <- 
+  prep_a %>% 
+  group_by(supervisor_e_mail_address) %>% 
+  summarise(team_size_mode = getmode(team_size)) %>% 
+  ungroup()
+```
+
+Review data.
+
+```{r}
+prep_xx %>% 
+  skim()
+```
+
+Check: These have the same number of unique `supervisor_e_mail_address`.
+
+```{r}
+cohort_ids %>% 
+  summarise(n_distinct(supervisor_e_mail_address)) %>% 
+  pull() ==
+  prep_xx %>% 
+  summarise(n_distinct(supervisor_e_mail_address)) %>% 
+  pull()
+```
+
+Join to `prep_building`.
+
+```{r}
+prep_building <- 
+  prep_building %>% 
+  left_join(prep_xx)
+```
+
+### Proportion of team members exiting team
+
+Calculate the number of days and last day of team members by `supervisor_e_mail_address`, and `person_id`.
+
+```{r}
+prep_a <- 
+  cohort_panel %>% 
+  group_by(supervisor_e_mail_address,person_id) %>% 
+  summarise(days = n_distinct(date),
+            last_day = max(date)) %>% 
+  ungroup()
+```
+
+Review data.
+
+```{r}
+prep_a %>% 
+  skim()
+```
+
+Identify team members that exit by limiting the list above to those who had few than the maximum number of days and whose last day was before the maxium day in the dataframe, then count the number per `supervisor_e_mail_address`.
+
+```{r}
+prep_b <- 
+  prep_a %>% 
+  filter(days < max(days)) %>% 
+  filter(last_day < max(last_day)) %>% 
+  group_by(supervisor_e_mail_address) %>% 
+  summarise(employee_exits = n_distinct(person_id)) %>% 
+  ungroup()
+```
+
+Review data.
+
+```{r}
+prep_b %>% 
+  skim()
+```
+
+Attach to `prep_building` selecting `supervisor_e_mail_address` and `team_members` from that dataframe to calucalate the proportio of the team exiting.
+
+```{r}
+prep_c <- 
+  prep_building %>% 
+  select(supervisor_e_mail_address, team_members) %>% 
+  distinct() %>% 
+  left_join(prep_b) %>% 
+  mutate(
+    across(
+      .cols = where(is.numeric),
+      .fns = ~replace_na(.,0)
+    )
+  ) %>% 
+  mutate(
+    employee_exits_prop = employee_exits/team_members
+  )
+```
+
+Review data.
+
+```{r}
+prep_c %>% 
+  skim()
+```
+
+Remove `team_members`.
+
+```{r}
+prep_xx <- 
+  prep_c %>% 
+  select(-team_members)
+```
+
+Review data.
+
+```{r}
+prep_xx %>% 
+  skim()
+```
+
+Check: These have the same number of unique `supervisor_e_mail_address`.
+
+```{r}
+cohort_ids %>% 
+  summarise(n_distinct(supervisor_e_mail_address)) %>% 
+  pull() ==
+  prep_xx %>% 
+  summarise(n_distinct(supervisor_e_mail_address)) %>% 
+  pull()
+```
+
+Join to `prep_building`.
+
+```{r}
+prep_building <- 
+  prep_building %>% 
+  left_join(prep_xx)
+```
+
+### Proportion of observation window the team existed
+
+Calculate the number of days and last day of team members by `supervisor_e_mail_address`.
+
+```{r}
+prep_a <- 
+  cohort_panel %>% 
+  group_by(supervisor_e_mail_address) %>% 
+  summarise(team_days = n_distinct(date)) %>% 
+  ungroup()
+```
+
+Review data.
+
+```{r}
+prep_a %>% 
+  skim()
+```
+
+Calculate the number of days and last day of team members by `supervisor_e_mail_address`.
+
+```{r}
+prep_xx <- 
+  prep_a %>% 
+  mutate(
+    team_days_prop = team_days/observation_window_days
+  )
+```
+
+Review data.
+
+```{r}
+prep_xx %>% 
+  skim()
+```
+
+Check: These have the same number of unique `supervisor_e_mail_address`.
+
+```{r}
+cohort_ids %>% 
+  summarise(n_distinct(supervisor_e_mail_address)) %>% 
+  pull() ==
+  prep_xx %>% 
+  summarise(n_distinct(supervisor_e_mail_address)) %>% 
+  pull()
+```
+
+Join to `prep_building`.
+
+```{r}
+prep_building <- 
+  prep_building %>% 
+  left_join(prep_xx)
+```
+
+### Proportion of working days at least two team members co-located
+
+Identify employees who report to the site and collect `person_id`, `dates`, `location`, and `supervisor_e_mail_address`.
+
+```{r}
+prep_a <-
+  cohort_panel %>%
+  filter(daily_status_imputed == "Reporting to Job Site") %>%
+  select(person_id, date, location, supervisor_e_mail_address) %>%
+  distinct()
+```
+
+Review data.
+
+```{r}
+prep_a %>% 
+  skim()
+```
+
+Self left join on `dates`, `location`, and `supervisor_e_mail_address` and filter to rows where the `person_id`s do not match.
+
+```{r}
+prep_b <- 
+  prep_a %>% 
+  left_join(prep_a,
+            by = c("date", "location", "supervisor_e_mail_address"),
+            suffix = c("","_joined")) %>%
+  filter(person_id != person_id_joined)
+```
+
+Review data.
+
+```{r}
+prep_b %>% 
+  skim()
+```
+
+Count dates where co-location occurs by `supervisor_e_mail_address`.
+
+```{r}
+prep_c <- 
+  prep_b %>% 
+  group_by(supervisor_e_mail_address) %>% 
+  summarise(days_colocated_1 = n_distinct(date)) %>% 
+  ungroup()
+```
+
+Review data.
+
+```{r}
+prep_c %>% 
+  skim()
+```
+
+Full join `working_days` from `prep_building`, calculate proportion of co-located days with at least one team member by `working_days` and `observation_window_days`, replace nulls with 0, and remove `working_days`.
+
+```{r}
+prep_xx <- 
+  prep_c %>% 
+  full_join(prep_building %>% 
+              select(supervisor_e_mail_address,working_days)) %>% 
+  mutate(days_colocated_1_working_prop = days_colocated_1/working_days,
+         days_colocated_1_observation_prop = days_colocated_1/observation_window_days) %>% 
+  mutate(
+    across(
+      .cols = where(is.numeric),
+      .fns = ~replace_na(.,0)
+    )
+  ) %>% 
+  select(-working_days)
+```
+
+Review data.
+
+```{r}
+prep_xx %>% 
+  skim()
+```
+
+
+Check: These have the same number of unique `supervisor_e_mail_address`.
+
+```{r}
+cohort_ids %>% 
+  summarise(n_distinct(supervisor_e_mail_address)) %>% 
+  pull() ==
+  prep_xx %>% 
+  summarise(n_distinct(supervisor_e_mail_address)) %>% 
+  pull()
+```
+
+Join to `prep_building`.
+
+```{r}
+prep_building <- 
+  prep_building %>% 
+  left_join(prep_xx)
+```
 
 # CONTINUE FROM HERE
-
-<!-- -   Modal size of team over observation window -->
-
-<!-- -   Proportion of team members working days remote by the day of the -->
-<!--     week -->
-
-<!-- -   Proportion of team members exiting team -->
-
-<!-- -   Proportion of working days at least two team member co-located -->
 
 <!-- -   Proportion of working days supervisor is co-located with at least -->
 <!--     one team member -->
@@ -643,8 +940,6 @@ prep_building <-
 <!-- -   Proportion of working days entire team is co-located -->
 
 <!-- -   Proportion of working days entire team is remote -->
-
-<!-- -   Proportion of observation window the team existed. -->
 
 #### Correlation of work status between days of the week
 
