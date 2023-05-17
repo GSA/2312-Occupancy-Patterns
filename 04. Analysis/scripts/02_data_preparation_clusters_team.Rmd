@@ -220,15 +220,15 @@ prep_building <-
 
 ## Creating aggregated variables {.tabset .tabset-pills}
 
-### Employee, whole period variables
+### Team, whole period variables
 
-For following variables are aggregated for the whole period for each employee:
+For following variables are aggregated for the whole period for the whole team:
 
--   Proportion of days onsite
+-   Proportion of team members working days onsite
 
--   Proportion of days remote
+-   Proportion of team members working days remote
 
--   Number of working days
+-   Number of team members working days
 
 First, calculating the number of days in the observation window.
 
@@ -254,13 +254,17 @@ $$
 WorkingDays_m = OnsiteDays_m + TeleworkDays_m
 $$
 
-$OnsiteDays_m$ is the number of onsite days for team member $m$ and $TeleworkDays_m$ is the number of telework days for team member $m$. $x$ is number of members on team
+$OnsiteDays_m$ is the number of onsite days for team member $m$ and $TeleworkDays_m$ is the number of telework days for team member $m$. $x$ is number of members on team.
 
 Second as a proportion of days in the observations window:
 
 $$
 \frac{\sum_{m=1}^{x}DailyStatusDays_m}{x\times ObservationWindowDays}
 $$
+
+Now we calculate the values for the data.
+
+First count the number of distinct days per `supervisor_e_mail_address`, `person_id`, and `daily_status_imputed`, then filter to daily status: *Reporting to Job Site* or *Teleworking*.
 
 ```{r}
 prep_a <-
@@ -281,6 +285,8 @@ prep_a %>%
   skim()
 ```
 
+Second, sum the number days by `supervisor_e_mail_address` from dataframe `prep_a`.
+
 ```{r}
 prep_b <- 
   prep_a %>% 
@@ -298,6 +304,8 @@ Review data.
 prep_b %>% 
   skim()
 ```
+
+Third, sum the number days by `supervisor_e_mail_address` and `daily_status_imputed` from dataframe `prep_a` and reshape the data wide so that statuses are in columns, `daily_status_*`.
 
 ```{r}
 prep_c <- 
@@ -319,6 +327,8 @@ prep_c %>%
   skim()
 ```
 
+Fourth, count the number of unique team members per supervisor.
+
 ```{r}
 prep_d <-
   cohort_panel %>%
@@ -336,6 +346,8 @@ prep_d %>%
   skim()
 ```
 
+Join working days, working days per status, and team members into one datafram by `supervisor_e_mail_address`.
+
 ```{r}
 prep_e <- 
   prep_b %>% 
@@ -349,6 +361,8 @@ Review data.
 prep_e %>% 
   skim()
 ```
+
+Calucate `observation_window_days`, `daily_status_reporting_to_job_site_working_prop`, `daily_status_teleworking_working_prop`, `daily_status_reporting_to_job_site_observation_prop`, and `daily_status_teleworking_observation_prop`, then replace missing values with zero.
 
 ```{r}
 prep_xx <- 
@@ -395,13 +409,30 @@ prep_building <-
 ```
 # CONTINUE FROM HERE
 
+-   Modal size of team over observation window
+
+-   Proportion of team members working days remote by the day of the
+    week
+
+-   Proportion of team members exiting team
+
+-   Proportion of working days at least two team member co-located
+
+-   Proportion of working days supervisor is co-located with at least
+    one team member
+
+-   Proportion of working days entire team is co-located
+
+-   Proportion of working days entire team is remote
+
+-   Proportion of observation window the team existed.
+
 ### Employee, day of week variables
 
-For following variables are aggregated for the whole period by day of the week for each employee:
+For following variables are aggregated for the whole period by day of the week for the whole team:
 
--   Proportion of days remote by the day of the week
-
--   Correlation of work status between days of the week
+-   Proportion of team members working days remote by the day of the
+    week
 
 #### Proportion of days remote by day of the week
 
