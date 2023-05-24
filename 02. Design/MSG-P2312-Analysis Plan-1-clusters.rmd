@@ -694,7 +694,7 @@ be in. Staff will be grouped as follows:
 Teams will be categorized similarly:
 
 1.  **All remote** - All team members are100% remote
-2.  **Routine teleworker** - All team members have
+2.  **Routine teleworker** - All team members who have
     `position_category_description`'s *Onsite Flexible* or *Offsite* and
     work at least two two days per pay period onsite.
 3.  **Onsite Flexible** - All team members are *Onsite Flexible* as
