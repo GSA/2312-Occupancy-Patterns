@@ -1300,7 +1300,7 @@ prep_building <-
 The analysis plan defines ten rule-based groups for analysis:
 
 1.  **All remote** - All team members are 100% remote
-2.  **Routine teleworker** - All team members have
+2.  **Routine teleworker** - All team members who have
     `position_category_description`'s *Onsite Flexible* or *Offsite* and
     work at least two two days per pay period onsite.
 3.  **Onsite Flexible** - All team members are *Onsite Flexible* as
@@ -1740,14 +1740,156 @@ prep_h %>%
   skim()
 ```
 
+Filter to team members who met the onsite minimum and count by `supervisor_e_mail_address`.
+
 ```{r}
-prep_h %>% 
+prep_i <- 
+  prep_h %>% 
   filter(rule_based_telework_onsite_minimum == 1) %>% 
   group_by(supervisor_e_mail_address) %>% 
-  summarise(rule_based_telework_onsite_minimum = n_distinct(person_id))
+  summarise(rule_based_telework_onsite_minimum = n_distinct(person_id)) %>% 
+  ungroup()
+```
+
+Review data.
+
+```{r}
+prep_i %>% 
+  skim()
+```
+
+From `cohort_panel` count number of team members with **Onsite flexible** or **Offsite** `position_category_description` by `supervisor_e_mail_address`.
+
+```{r}
+prep_j <- 
+  cohort_panel %>% 
+  filter(position_category_description == "Onsite Flexible" |
+           position_category_description == "Offsite") %>% 
+  group_by(supervisor_e_mail_address) %>% 
+  summarise(team_members_telework = n_distinct(person_id)) %>% 
+  ungroup() 
+```
+
+Review data.
+
+```{r}
+prep_j %>% 
+  skim()
+```
+
+Full join and identify rows where all teleworking team members meet the minimum. 
+
+```{r}
+prep_k <- 
+  prep_i %>% 
+  full_join(prep_j) %>% 
+  mutate(
+    rule_based_telework_onsite_minimum = case_when(rule_based_telework_onsite_minimum == team_members_telework ~ 1,
+                    TRUE ~ 0)
+  ) %>% 
+  select(-team_members_telework)
+```
+
+Review data.
+
+```{r}
+prep_k %>% 
+  skim()
 ```
 
 
+Left join to `prep_building` selecting only `supervisor_e_mail_address` and remove `team_members`.
+
+```{r}
+prep_xx <-
+  prep_building %>% 
+  select(supervisor_e_mail_address) %>% 
+  left_join(prep_k) %>% 
+  mutate(
+    across(
+      .cols = where(is.numeric),
+      .fns = ~replace_na(.,0)
+    )
+  )
+```
+
+Review data.
+
+```{r}
+prep_xx %>% 
+  skim()
+```
+
+Check: These have the same number of unique `supervisor_e_mail_address`.
+
+```{r}
+cohort_ids %>% 
+  summarise(n_distinct(supervisor_e_mail_address)) %>% 
+  pull() ==
+  prep_xx %>% 
+  summarise(n_distinct(supervisor_e_mail_address)) %>% 
+  pull()
+```
+
+Join to `prep_building`.
+
+```{r}
+prep_building <- 
+  prep_building %>% 
+  left_join(prep_xx)
+```
+
+### Mixed categories
+
+From `cohort_panel` count team members by `position_category_description` and `supervisor_e_mail_address`, then filter to only `position_category_description`s that are **Onsite Flexible**, **Offsite**, or **Onsite Required**, then count `position_category_description` by `supervisor_e_mail_address`, then create `rule_based_mixed_position_category` identifying teams with more than one category, and last drop the temporary variable. 
+
+```{r}
+prep_a <-
+  cohort_panel %>% 
+  group_by(supervisor_e_mail_address,position_category_description) %>% 
+  summarise(team_members = n_distinct(person_id)) %>% 
+  ungroup() %>% 
+  filter(position_category_description == "Onsite Flexible" |
+           position_category_description == "Offsite" |
+           position_category_description == "Onsite Required") %>% 
+  group_by(supervisor_e_mail_address) %>% 
+  summarise(temp_var = n_distinct(position_category_description)) %>% 
+  ungroup() %>% 
+   mutate(
+     rule_based_mixed_position_category = case_when(temp_var > 1 ~ 1,
+                                                    TRUE ~ 0)
+     ) %>% 
+  select(-temp_var)
+```
+
+Review data.
+
+```{r}
+prep_a %>% 
+  skim()
+```
+
+Left join to `prep_building` selecting only `supervisor_e_mail_address`.
+
+```{r}
+prep_xx <-
+  prep_building %>% 
+  select(supervisor_e_mail_address) %>% 
+  left_join(prep_a) %>% 
+  mutate(
+    across(
+      .cols = where(is.numeric),
+      .fns = ~replace_na(.,0)
+    )
+  )
+```
+
+Review data.
+
+```{r}
+prep_xx %>% 
+  skim()
+```
 
 Check: These have the same number of unique `supervisor_e_mail_address`.
 
@@ -1773,7 +1915,56 @@ prep_building <-
 Define `cohort_first` as `prep_xx`.
 
 ```{r}
-prep_xx <- cohort_first
+cohort_first %>% 
+  group_by(supervisor_e_mail_address) %>% 
+  summarise(
+    across(
+      .cols = c(-where(is.Date),
+                -employee_e_mail_address,
+                -position_category_code,
+                -employee_name,
+                -supervisor_display_name,
+                -date_day_of_week,
+                -position_number,
+                -business_line_2_letter_department_id),
+      .fns = list(dist = n_distinct,mode = getmode),
+      .names = "{.col}_{.fn}"
+    )
+  ) %>% 
+  select(-person_id_mode,
+         -business_line_2_letter_department_id_dist) %>% 
+  # skim()
+  glimpse()
+```
+
+```{r}
+cohort_first %>% 
+  group_by(supervisor_e_mail_address) %>% 
+  summarise(
+    across(
+      .cols = c(grade),
+      .fns = list(min = min, max = max),
+      .names = "{.col}_{.fn}"
+    )
+  ) %>% 
+  # select(-person_id_mode,
+  #        -business_line_2_letter_department_id_dist) %>% 
+  # skim()
+  glimpse()
+```
+
+
+```{r}
+# prep_xx <- 
+  cohort_ids %>% 
+  select(supervisor_e_mail_address) %>% 
+  distinct() %>% 
+  inner_join(
+    cohort_panel %>% 
+      filter(date >= date_cohort_month_start & date <= date_cohort_month_end),
+    by = c("supervisor_e_mail_address" = "employee_e_mail_address")
+  ) %>% 
+  skim()
 ```
 
 Review data.
