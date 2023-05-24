@@ -912,7 +912,6 @@ prep_xx %>%
   skim()
 ```
 
-
 Check: These have the same number of unique `supervisor_e_mail_address`.
 
 ```{r}
@@ -932,458 +931,7 @@ prep_building <-
   left_join(prep_xx)
 ```
 
-# CONTINUE FROM HERE
-
-<!-- -   Proportion of working days supervisor is co-located with at least -->
-<!--     one team member -->
-
-<!-- -   Proportion of working days entire team is co-located -->
-
-<!-- -   Proportion of working days entire team is remote -->
-
-#### Correlation of work status between days of the week
-
-Three strategies to captured relationships between day are below:
-
-1.  Correlation in telework between days of week
-
-2.  Correlation in status (as an ordered factor) between days of week
-
-3.  Proportion of telework on other days of week, if the employ teleworked on a specific day
-
-##### Correlation in telework between days of week
-
-The script below calculates the correlation in telework between days of the week.
-
-```{r correlation remote only}
-prep_day_of_week_cor_telework <- 
-  cohort_panel %>% 
-  select(person_id,date,date_day_of_week,daily_status_imputed) %>% 
-  mutate(ind = 1) %>% 
-  pivot_wider(names_from = daily_status_imputed, values_from = ind) %>% 
-  clean_names() %>% 
-  select(person_id,date,date_day_of_week,teleworking) %>% 
-  mutate(
-    across(
-      .cols = where(is.numeric),
-      .fns = ~replace_na(.,0)
-    )
-  ) %>% 
-  mutate(
-    date_week_start = floor_date(date,unit = "week")) %>% 
-  select(-date) %>% 
-  pivot_wider(values_from = teleworking,names_from = date_day_of_week) %>% 
-  mutate(
-    across(
-      .cols = where(is.numeric),
-      .fns = ~replace_na(.,0)
-    )
-  ) %>% 
-  clean_names() %>% 
-  group_by(person_id) %>%
-  # filter(person_id == "10070")
-  summarise(
-    mon_tue_cor_telework = cor(mon,tue,method = "kendall", use = "complete.obs"),
-    mon_wed_cor_telework = cor(mon,wed,method = "kendall", use = "complete.obs"),
-    mon_thu_cor_telework = cor(mon,thu,method = "kendall", use = "complete.obs"),
-    mon_fri_cor_telework = cor(mon,fri,method = "kendall", use = "complete.obs"),
-    tue_wed_cor_telework = cor(tue,wed,method = "kendall", use = "complete.obs"),
-    tue_thu_cor_telework = cor(tue,thu,method = "kendall", use = "complete.obs"),
-    tue_fri_cor_telework = cor(tue,fri,method = "kendall", use = "complete.obs"),
-    wed_thu_cor_telework = cor(wed,thu,method = "kendall", use = "complete.obs"),
-    wed_fri_cor_telework = cor(wed,fri,method = "kendall", use = "complete.obs"),
-    thu_fri_cor_telework = cor(thu,fri,method = "kendall", use = "complete.obs")
-    ) %>% 
-  ungroup()
-```
-
-Now rename to attach to `prep_building`.
-
-```{r}
-prep_xx <- 
-  prep_day_of_week_cor_telework
-```
-
-Review data.
-
-```{r}
-prep_xx %>% 
-  skim()
-```
-
-Check: These have the same number of unique `person_id`.
-
-```{r}
-cohort_ids %>% 
-  summarise(n_distinct(person_id)) %>% 
-  pull() ==
-  prep_xx %>% 
-  summarise(n_distinct(person_id)) %>% 
-  pull()
-```
-
-Join to `prep_building`.
-
-```{r}
-prep_building <- 
-  prep_building %>% 
-  left_join(prep_xx)
-```
-
-##### Correlation in status between days of week
-
-The script below calculates the correlation between work status.
-
-```{r correlation ordered status}
-prep_day_of_week_cor_status <- 
-  cohort_panel %>% 
-  select(person_id,date,date_day_of_week,daily_status_imputed) %>% 
-  mutate(
-    daily_status_imputed = fct_lump_prop(daily_status_imputed, prop = .1),
-    daily_status_imputed = fct_infreq(daily_status_imputed),
-    daily_status_imputed = factor(daily_status_imputed, ordered = TRUE)
-  )  %>% 
-  mutate(
-    date_week_start = floor_date(date,unit = "week")) %>% 
-  select(-date) %>% 
-  pivot_wider(values_from = daily_status_imputed,names_from = date_day_of_week) %>% 
-  mutate(
-    across(
-      .cols = where(is.factor),
-      .fns = ~replace_na(.,"Other")
-    )
-  ) %>% 
-  clean_names() %>% 
-  group_by(person_id) %>%
-  summarise(
-    mon_tue_cor_status = cor(as.numeric(mon),as.numeric(tue),method = "spearman", use = "complete.obs"),
-    mon_wed_cor_status = cor(as.numeric(mon),as.numeric(wed),method = "spearman", use = "complete.obs"),
-    mon_thu_cor_status = cor(as.numeric(mon),as.numeric(thu),method = "spearman", use = "complete.obs"),
-    mon_fri_cor_status = cor(as.numeric(mon),as.numeric(fri),method = "spearman", use = "complete.obs"),
-    tue_wed_cor_status = cor(as.numeric(tue),as.numeric(wed),method = "spearman", use = "complete.obs"),
-    tue_thu_cor_status = cor(as.numeric(tue),as.numeric(thu),method = "spearman", use = "complete.obs"),
-    tue_fri_cor_status = cor(as.numeric(tue),as.numeric(fri),method = "spearman", use = "complete.obs"),
-    wed_thu_cor_status = cor(as.numeric(wed),as.numeric(thu),method = "spearman", use = "complete.obs"),
-    wed_fri_cor_status = cor(as.numeric(wed),as.numeric(fri),method = "spearman", use = "complete.obs"),
-    thu_fri_cor_status = cor(as.numeric(thu),as.numeric(fri),method = "spearman", use = "complete.obs")
-    ) %>% 
-  ungroup()
-```
-
-Now rename to attach to `prep_building`.
-
-```{r}
-prep_xx <- 
-  prep_day_of_week_cor_status
-```
-
-Review data.
-
-```{r}
-prep_xx %>% 
-  skim()
-```
-
-Check: These have the same number of unique `person_id`.
-
-```{r}
-cohort_ids %>% 
-  summarise(n_distinct(person_id)) %>% 
-  pull() ==
-  prep_xx %>% 
-  summarise(n_distinct(person_id)) %>% 
-  pull()
-```
-
-Join to `prep_building`.
-
-```{r}
-prep_building <- 
-  prep_building %>% 
-  left_join(prep_xx)
-```
-
-##### Proportion of telework week day pairs
-
-First, create a dataframe of telework by days of the week.
-
-```{r proportion remote only prep dataframe}
-prep_a <- 
-  cohort_panel %>% 
-  select(person_id,date,date_day_of_week,daily_status_imputed) %>% 
-  mutate(ind = 1) %>% 
-  pivot_wider(names_from = daily_status_imputed, values_from = ind) %>% 
-  clean_names() %>% 
-  select(person_id,date,date_day_of_week,teleworking) %>% 
-  mutate(
-    across(
-      .cols = where(is.numeric),
-      .fns = ~replace_na(.,0)
-    )
-  ) %>% 
-  mutate(
-    date_week_start = floor_date(date,unit = "week")) %>% 
-  select(-date) %>% 
-  pivot_wider(values_from = teleworking,names_from = date_day_of_week) %>% 
-  mutate(
-    across(
-      .cols = where(is.numeric),
-      .fns = ~replace_na(.,0)
-    )
-  ) %>% 
-  clean_names()
-```
-
-Now, a function to calculate the proportion of telework on a different day, if the employee teleworked on a specific day.
-
-```{r}
-day_to_day_proportions <- function(in_data,in_var)
-{
-  var_string <- rlang::as_name(enquo(in_var))
-
-  # print(person_id)
-  
-  out <- 
-    in_data %>% 
-  filter({{in_var}} == 1) %>% 
-  group_by(person_id) %>% 
-  summarise(
-    across(
-      .cols = where(is.numeric),
-      .fns = ~sum(.,na.rm = TRUE)
-  )) %>% 
-  mutate(
-    across(
-      .cols = c(-person_id,-{{in_var}}),
-      .fns = ~./{{in_var}},
-      .names = "{var_string}_{.col}"
-    )
-  ) %>% 
-  ungroup() %>% 
-    select(person_id,starts_with(var_string),-{{in_var}})
-  
-  return(out)
-}
-```
-
-Iterated over the days of the week and join results.
-
-```{r}
-prep_day_of_week_proportion_pairs <- 
-  prep_a %>% 
-  select(thu:fri) %>%
-  names() %>% 
-  map(~day_to_day_proportions(prep_a,!!sym(.))) %>% 
-  reduce(full_join, by = "person_id")
-
-```
-
-Now rename to attach to `prep_building`.
-
-```{r}
-prep_xx <- 
-  prep_day_of_week_proportion_pairs %>% 
-  rename_with(-person_id,
-              .fn = ~glue::glue("{.}_prop_pairs")
-  )
-```
-
-Review data.
-
-```{r}
-prep_xx %>% 
-  skim()
-```
-
-Check: These have the same number of unique `person_id`.
-
-```{r}
-cohort_ids %>% 
-  summarise(n_distinct(person_id)) %>% 
-  pull() ==
-  prep_xx %>% 
-  summarise(n_distinct(person_id)) %>% 
-  pull()
-```
-
-Join to `prep_building`.
-
-```{r}
-prep_building <- 
-  prep_building %>% 
-  left_join(prep_xx)
-```
-
-#### Modal size of team over observation window
-
-Calculate number of team members per day by supervisor email.
-
-```{r}
-prep_a <- 
-  cohort_panel %>% 
-  group_by(date,supervisor_e_mail_address) %>% 
-  summarise(team_size = n_distinct(person_id)) %>% 
-  ungroup()
-```
-
-Review data.
-
-```{r}
-prep_a %>% 
-  skim()
-```
-
-Join to `cohort_panel` only selecting, `person_id`, `date`, and `supervisor_e_mail_address`.
-
-```{r}
-prep_b <- 
-  cohort_panel %>% 
-  select(date,person_id,supervisor_e_mail_address) %>% 
-  left_join(prep_a)
-```
-
-Review data.
-
-```{r}
-prep_b %>% 
-  skim()
-```
-
-Calculate the mode team size for each employee.
-
-```{r}
-prep_xx <- 
-  prep_b %>% 
-  group_by(person_id) %>% 
-  summarise(team_size_mode = getmode(team_size)) %>% 
-  ungroup()
-```
-
-Review data.
-
-```{r}
-prep_xx %>% 
-  skim()
-```
-
-Check: These have the same number of unique `person_id`.
-
-```{r}
-cohort_ids %>% 
-  summarise(n_distinct(person_id)) %>% 
-  pull() ==
-  prep_xx %>% 
-  summarise(n_distinct(person_id)) %>% 
-  pull()
-```
-
-Join to `prep_building`.
-
-```{r}
-prep_building <- 
-  prep_building %>% 
-  left_join(prep_xx)
-```
-
-#### Proportion of working days co-located with at least one other team member
-
-Identify employees who report to the site and collect `person_id`, `dates`, `location`, and `supervisor_e_mail_address`.
-
-```{r}
-prep_a <-
-  cohort_panel %>%
-  filter(daily_status_imputed == "Reporting to Job Site") %>%
-  select(person_id, date, location, supervisor_e_mail_address) %>%
-  distinct()
-```
-
-Review data.
-
-```{r}
-prep_a %>% 
-  skim()
-```
-
-Self left join on `dates`, `location`, and `supervisor_e_mail_address` and filter to rows where the `person_id`s do not match.
-
-```{r}
-prep_b <- 
-  prep_a %>% 
-  left_join(prep_a,
-            by = c("date", "location", "supervisor_e_mail_address"),
-            suffix = c("","_joined")) %>%
-  filter(person_id != person_id_joined)
-```
-
-Review data.
-
-```{r}
-prep_b %>% 
-  skim()
-```
-
-Count dates where co-location occurs by `person_id`.
-
-```{r}
-prep_c <- 
-  prep_b %>% 
-  group_by(person_id) %>% 
-  summarise(days_colocated_1 = n_distinct(date)) %>% 
-  ungroup()
-```
-
-Review data.
-
-```{r}
-prep_c %>% 
-  skim()
-```
-
-Full join `working_days` from `prep_building`, calculate proportion of co-located days with at least one team member by `working_days` and `observation_window_days`, replace nulls with 0, and remove `working_days`.
-
-```{r}
-prep_xx <- 
-  prep_c %>% 
-  full_join(prep_building %>% 
-              select(person_id,working_days)) %>% 
-  mutate(days_colocated_1_working_prop = days_colocated_1/working_days,
-         days_colocated_1_observation_prop = days_colocated_1/observation_window_days) %>% 
-  mutate(
-    across(
-      .cols = where(is.numeric),
-      .fns = ~replace_na(.,0)
-    )
-  ) %>% 
-  select(-working_days)
-```
-
-Review data.
-
-```{r}
-prep_xx %>% 
-  skim()
-```
-
-Check: These have the same number of unique `person_id`.
-
-```{r}
-cohort_ids %>% 
-  summarise(n_distinct(person_id)) %>% 
-  pull() ==
-  prep_xx %>% 
-  summarise(n_distinct(person_id)) %>% 
-  pull()
-```
-
-Join to `prep_building`.
-
-```{r}
-prep_building <- 
-  prep_building %>% 
-  left_join(prep_xx)
-```
-
-#### Proportion of working days co-located with supervisor
+### Proportion of working days supervisor is co-located with at least one team member
 
 Identify employees who report to the site and collect `person_id`, `dates`, `location`, `employee_e_mail_address`, and `supervisor_e_mail_address`.
 
@@ -1419,12 +967,12 @@ prep_b %>%
   skim()
 ```
 
-Count dates where co-location with supervisor occurs by `person_id`.
+Count dates where co-location with supervisor occurs by `supervisor_e_mail_address`.
 
 ```{r}
 prep_c <- 
   prep_b %>% 
-  group_by(person_id) %>% 
+  group_by(supervisor_e_mail_address) %>% 
   summarise(days_colocated_supervisor = n_distinct(date)) %>% 
   ungroup()
 ```
@@ -1436,13 +984,13 @@ prep_c %>%
   skim()
 ```
 
-Full join `working_days` from `prep_building`, calculate proportion of co-located days with at least one team member by `working_days` and `observation_window_days`, replace nulls with 0, and remove `working_days`.
+Full join `working_days` and `observation_window_days` from `prep_building`, calculate proportion of co-located days with at least one team member by `working_days` and `observation_window_days`, replace nulls with 0, and remove `working_days` and `observation_window_days`.
 
 ```{r}
 prep_xx <- 
   prep_c %>% 
   full_join(prep_building %>% 
-              select(person_id,working_days)) %>% 
+              select(supervisor_e_mail_address,working_days,observation_window_days)) %>% 
   mutate(days_colocated_supervisor_working_prop = days_colocated_supervisor/working_days,
          days_colocated_supervisor_observation_prop = days_colocated_supervisor/observation_window_days) %>% 
   mutate(
@@ -1451,7 +999,7 @@ prep_xx <-
       .fns = ~replace_na(.,0)
     )
   ) %>% 
-  select(-working_days)
+  select(-working_days,-observation_window_days)
 ```
 
 Review data.
@@ -1461,14 +1009,14 @@ prep_xx %>%
   skim()
 ```
 
-Check: These have the same number of unique `person_id`.
+Check: These have the same number of unique `supervisor_e_mail_address`.
 
 ```{r}
 cohort_ids %>% 
-  summarise(n_distinct(person_id)) %>% 
+  summarise(n_distinct(supervisor_e_mail_address)) %>% 
   pull() ==
   prep_xx %>% 
-  summarise(n_distinct(person_id)) %>% 
+  summarise(n_distinct(supervisor_e_mail_address)) %>% 
   pull()
 ```
 
@@ -1479,8 +1027,7 @@ prep_building <-
   prep_building %>% 
   left_join(prep_xx)
 ```
-
-#### Proportion of working days co-located with entire team
+### Proportion of working days entire team is co-located
 
 Identify employees who report to the site and collect `person_id`, `dates`, `location`, and `supervisor_e_mail_address`.
 
@@ -1499,14 +1046,14 @@ prep_a %>%
   skim()
 ```
 
-Self left join on `dates`, `location`, and `supervisor_e_mail_address`.
+Count number of team members co-located by `supervisor_e_mail_address`, `location`, and `date` by counting unique `person_id`.
 
 ```{r}
 prep_b <- 
   prep_a %>% 
-  left_join(prep_a,
-            by = c("date", "location", "supervisor_e_mail_address"),
-            suffix = c("","_joined"))
+  group_by(supervisor_e_mail_address,location, date) %>% 
+  summarise(colocated_team_members = n_distinct(person_id)) %>% 
+  ungroup()
 ```
 
 Review data.
@@ -1516,13 +1063,13 @@ prep_b %>%
   skim()
 ```
 
-Count number of team members co-located by `person_id` and `date` by counting unique `person_id_joined`.
+Calculate number of team members per day by supervisor email.
 
 ```{r}
 prep_c <- 
-  prep_b %>% 
-  group_by(person_id,date,supervisor_e_mail_address) %>% 
-  summarise(colocated_team_members = n_distinct(person_id_joined)) %>% 
+  cohort_panel %>% 
+  group_by(date,supervisor_e_mail_address) %>% 
+  summarise(team_size = n_distinct(person_id)) %>% 
   ungroup()
 ```
 
@@ -1533,14 +1080,13 @@ prep_c %>%
   skim()
 ```
 
-Calculate number of team members per day by supervisor email.
+Left join co-located team members and teams size, but `date` and `supervisor_e_mail_address`, then filter to when co-located team members is the same size as the team
 
 ```{r}
 prep_d <- 
-  cohort_panel %>% 
-  group_by(date,supervisor_e_mail_address) %>% 
-  summarise(team_size = n_distinct(person_id)) %>% 
-  ungroup()
+  prep_b %>% 
+  left_join(prep_c) %>% 
+  filter(colocated_team_members == team_size)
 ```
 
 Review data.
@@ -1550,13 +1096,15 @@ prep_d %>%
   skim()
 ```
 
-Left join co-located team members and teams size, but `date` and `supervisor_e_mail_address`, then filter to when co-located team members is the same size as the team
+
+Count dates where co-location with whole team occurs by `supervisor_e_mail_address`.
 
 ```{r}
 prep_e <- 
-  prep_c %>% 
-  left_join(prep_d) %>% 
-  filter(colocated_team_members == team_size)
+  prep_d %>% 
+  group_by(supervisor_e_mail_address) %>% 
+  summarise(days_colocated_team = n_distinct(date)) %>% 
+  ungroup()
 ```
 
 Review data.
@@ -1566,31 +1114,13 @@ prep_e %>%
   skim()
 ```
 
-
-Count dates where co-location with whole team occurs by `person_id`.
-
-```{r}
-prep_f <- 
-  prep_e %>% 
-  group_by(person_id) %>% 
-  summarise(days_colocated_team = n_distinct(date)) %>% 
-  ungroup()
-```
-
-Review data.
-
-```{r}
-prep_f %>% 
-  skim()
-```
-
-Full join `working_days` from `prep_building`, calculate proportion of co-located days with team member by `working_days` and `observation_window_days`, replace nulls with 0, and remove `working_days`.
+Full join `working_days` and `observation_window_days` from `prep_building`, calculate proportion of co-located days with team member by `working_days` and `observation_window_days`, replace nulls with 0, and remove `working_days` and `observation_window_days`.
 
 ```{r}
 prep_xx <- 
-  prep_f %>% 
+  prep_e %>% 
   full_join(prep_building %>% 
-              select(person_id,working_days)) %>% 
+              select(supervisor_e_mail_address,working_days,observation_window_days)) %>% 
   mutate(days_colocated_team_working_prop = days_colocated_team/working_days,
          days_colocated_team_observation_prop = days_colocated_team/observation_window_days) %>% 
   mutate(
@@ -1599,7 +1129,7 @@ prep_xx <-
       .fns = ~replace_na(.,0)
     )
   ) %>% 
-  select(-working_days)
+  select(-working_days,-observation_window_days)
 ```
 
 Review data.
@@ -1609,14 +1139,14 @@ prep_xx %>%
   skim()
 ```
 
-Check: These have the same number of unique `person_id`.
+Check: These have the same number of unique `supervisor_e_mail_address`.
 
 ```{r}
 cohort_ids %>% 
-  summarise(n_distinct(person_id)) %>% 
+  summarise(n_distinct(supervisor_e_mail_address)) %>% 
   pull() ==
   prep_xx %>% 
-  summarise(n_distinct(person_id)) %>% 
+  summarise(n_distinct(supervisor_e_mail_address)) %>% 
   pull()
 ```
 
@@ -1628,15 +1158,15 @@ prep_building <-
   left_join(prep_xx)
 ```
 
-#### Proportion of working days entire team is remote
+### Proportion of working days entire team is remote
 
-Identify employees who telework and collect `person_id`, `dates`, `location`, and `supervisor_e_mail_address`.
+Identify employees who are teleworking and collect `person_id`, `dates`, and `supervisor_e_mail_address`.
 
 ```{r}
 prep_a <-
-  cohort_panel %>% 
+  cohort_panel %>%
   filter(daily_status_imputed == "Teleworking") %>%
-  select(person_id, date, location, supervisor_e_mail_address) %>%
+  select(person_id, date, supervisor_e_mail_address) %>%
   distinct()
 ```
 
@@ -1647,14 +1177,14 @@ prep_a %>%
   skim()
 ```
 
-Self left join on `dates`, `location`, and `supervisor_e_mail_address`.
+Count number of team members co-located by `supervisor_e_mail_address`, and `date` by counting unique `person_id`.
 
 ```{r}
 prep_b <- 
   prep_a %>% 
-  left_join(prep_a,
-            by = c("date", "location", "supervisor_e_mail_address"),
-            suffix = c("","_joined"))
+  group_by(supervisor_e_mail_address,date) %>% 
+  summarise(telework_team_members = n_distinct(person_id)) %>% 
+  ungroup()
 ```
 
 Review data.
@@ -1664,13 +1194,13 @@ prep_b %>%
   skim()
 ```
 
-Count number of team members co-located by `person_id` and `date` by counting unique `person_id_joined`.
+Calculate number of team members per day by supervisor email.
 
 ```{r}
 prep_c <- 
-  prep_b %>% 
-  group_by(person_id,date,supervisor_e_mail_address) %>% 
-  summarise(telework_team_members = n_distinct(person_id_joined)) %>% 
+  cohort_panel %>% 
+  group_by(date,supervisor_e_mail_address) %>% 
+  summarise(team_size = n_distinct(person_id)) %>% 
   ungroup()
 ```
 
@@ -1681,14 +1211,13 @@ prep_c %>%
   skim()
 ```
 
-Calculate number of team members per day by supervisor email.
+Left join teleworking team members and teams size, by `date` and `supervisor_e_mail_address`, then filter to when teleworking team members is the same size as the team.
 
 ```{r}
 prep_d <- 
-  cohort_panel %>% 
-  group_by(date,supervisor_e_mail_address) %>% 
-  summarise(team_size = n_distinct(person_id)) %>% 
-  ungroup()
+  prep_b %>% 
+  left_join(prep_c) %>% 
+  filter(telework_team_members == team_size)
 ```
 
 Review data.
@@ -1698,13 +1227,15 @@ prep_d %>%
   skim()
 ```
 
-Left join telework team members and teams size, but `date` and `supervisor_e_mail_address`, then filter to when telework team members is the same size as the team
+
+Count dates where co-location with whole team occurs by `supervisor_e_mail_address`.
 
 ```{r}
 prep_e <- 
-  prep_c %>% 
-  left_join(prep_d) %>% 
-  filter(telework_team_members == team_size)
+  prep_d %>% 
+  group_by(supervisor_e_mail_address) %>% 
+  summarise(days_telework_team = n_distinct(date)) %>% 
+  ungroup()
 ```
 
 Review data.
@@ -1714,32 +1245,14 @@ prep_e %>%
   skim()
 ```
 
-
-Count dates where telework with whole team occurs by `person_id`.
-
-```{r}
-prep_f <- 
-  prep_e %>% 
-  group_by(person_id) %>% 
-  summarise(days_telework_team = n_distinct(date)) %>% 
-  ungroup()
-```
-
-Review data.
-
-```{r}
-prep_f %>% 
-  skim()
-```
-
-Full join `working_days` from `prep_building`, calculate proportion of telework days with team member by `working_days` and `observation_window_days`, replace nulls with 0, and remove `working_days`.
+Full join `team_days` and `observation_window_days` from `prep_building`, calculate proportion of co-located days with team member by `team_days` and `observation_window_days`, replace nulls with 0, and remove `team_days` and `observation_window_days`.
 
 ```{r}
 prep_xx <- 
-  prep_f %>% 
+  prep_e %>% 
   full_join(prep_building %>% 
-              select(person_id,working_days)) %>% 
-  mutate(days_telework_team_working_prop = days_telework_team/working_days,
+              select(supervisor_e_mail_address,team_days)) %>% 
+  mutate(days_telework_team_working_prop =  days_telework_team/team_days,
          days_telework_team_observation_prop = days_telework_team/observation_window_days) %>% 
   mutate(
     across(
@@ -1747,7 +1260,7 @@ prep_xx <-
       .fns = ~replace_na(.,0)
     )
   ) %>% 
-  select(-working_days)
+  select(-team_days)
 ```
 
 Review data.
@@ -1757,14 +1270,14 @@ prep_xx %>%
   skim()
 ```
 
-Check: These have the same number of unique `person_id`.
+Check: These have the same number of unique `supervisor_e_mail_address`.
 
 ```{r}
 cohort_ids %>% 
-  summarise(n_distinct(person_id)) %>% 
+  summarise(n_distinct(supervisor_e_mail_address)) %>% 
   pull() ==
   prep_xx %>% 
-  summarise(n_distinct(person_id)) %>% 
+  summarise(n_distinct(supervisor_e_mail_address)) %>% 
   pull()
 ```
 
@@ -1776,28 +1289,38 @@ prep_building <-
   left_join(prep_xx)
 ```
 
+
+
+# CONTINUE FROM HERE
+
+
+
 ## Define rule-based groups {.tabset .tabset-pills}
 
-The analysis plan defines nine rule-based groups for analysis:
+The analysis plan defines ten rule-based groups for analysis:
 
-1.  **All remote** - A policy definition for staff that are 100% remote
-2.  **Routine teleworker** - Employees with position_category_description's *Onsite Flexible* or *Offsite* that work at least two two days per pay period onsite.
-    per pay period onsite.
-3.  **Onsite Flexible** - Defined by `position_category_description` in
-    the roster data
-4.  **Offsite** - Defined by `position_category_description` in the
+1.  **All remote** - All team members are 100% remote
+2.  **Routine teleworker** - All team members have
+    `position_category_description`'s *Onsite Flexible* or *Offsite* and
+    work at least two two days per pay period onsite.
+3.  **Onsite Flexible** - All team members are *Onsite Flexible* as
+    defined by `position_category_description` in the roster data
+4.  **Offsite** - All team members are *Offsite* as defined by team
+    members `position_category_description` in the roster data
+5.  **Onsite Required** - All team members are *Onsite Required* as
+    defined by `position_category_description` in the roster data
+6.  **Mixed position categories** - Team members are different position
+    categories as as defined by `position_category_description` in the
     roster data
-5.  **Onsite Required** - Defined by `position_category_description` in
-    the roster data
-6.  **Primarily remote** - Employees who work remotely above the 95th
+7.  **Primarily remote** - Teams that work remotely above the 95th
     percentile <!-- could be 75th -->
-7.  **Mostly remote** - Employees who work remotely between the median
-    and the 95th percentile <!-- could be 75th -->
-8.  **Mostly onsite** - Employees who work remotely between 5th
-    percentile and the median <!-- could be 25th -->
-9.  **Primarily onsite** - Employees who work remotely below the 5th
+8.  **Mostly remote** - Teams that work remotely between the median and
+    the 95th percentile <!-- could be 75th -->
+9.  **Mostly onsite** - Teams that work remotely between 5th percentile
+    and the median <!-- could be 25th -->
+10. **Primarily onsite** - Teams that work remotely below the 5th
     percentile <!-- could be 75th -->
-    
+
 Below the variables for the groups are created. 
 
 ### All remote
@@ -1812,7 +1335,7 @@ prep_xx <-
       daily_status_teleworking_working_prop == 1 ~ 1,
                                       TRUE ~ 0)
   ) %>% 
-  select(person_id,starts_with("rule_based_"))
+  select(supervisor_e_mail_address,starts_with("rule_based_"))
 ```
 
 Review data.
@@ -1822,14 +1345,14 @@ prep_xx %>%
   skim()
 ```
 
-Check: These have the same number of unique `person_id`.
+Check: These have the same number of unique `supervisor_e_mail_address`.
 
 ```{r}
 cohort_ids %>% 
-  summarise(n_distinct(person_id)) %>% 
+  summarise(n_distinct(supervisor_e_mail_address)) %>% 
   pull() ==
   prep_xx %>% 
-  summarise(n_distinct(person_id)) %>% 
+  summarise(n_distinct(supervisor_e_mail_address)) %>% 
   pull()
 ```
 
@@ -1871,7 +1394,7 @@ Use the quantiles above to create new variables for `primarily_` and `mostly_` w
 prep_xx <-
   prep_building %>%
   select(
-    person_id,
+    supervisor_e_mail_address,
     daily_status_reporting_to_job_site_working_prop,
     daily_status_teleworking_working_prop,
     daily_status_reporting_to_job_site_observation_prop,
@@ -1919,7 +1442,7 @@ prep_xx <-
         TRUE ~ 0
       ),
   ) %>%
-  select(person_id, starts_with("rule_based_"))
+  select(supervisor_e_mail_address, starts_with("rule_based_"))
 ```
 
 Review data.
@@ -1929,14 +1452,14 @@ prep_xx %>%
   skim()
 ```
 
-Check: These have the same number of unique `person_id`.
+Check: These have the same number of unique `supervisor_e_mail_address`.
 
 ```{r}
 cohort_ids %>% 
-  summarise(n_distinct(person_id)) %>% 
+  summarise(n_distinct(supervisor_e_mail_address)) %>% 
   pull() ==
   prep_xx %>% 
-  summarise(n_distinct(person_id)) %>% 
+  summarise(n_distinct(supervisor_e_mail_address)) %>% 
   pull()
 ```
 
@@ -1966,19 +1489,75 @@ prep_c <-
   select(person_id,position_category_description)
 
 prep_c %>% 
-  inner_join(prep_a, by = "person_id") %>% 
+  inner_join(prep_b, by = "person_id") %>% 
   filter(position_category_description.x != position_category_description.y)
 ```
 
-Identify the `position_category_description` at the beginning of the observation window and convert the categories into indicators.  
+Identify the `position_category_description` at the beginning of the observation window and count number of team members per category by `supervisor_e_mail_address`.  
 
 ```{r}
-prep_xx <- 
-  cohort_first %>% 
-  select(person_id,position_category_description) %>% 
-  character_to_indicator(in_unique_identifier = "person_id",
-                         position_category_description,
-                         in_prefix = "rule_based_position_category_")
+prep_a <- 
+  cohort_panel %>% 
+  group_by(supervisor_e_mail_address,position_category_description) %>% 
+  summarise(team_members = n_distinct(person_id)) %>% 
+  ungroup() %>% 
+  pivot_wider(values_from = team_members, names_from = position_category_description,
+              names_prefix = "rule_based_position_category_") %>% 
+  clean_names()
+```
+
+Review data.
+
+```{r}
+prep_a %>% 
+  skim()
+```
+
+Inner join with `prep_building` selecting `supervisor_e_mail_address`, and `team_members`.
+
+```{r}
+prep_b <- 
+  prep_building %>% 
+  select(supervisor_e_mail_address,team_members) %>% 
+  inner_join(prep_a)
+```
+
+Review data.
+
+```{r}
+prep_b %>% 
+  skim()
+```
+
+Create indicators for when the number of team members equals the number of members in a specific category.
+
+```{r}
+prep_c <- 
+  prep_b %>% 
+  mutate(
+    across(
+      .cols = starts_with("rule_based_position_category_"),
+      .fns = ~case_when(. == team_members ~ 1,
+                        TRUE ~ 0)
+    )
+  )
+```
+
+Review data.
+
+```{r}
+prep_c %>% 
+  skim()
+```
+
+Left join to `prep_building` selecting only `supervisor_e_mail_address` and remove `team_members`.
+
+```{r}
+prep_xx <-
+  prep_building %>% 
+  select(supervisor_e_mail_address) %>% 
+  left_join(prep_c) %>% 
+  select(-team_members)
 ```
 
 Review data.
@@ -1989,14 +1568,14 @@ prep_xx %>%
 ```
 
 
-Check: These have the same number of unique `person_id`.
+Check: These have the same number of unique `supervisor_e_mail_address`.
 
 ```{r}
 cohort_ids %>% 
-  summarise(n_distinct(person_id)) %>% 
+  summarise(n_distinct(supervisor_e_mail_address)) %>% 
   pull() ==
   prep_xx %>% 
-  summarise(n_distinct(person_id)) %>% 
+  summarise(n_distinct(supervisor_e_mail_address)) %>% 
   pull()
 ```
 
@@ -2126,7 +1705,7 @@ prep_f %>%
 Seventh, select `person_id`, and `position_category_description` from the beginning of the observation window (`cohort_first`) and left join the above (`prep_f`). Then, create `rule_based_telework_onsite_minimum` when `telework_onsite_minimum` is 1 and `position_category_description` is *Onsite Flexible* or *Offsite*.
 
 ```{r}
-prep_xx <- 
+prep_g <- 
   cohort_first %>% 
   select(person_id,position_category_description) %>% 
   left_join(prep_f) %>% 
@@ -2142,19 +1721,42 @@ prep_xx <-
 Review data.
 
 ```{r}
-prep_xx %>% 
+prep_g %>% 
   skim()
 ```
 
+Left join to `cohort_ids`.
 
-Check: These have the same number of unique `person_id`.
+```{r}
+prep_h <- 
+  cohort_ids %>% 
+  left_join(prep_g)
+```
+
+Review data.
+
+```{r}
+prep_h %>% 
+  skim()
+```
+
+```{r}
+prep_h %>% 
+  filter(rule_based_telework_onsite_minimum == 1) %>% 
+  group_by(supervisor_e_mail_address) %>% 
+  summarise(rule_based_telework_onsite_minimum = n_distinct(person_id))
+```
+
+
+
+Check: These have the same number of unique `supervisor_e_mail_address`.
 
 ```{r}
 cohort_ids %>% 
-  summarise(n_distinct(person_id)) %>% 
+  summarise(n_distinct(supervisor_e_mail_address)) %>% 
   pull() ==
   prep_xx %>% 
-  summarise(n_distinct(person_id)) %>% 
+  summarise(n_distinct(supervisor_e_mail_address)) %>% 
   pull()
 ```
 
@@ -2182,14 +1784,14 @@ prep_xx %>%
 ```
 
 
-Check: These have the same number of unique `person_id`.
+Check: These have the same number of unique `supervisor_e_mail_address`.
 
 ```{r}
 cohort_ids %>% 
-  summarise(n_distinct(person_id)) %>% 
+  summarise(n_distinct(supervisor_e_mail_address)) %>% 
   pull() ==
   prep_xx %>% 
-  summarise(n_distinct(person_id)) %>% 
+  summarise(n_distinct(supervisor_e_mail_address)) %>% 
   pull()
 ```
 
