@@ -703,7 +703,7 @@ Teams will be categorized similarly:
     members `position_category_description` in the roster data
 5.  **Onsite Required** - All team members are *Onsite Required* as
     defined by `position_category_description` in the roster data
-6.  Mixed position categories - Team members are different position
+6.  **Mixed position categories** - Team members are different position
     categories as as defined by `position_category_description` in the
     roster data
 7.  **Primarily remote** - Teams that work remotely above the 95th
