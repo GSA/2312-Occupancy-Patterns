@@ -1077,13 +1077,13 @@ prep_building <-
 
 #### Proportion of working days entire team is remote
 
-Identify employees who telework and collect `person_id`, `dates`, `location`, and `supervisor_e_mail_address`.
+Identify employees who telework and collect `person_id`, `dates`, and `supervisor_e_mail_address`.
 
 ```{r}
 prep_a <-
   cohort_panel %>% 
   filter(daily_status_imputed == "Teleworking") %>%
-  select(person_id, date, location, supervisor_e_mail_address) %>%
+  select(person_id, date, supervisor_e_mail_address) %>%
   distinct()
 ```
 
@@ -1094,14 +1094,14 @@ prep_a %>%
   skim()
 ```
 
-Self left join on `dates`, `location`, and `supervisor_e_mail_address`.
+Count number of distinct `person_id`s by `dates`, and `supervisor_e_mail_address`.
 
 ```{r}
 prep_b <- 
   prep_a %>% 
-  left_join(prep_a,
-            by = c("date", "location", "supervisor_e_mail_address"),
-            suffix = c("","_joined"))
+  group_by(date, supervisor_e_mail_address) %>%
+  summarise(telework_team_members = n_distinct(person_id)) %>% 
+  ungroup()
 ```
 
 Review data.
@@ -1111,13 +1111,13 @@ prep_b %>%
   skim()
 ```
 
-Count number of team members co-located by `person_id` and `date` by counting unique `person_id_joined`.
+Calculate number of team members per day by supervisor email.
 
 ```{r}
 prep_c <- 
-  prep_b %>% 
-  group_by(person_id,date,supervisor_e_mail_address) %>% 
-  summarise(telework_team_members = n_distinct(person_id_joined)) %>% 
+  cohort_panel %>% 
+  group_by(date,supervisor_e_mail_address) %>% 
+  summarise(team_size = n_distinct(person_id)) %>% 
   ungroup()
 ```
 
@@ -1128,14 +1128,13 @@ prep_c %>%
   skim()
 ```
 
-Calculate number of team members per day by supervisor email.
+Left join telework team members and teams size, but `date` and `supervisor_e_mail_address`, then filter to when telework team members is the same size as the team
 
 ```{r}
 prep_d <- 
-  cohort_panel %>% 
-  group_by(date,supervisor_e_mail_address) %>% 
-  summarise(team_size = n_distinct(person_id)) %>% 
-  ungroup()
+  prep_b %>% 
+  left_join(prep_c) %>% 
+  filter(telework_team_members == team_size)
 ```
 
 Review data.
@@ -1145,13 +1144,14 @@ prep_d %>%
   skim()
 ```
 
-Left join telework team members and teams size, but `date` and `supervisor_e_mail_address`, then filter to when telework team members is the same size as the team
+Inner join `cohort_panel` to `prep_d` to only capture employees on days where the whole team is remote. 
 
 ```{r}
 prep_e <- 
-  prep_c %>% 
-  left_join(prep_d) %>% 
-  filter(telework_team_members == team_size)
+  cohort_panel %>% 
+  select(person_id,supervisor_e_mail_address,date) %>% 
+  distinct() %>% 
+  inner_join(prep_d)
 ```
 
 Review data.
@@ -1160,7 +1160,6 @@ Review data.
 prep_e %>% 
   skim()
 ```
-
 
 Count dates where telework with whole team occurs by `person_id`.
 
