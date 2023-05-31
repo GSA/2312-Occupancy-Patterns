@@ -1289,12 +1289,6 @@ prep_building <-
   left_join(prep_xx)
 ```
 
-
-
-# CONTINUE FROM HERE
-
-
-
 ## Define rule-based groups {.tabset .tabset-pills}
 
 The analysis plan defines ten rule-based groups for analysis:
@@ -1912,59 +1906,88 @@ prep_building <-
 
 ## Attach characteristics
 
-Define `cohort_first` as `prep_xx`.
+Collect initial characteristics for supervisors for `check_in_panel` by joining `supervisor_e_mail_address` in `prep_building` to `employee_e_mail_address` and selecting for the first rows for each `supervisor_e_mail_address` by `date`.
 
 ```{r}
-cohort_first %>% 
-  group_by(supervisor_e_mail_address) %>% 
-  summarise(
-    across(
-      .cols = c(-where(is.Date),
-                -employee_e_mail_address,
-                -position_category_code,
-                -employee_name,
-                -supervisor_display_name,
-                -date_day_of_week,
-                -position_number,
-                -business_line_2_letter_department_id),
-      .fns = list(dist = n_distinct,mode = getmode),
-      .names = "{.col}_{.fn}"
-    )
-  ) %>% 
-  select(-person_id_mode,
-         -business_line_2_letter_department_id_dist) %>% 
-  # skim()
-  glimpse()
-```
-
-```{r}
-cohort_first %>% 
-  group_by(supervisor_e_mail_address) %>% 
-  summarise(
-    across(
-      .cols = c(grade),
-      .fns = list(min = min, max = max),
-      .names = "{.col}_{.fn}"
-    )
-  ) %>% 
-  # select(-person_id_mode,
-  #        -business_line_2_letter_department_id_dist) %>% 
-  # skim()
-  glimpse()
-```
-
-
-```{r}
-# prep_xx <- 
-  cohort_ids %>% 
-  select(supervisor_e_mail_address) %>% 
-  distinct() %>% 
+prep_a <-
+  prep_building %>%
+  select(supervisor_e_mail_address) %>%
+  distinct() %>%
   inner_join(
-    cohort_panel %>% 
-      filter(date >= date_cohort_month_start & date <= date_cohort_month_end),
-    by = c("supervisor_e_mail_address" = "employee_e_mail_address")
-  ) %>% 
+    check_in_panel,
+    by = c("supervisor_e_mail_address" = "employee_e_mail_address"),
+    suffix = c("", "_of_supervisor")
+  ) %>%
+  arrange(supervisor_e_mail_address, date) %>%
+  group_by(supervisor_e_mail_address) %>%
+  summarise(across(.cols = everything(),
+                   .fns = first)) %>%
+  ungroup()
+```
+
+Review data
+
+```{r}
+prep_a %>% 
   skim()
+```
+
+Create initial summary data of the team aggregating `cohort_first` by `supervisor_e_mail_address` and collecting the mode and distinct count for most variables. 
+
+```{r}
+prep_b <-
+  cohort_first %>%
+  group_by(supervisor_e_mail_address) %>%
+  summarise(across(
+    .cols = c(
+      -where(is.Date),-employee_e_mail_address,-position_category_code,-employee_name,-supervisor_display_name,-date_day_of_week,-position_number,-business_line_2_letter_department_id
+    ),
+    .fns = list(dist = n_distinct, mode = getmode),
+    .names = "{.col}_{.fn}"
+  )) %>%
+  select(-person_id_mode) %>%
+  ungroup()
+```
+
+Review data
+
+```{r}
+prep_b %>% 
+  skim()
+```
+
+Collect the minimum and maximum GS levels for the team by `supervisor_e_mail_address` from `cohort_first`.
+
+```{r}
+prep_c <-
+  cohort_first %>%
+  group_by(supervisor_e_mail_address) %>%
+  summarise(across(
+    .cols = c(grade),
+    .fns = list(min = min, max = max),
+    .names = "{.col}_{.fn}"
+  )) %>%
+  ungroup()
+```
+
+
+Review data
+
+```{r}
+prep_c %>% 
+  skim()
+```
+
+Create `prep_xx` by left joining the above to `supervisor_e_mail_address` in `prep_building`.
+
+```{r}
+prep_xx <-
+  cohort_ids %>%
+  select(supervisor_e_mail_address) %>%
+  distinct() %>%
+  left_join(prep_a) %>%
+  left_join(prep_b) %>%
+  left_join(prep_c)
 ```
 
 Review data.
@@ -2087,12 +2110,12 @@ problem_variables <-
 problem_variables
 ```
 
-All of these are null correlations, which will address in analysis.
+All of these are null from supervisors that didn't show up in the panel data. 
 
 ## Creating final dataframe
 
 ```{r}
-prep_employees <- prep_building
+prep_team <- prep_building
 ```
 
 ```{r}
@@ -2102,8 +2125,8 @@ rm(prep_building)
 ## Save data {.tabset .tabset-pills}
 
 ```{r}
-save(prep_employees, file = file.path(params$google_drive_home,"03. Data Collection","prepared-data",
-          glue::glue("prep_employees_{Sys.Date()}.rdata")))
+save(prep_team, file = file.path(params$google_drive_home,"03. Data Collection","prepared-data",
+          glue::glue("prep_team_{Sys.Date()}.rdata")))
 ```
 
 Remove all data elements.
