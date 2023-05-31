@@ -40,6 +40,7 @@ library(Hmisc)
 library(readxl)
 library(flextable)
 library(ggthemes)
+library(tidymodels)
 ```
 
 ```{r cohort dates}
@@ -48,6 +49,11 @@ date_cohort_month_end <- ceiling_date(date_cohort_month_start,unit = "month") %>
 date_observation_window_month_start <- date_cohort_month_start %m+% months(params$observation_window_length_months)
 date_observation_window_month_end <- ceiling_date(date_observation_window_month_start,unit = "month") %>% rollbackward()
 ```
+
+```{r}
+set.seed(27)
+```
+
 
 # Data preparation {.tabset .tabset-pills}
 
@@ -78,6 +84,230 @@ load(file = file.path(params$google_drive_home,"03. Data Collection",params$data
 Review.
 
 ```{r}
-check_in_panel %>% 
+prep_employees %>% 
   skim()
 ```
+
+## Scale data {.tabset .tabset-pills}
+
+```{r}
+d <- 
+  prep_employees %>% 
+  mutate(
+    across(
+      .cols = c(daily_status_reporting_to_job_site_working_prop,
+                daily_status_teleworking_working_prop,
+                daily_status_reporting_to_job_site_observation_prop,
+                daily_status_teleworking_observation_prop,
+                starts_with("mon_"),
+                starts_with("tue_"),
+                starts_with("wed_"),
+                starts_with("thu_"),
+                starts_with("fri_"),
+                working_days,
+                team_size_mode,
+                starts_with("days_colocated_"),
+                starts_with("days_telework_"),
+                -days_colocated_1,
+                -days_colocated_supervisor,
+                -days_colocated_team,
+                -days_telework_team
+                ),
+      .fns = list(scale = scale,rank = rank),
+      .names = "{.col}_{.fn}"
+    )
+  )
+```
+
+Review data.
+
+```{r}
+d %>% 
+  skim()
+```
+
+
+## Create clusters {.tabset .tabset-pills}
+
+### Scale
+
+#### Observation
+
+##### Correlation telework
+
+```{r}
+prep_a <-
+  d %>%
+  select(
+    person_id,
+    ends_with("_scale"),
+    -contains("_working_prop_"),
+    -contains("_cor_status_"),
+    -contains("_prop_pairs_"),
+    ) %>% 
+  drop_na()
+```
+
+```{r}
+prep_a %>% 
+  skim()
+```
+
+```{r}
+prep_b <- 
+  prep_a %>% 
+  select(-person_id)
+```
+
+Review data.
+
+```{r}
+prep_b %>% 
+  skim()
+```
+
+
+```{r}
+kclusts <- 
+  tibble(k = 1:9) %>%
+  mutate(
+    kclust = map(k, ~kmeans(prep_b, .x)),
+    tidied = map(kclust, tidy),
+    glanced = map(kclust, glance),
+    augmented = map(kclust, augment, prep_b)
+  )
+
+
+```
+
+```{r}
+clusters <- 
+  kclusts %>%
+  unnest(cols = c(tidied))
+
+assignments <- 
+  kclusts %>% 
+  unnest(cols = c(augmented))
+
+clusterings <- 
+  kclusts %>%
+  unnest(cols = c(glanced))
+
+```
+
+```{r}
+p1 <- 
+  ggplot(assignments, aes(x = days_colocated_1_observation_prop_scale, y = days_colocated_supervisor_observation_prop_scale)) +
+  geom_point(aes(color = .cluster), alpha = 0.8) + 
+  facet_wrap(~ k)
+p1
+
+```
+
+```{r}
+ggplot(clusterings, aes(k, tot.withinss)) +
+  geom_line() +
+  geom_point()
+
+```
+
+```{r}
+clusterings %>% 
+  select(k,tot.withinss) %>% 
+  mutate(
+    tot.withinss_lag = lag(tot.withinss),
+    diff = tot.withinss_lag - tot.withinss,
+    change = diff/tot.withinss_lag,
+    change_lag = lag(change),
+    diff_2 = change_lag - change
+  )
+```
+
+
+
+
+```{r}
+kclust <- kmeans(points, centers = 3)
+kclust
+#> K-means clustering with 3 clusters of sizes 148, 51, 101
+#> 
+#> Cluster means:
+#>        x1    x2
+#> 1  0.0885  1.05
+#> 2 -3.1429 -2.00
+#> 3  5.0040 -1.05
+#> 
+#> Clustering vector:
+#>   [1] 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3
+#>  [38] 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3
+#>  [75] 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 1 1 1 1 1 1 1 1 1 1 1
+#> [112] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+#> [149] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+#> [186] 1 1 1 1 1 1 1 1 1 1 1 1 1 3 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+#> [223] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 2 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2
+#> [260] 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2
+#> [297] 2 2 2 2
+#> 
+#> Within cluster sum of squares by cluster:
+#> [1] 299 109 243
+#>  (between_SS / total_SS =  82.5 %)
+#> 
+#> Available components:
+#> 
+#> [1] "cluster"      "centers"      "totss"        "withinss"     "tot.withinss"
+#> [6] "betweenss"    "size"         "iter"         "ifault"
+summary(kclust)
+#>              Length Class  Mode   
+#> cluster      300    -none- numeric
+#> centers        6    -none- numeric
+#> totss          1    -none- numeric
+#> withinss       3    -none- numeric
+#> tot.withinss   1    -none- numeric
+#> betweenss      1    -none- numeric
+#> size           3    -none- numeric
+#> iter           1    -none- numeric
+#> ifault         1    -none- numeric
+
+```
+
+
+
+##### Correlation status
+
+
+##### Proportion pairs
+
+
+#### Working
+
+##### Correlation telework
+
+
+##### Correlation status
+
+
+##### Proportion pairs
+
+
+### Rank
+
+#### Observation
+
+##### Correlation telework
+
+
+##### Correlation status
+
+
+##### Proportion pairs
+
+
+#### Working
+
+##### Correlation telework
+
+
+##### Correlation status
+
+
+##### Proportion pairs
