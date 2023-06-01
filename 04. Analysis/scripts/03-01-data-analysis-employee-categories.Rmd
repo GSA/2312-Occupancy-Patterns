@@ -129,6 +129,376 @@ d %>%
 
 ## Create clusters {.tabset .tabset-pills}
 
+### Functions
+
+#### Selecting data for cluster analysis
+
+```{r}
+#' Selects the correct columns for employee cluster analysis
+#'
+#' @param in_data Data to use
+#' @param in_scale_or_rank Option for which scaling procedure: "scale" (normalization) or "rank" (rank order)
+#' @param in_working_or_observation_window Option for proportion denominator: "observation" (proportion of entire observation window) or "working" (proportion of period employ was working onsite or via telework)
+#' @param in_weekday_correlation Option for inter weekday relationship: "correlation telework" (telework correlation between days of the week), "correlation status" (work status correlation based on ordered work status by days of the week), or "proportion pairs" (proportion of telework in pairs)
+#'
+#' @return Dataframe with only selected columns and dropped null observations
+#' @export
+#'
+#' @examples
+select_cluster_cols <-
+  function(in_data,
+           in_scale_or_rank,
+           in_working_or_observation_window,
+           in_weekday_correlation)
+  {
+    stopifnot(in_scale_or_rank %in% c("scale", "rank"))
+    stopifnot(in_working_or_observation_window %in% c("observation", "working"))
+    stopifnot(in_weekday_correlation %in% c("correlation telework", "correlation status","proportion pairs"))
+    
+    if (in_scale_or_rank == "scale" &
+        in_working_or_observation_window == "observation" &
+        in_weekday_correlation == "correlation telework")
+    {
+      step_01 <-
+        in_data %>%
+        select(
+          person_id,
+          ends_with("_scale"),
+          -contains("_working_prop_"),
+          -contains("_cor_status_"),
+          -contains("_prop_pairs_"),
+        ) %>%
+        drop_na()
+    }
+    
+    if (in_scale_or_rank == "rank" &
+        in_working_or_observation_window == "observation" &
+        in_weekday_correlation == "correlation telework")
+    {
+      step_01 <-
+        in_data %>%
+        select(
+          person_id,
+          ends_with("_rank"),
+          -contains("_working_prop_"),
+          -contains("_cor_status_"),
+          -contains("_prop_pairs_"),
+        ) %>%
+        drop_na()
+    }
+    
+    if (in_scale_or_rank == "scale" &
+        in_working_or_observation_window == "working" &
+        in_weekday_correlation == "correlation telework")
+    {
+      step_01 <-
+        in_data %>%
+        select(
+          person_id,
+          ends_with("_scale"),
+          -contains("_observation_"),
+          -contains("_cor_status_"),
+          -contains("_prop_pairs_"),
+        ) %>%
+        drop_na()
+    }
+    
+    if (in_scale_or_rank == "rank" &
+        in_working_or_observation_window == "working" &
+        in_weekday_correlation == "correlation telework")
+    {
+      step_01 <-
+        in_data %>%
+        select(
+          person_id,
+          ends_with("_rank"),
+          -contains("_observation_"),
+          -contains("_cor_status_"),
+          -contains("_prop_pairs_"),
+        ) %>%
+        drop_na()
+    }
+    
+    if (in_scale_or_rank == "scale" &
+        in_working_or_observation_window == "observation" &
+        in_weekday_correlation == "correlation status")
+    {
+      step_01 <-
+        in_data %>%
+        select(
+          person_id,
+          ends_with("_scale"),
+          -contains("_working_prop_"),
+          -contains("_cor_telework_"),
+          -contains("_prop_pairs_"),
+        ) %>%
+        drop_na()
+    }
+    
+    if (in_scale_or_rank == "rank" &
+        in_working_or_observation_window == "observation" &
+        in_weekday_correlation == "correlation status")
+    {
+      step_01 <-
+        in_data %>%
+        select(
+          person_id,
+          ends_with("_rank"),
+          -contains("_working_prop_"),
+          -contains("_cor_telework_"),
+          -contains("_prop_pairs_"),
+        ) %>%
+        drop_na()
+    }
+    
+    if (in_scale_or_rank == "scale" &
+        in_working_or_observation_window == "working" &
+        in_weekday_correlation == "correlation status")
+    {
+      step_01 <-
+        in_data %>%
+        select(
+          person_id,
+          ends_with("_scale"),
+          -contains("_observation_"),
+          -contains("_cor_telework_"),
+          -contains("_prop_pairs_"),
+        ) %>%
+        drop_na()
+    }
+    
+    if (in_scale_or_rank == "rank" &
+        in_working_or_observation_window == "working" &
+        in_weekday_correlation == "correlation status")
+    {
+      step_01 <-
+        in_data %>%
+        select(
+          person_id,
+          ends_with("_rank"),
+          -contains("_observation_"),
+          -contains("_cor_telework_"),
+          -contains("_prop_pairs_"),
+        ) %>%
+        drop_na()
+    }
+    
+    if (in_scale_or_rank == "scale" &
+        in_working_or_observation_window == "observation" &
+        in_weekday_correlation == "proportion pairs")
+    {
+      step_01 <-
+        in_data %>%
+        select(
+          person_id,
+          ends_with("_scale"),
+          -contains("_working_prop_"),
+          -contains("_cor_status_"),
+          -contains("cor_telework"),
+        ) %>%
+        drop_na()
+    }
+    
+    if (in_scale_or_rank == "rank" &
+        in_working_or_observation_window == "observation" &
+        in_weekday_correlation == "proportion pairs")
+    {
+      step_01 <-
+        in_data %>%
+        select(
+          person_id,
+          ends_with("_rank"),
+          -contains("_working_prop_"),
+          -contains("_cor_status_"),
+          -contains("cor_telework"),
+        ) %>%
+        drop_na()
+    }
+    
+    if (in_scale_or_rank == "scale" &
+        in_working_or_observation_window == "working" &
+        in_weekday_correlation == "proportion pairs")
+    {
+      step_01 <-
+        in_data %>%
+        select(
+          person_id,
+          ends_with("_scale"),
+          -contains("_observation_"),
+          -contains("_cor_status_"),
+          -contains("cor_telework"),
+        ) %>%
+        drop_na()
+    }
+    
+    if (in_scale_or_rank == "rank" &
+        in_working_or_observation_window == "working" &
+        in_weekday_correlation == "proportion pairs")
+    {
+      step_01 <-
+        in_data %>%
+        select(
+          person_id,
+          ends_with("_rank"),
+          -contains("_observation_"),
+          -contains("_cor_status_"),
+          -contains("cor_telework"),
+        ) %>%
+        drop_na()
+    }
+    
+    out <- 
+      step_01 %>% 
+      as_tibble()
+    
+    return(out)
+  }
+```
+
+#### Making clusters of different sizes
+
+```{r}
+#' Make employee clusters of a variety of sizes and different specifications
+#'
+#' @param in_data Data to use
+#' @param in_scale_or_rank Option for which scaling procedure: "scale" (normalization) or "rank" (rank order)
+#' @param in_working_or_observation_window Option for proportion denominator: "observation" (proportion of entire observation window) or "working" (proportion of period employ was working onsite or via telework)
+#' @param in_weekday_correlation Option for inter weekday relationship: "correlation telework" (telework correlation between days of the week), "correlation status" (work status correlation based on ordered work status by days of the week), or "proportion pairs" (proportion of telework in pairs)
+#' @param in_number_of_clusters_start Minimum number of clusters to test
+#' @param in_number_of_clusters_end Maximum number of clusters to test
+#'
+#' @return Dataframe of clusters and associatied statistics
+#' @export
+#'
+#' @examples
+make_clusters <-
+  function(in_data,
+           in_scale_or_rank,
+           in_working_or_observation_window,
+           in_weekday_correlation,
+           in_number_of_clusters_start,
+           in_number_of_clusters_end)
+  {
+    stopifnot(in_scale_or_rank %in% c("scale", "rank"))
+    stopifnot(in_working_or_observation_window %in% c("observation", "working"))
+    stopifnot(
+      in_weekday_correlation %in% c(
+        "correlation telework",
+        "correlation status",
+        "proportion pairs"
+      )
+    )
+    stopifnot(in_number_of_clusters_start >= 1)
+    stopifnot(in_number_of_clusters_start <= in_number_of_clusters_end)
+    
+    step_01 <-
+      in_data %>%
+      select_cluster_cols(
+        in_scale_or_rank = in_scale_or_rank,
+        in_working_or_observation_window = in_working_or_observation_window,
+        in_weekday_correlation = in_weekday_correlation
+      )
+    
+    print(glue::glue("Review data for step 1. {Sys.time()}"))
+    
+    step_01 %>%
+      skim() %>%
+      print()
+    
+    print(glue::glue("Remove person_id. {Sys.time()}"))
+    
+    step_02 <-
+      step_01 %>%
+      select(-person_id)
+    
+    print(glue::glue("Review data for step 2. {Sys.time()}"))
+    
+    step_02 %>%
+      skim() %>%
+      print()
+    
+    print(
+      glue::glue(
+        "Create clusters of the data from {in_number_of_clusters_start} to {in_number_of_clusters_end}. {Sys.time()}"
+      )
+    )
+    
+    out <-
+      tibble(k = in_number_of_clusters_start:in_number_of_clusters_end) %>%
+      mutate(
+        kclust = map(k, ~ kmeans(step_02, .x)),
+        tidied = map(kclust, tidy),
+        glanced = map(kclust, glance),
+        augmented = map(kclust, augment, step_01)
+      )
+    
+    return(out)
+  }
+```
+
+```{r}
+make_clusters_d <- function(
+    in_specification,
+    in_scale_or_rank,
+                            in_working_or_observation_window,
+                            in_weekday_correlation,
+                            in_number_of_clusters_start,
+                            in_number_of_clusters_end)
+{
+  make_clusters(
+    in_data = d,
+    in_scale_or_rank = in_scale_or_rank,
+    in_working_or_observation_window = in_working_or_observation_window,
+    in_weekday_correlation = in_weekday_correlation,
+    in_number_of_clusters_start = in_number_of_clusters_start,
+    in_number_of_clusters_end = in_number_of_clusters_end
+  ) %>% 
+    mutate(specification = in_specification)
+}
+```
+
+
+
+```{r}
+specs <- 
+  tibble(
+  in_scale_or_rank = c(rep("scale", 6), rep("rank", 6)),
+  in_working_or_observation_window = rep(c(rep("observation", 3), rep("working", 3)), 2),
+  in_weekday_correlation = rep(
+    c(
+      "correlation telework",
+      "correlation status",
+      "proportion pairs"
+    ),
+    4
+  ),
+  in_number_of_clusters_start = rep(1, 12),
+  in_number_of_clusters_end = rep(10, 12)
+) %>% 
+  unite(col = "in_specification",everything(),remove = FALSE)
+```
+
+```{r}
+specs
+```
+
+
+```{r}
+# specs[1,] %>% 
+  pmap(specs[1:2,]$in_scale_or_rank,specs[1:2,]$in_working_or_observation_window,specs[1:2,]$in_weekday_correlation,
+       specs[1:2,]$in_number_of_clusters_start,specs[1:2,]$in_number_of_clusters_end,make_clusters_d)
+```
+
+```{r}
+kclusts <- 
+  specs[1,] %>%
+  pmap_dfr(make_clusters_d)
+
+```
+
+
+
+
 ### Scale
 
 #### Observation
@@ -136,48 +506,14 @@ d %>%
 ##### Correlation telework
 
 ```{r}
-prep_a <-
-  d %>%
-  select(
-    person_id,
-    ends_with("_scale"),
-    -contains("_working_prop_"),
-    -contains("_cor_status_"),
-    -contains("_prop_pairs_"),
-    ) %>% 
-  drop_na()
-```
-
-```{r}
-prep_a %>% 
-  skim()
-```
-
-```{r}
-prep_b <- 
-  prep_a %>% 
-  select(-person_id)
-```
-
-Review data.
-
-```{r}
-prep_b %>% 
-  skim()
-```
-
-
-```{r}
-kclusts <- 
-  tibble(k = 1:9) %>%
-  mutate(
-    kclust = map(k, ~kmeans(prep_b, .x)),
-    tidied = map(kclust, tidy),
-    glanced = map(kclust, glance),
-    augmented = map(kclust, augment, prep_b)
+kclusts <- d %>%
+   make_clusters(
+    in_scale_or_rank = "scale",
+    in_working_or_observation_window = "observation",
+    in_weekday_correlation = "correlation telework",
+    in_number_of_clusters_start = 1,
+    in_number_of_clusters_end = 10
   )
-
-
 ```
 
 ```{r}
@@ -196,11 +532,53 @@ clusterings <-
 ```
 
 ```{r}
-p1 <- 
-  ggplot(assignments, aes(x = days_colocated_1_observation_prop_scale, y = days_colocated_supervisor_observation_prop_scale)) +
-  geom_point(aes(color = .cluster), alpha = 0.8) + 
-  facet_wrap(~ k)
-p1
+ggplot(clusterings, aes(k, tot.withinss)) +
+  geom_line() +
+  geom_point()
+
+```
+
+```{r}
+prep_01 <- clusterings %>% 
+  select(k,tot.withinss) %>% 
+  mutate(
+    tot.withinss_lag = lag(tot.withinss),
+    rate_of_change = tot.withinss - tot.withinss_lag,
+    rate_of_change_lag = lag(rate_of_change),
+    acceleration = rate_of_change - rate_of_change_lag
+  )
+
+prep_01
+```
+
+
+
+##### Correlation status
+
+
+```{r}
+kclusts <- d %>%
+   make_clusters(
+    in_scale_or_rank = "scale",
+    in_working_or_observation_window = "observation",
+    in_weekday_correlation = "correlation status",
+    in_number_of_clusters_start = 1,
+    in_number_of_clusters_end = 10
+  )
+```
+
+```{r}
+clusters <- 
+  kclusts %>%
+  unnest(cols = c(tidied))
+
+assignments <- 
+  kclusts %>% 
+  unnest(cols = c(augmented))
+
+clusterings <- 
+  kclusts %>%
+  unnest(cols = c(glanced))
 
 ```
 
@@ -212,81 +590,220 @@ ggplot(clusterings, aes(k, tot.withinss)) +
 ```
 
 ```{r}
-clusterings %>% 
+prep_01 <- clusterings %>% 
   select(k,tot.withinss) %>% 
   mutate(
     tot.withinss_lag = lag(tot.withinss),
-    diff = tot.withinss_lag - tot.withinss,
-    change = diff/tot.withinss_lag,
-    change_lag = lag(change),
-    diff_2 = change_lag - change
+    rate_of_change = tot.withinss - tot.withinss_lag,
+    rate_of_change_lag = lag(rate_of_change),
+    acceleration = rate_of_change - rate_of_change_lag
   )
+
+prep_01
 ```
-
-
-
-
-```{r}
-kclust <- kmeans(points, centers = 3)
-kclust
-#> K-means clustering with 3 clusters of sizes 148, 51, 101
-#> 
-#> Cluster means:
-#>        x1    x2
-#> 1  0.0885  1.05
-#> 2 -3.1429 -2.00
-#> 3  5.0040 -1.05
-#> 
-#> Clustering vector:
-#>   [1] 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3
-#>  [38] 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3
-#>  [75] 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 1 1 1 1 1 1 1 1 1 1 1
-#> [112] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-#> [149] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-#> [186] 1 1 1 1 1 1 1 1 1 1 1 1 1 3 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-#> [223] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 2 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2
-#> [260] 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2
-#> [297] 2 2 2 2
-#> 
-#> Within cluster sum of squares by cluster:
-#> [1] 299 109 243
-#>  (between_SS / total_SS =  82.5 %)
-#> 
-#> Available components:
-#> 
-#> [1] "cluster"      "centers"      "totss"        "withinss"     "tot.withinss"
-#> [6] "betweenss"    "size"         "iter"         "ifault"
-summary(kclust)
-#>              Length Class  Mode   
-#> cluster      300    -none- numeric
-#> centers        6    -none- numeric
-#> totss          1    -none- numeric
-#> withinss       3    -none- numeric
-#> tot.withinss   1    -none- numeric
-#> betweenss      1    -none- numeric
-#> size           3    -none- numeric
-#> iter           1    -none- numeric
-#> ifault         1    -none- numeric
-
-```
-
-
-
-##### Correlation status
 
 
 ##### Proportion pairs
+
+
+```{r}
+kclusts <- d %>%
+   make_clusters(
+    in_scale_or_rank = "scale",
+    in_working_or_observation_window = "observation",
+    in_weekday_correlation = "proportion pairs",
+    in_number_of_clusters_start = 1,
+    in_number_of_clusters_end = 10
+  )
+```
+
+```{r}
+clusters <- 
+  kclusts %>%
+  unnest(cols = c(tidied))
+
+assignments <- 
+  kclusts %>% 
+  unnest(cols = c(augmented))
+
+clusterings <- 
+  kclusts %>%
+  unnest(cols = c(glanced))
+
+```
+
+```{r}
+ggplot(clusterings, aes(k, tot.withinss)) +
+  geom_line() +
+  geom_point()
+
+```
+
+```{r}
+prep_01 <- clusterings %>% 
+  select(k,tot.withinss) %>% 
+  mutate(
+    tot.withinss_lag = lag(tot.withinss),
+    rate_of_change = tot.withinss - tot.withinss_lag,
+    rate_of_change_lag = lag(rate_of_change),
+    acceleration = rate_of_change - rate_of_change_lag
+  )
+
+prep_01
+```
 
 
 #### Working
 
 ##### Correlation telework
 
+```{r}
+kclusts <- d %>%
+   make_clusters(
+    in_scale_or_rank = "scale",
+    in_working_or_observation_window = "working",
+    in_weekday_correlation = "correlation telework",
+    in_number_of_clusters_start = 1,
+    in_number_of_clusters_end = 10
+  )
+```
+
+```{r}
+clusters <- 
+  kclusts %>%
+  unnest(cols = c(tidied))
+
+assignments <- 
+  kclusts %>% 
+  unnest(cols = c(augmented))
+
+clusterings <- 
+  kclusts %>%
+  unnest(cols = c(glanced))
+
+```
+
+```{r}
+ggplot(clusterings, aes(k, tot.withinss)) +
+  geom_line() +
+  geom_point()
+
+```
+
+```{r}
+prep_01 <- clusterings %>% 
+  select(k,tot.withinss) %>% 
+  mutate(
+    tot.withinss_lag = lag(tot.withinss),
+    rate_of_change = tot.withinss - tot.withinss_lag,
+    rate_of_change_lag = lag(rate_of_change),
+    acceleration = rate_of_change - rate_of_change_lag
+  )
+
+prep_01
+```
+
+
 
 ##### Correlation status
 
 
+```{r}
+kclusts <- d %>%
+   make_clusters(
+    in_scale_or_rank = "scale",
+    in_working_or_observation_window = "working",
+    in_weekday_correlation = "correlation status",
+    in_number_of_clusters_start = 1,
+    in_number_of_clusters_end = 10
+  )
+```
+
+```{r}
+clusters <- 
+  kclusts %>%
+  unnest(cols = c(tidied))
+
+assignments <- 
+  kclusts %>% 
+  unnest(cols = c(augmented))
+
+clusterings <- 
+  kclusts %>%
+  unnest(cols = c(glanced))
+
+```
+
+```{r}
+ggplot(clusterings, aes(k, tot.withinss)) +
+  geom_line() +
+  geom_point()
+
+```
+
+```{r}
+prep_01 <- clusterings %>% 
+  select(k,tot.withinss) %>% 
+  mutate(
+    tot.withinss_lag = lag(tot.withinss),
+    rate_of_change = tot.withinss - tot.withinss_lag,
+    rate_of_change_lag = lag(rate_of_change),
+    acceleration = rate_of_change - rate_of_change_lag
+  )
+
+prep_01
+```
+
+
 ##### Proportion pairs
+
+
+```{r}
+kclusts <- d %>%
+   make_clusters(
+    in_scale_or_rank = "scale",
+    in_working_or_observation_window = "working",
+    in_weekday_correlation = "proportion pairs",
+    in_number_of_clusters_start = 1,
+    in_number_of_clusters_end = 10
+  )
+```
+
+```{r}
+clusters <- 
+  kclusts %>%
+  unnest(cols = c(tidied))
+
+assignments <- 
+  kclusts %>% 
+  unnest(cols = c(augmented))
+
+clusterings <- 
+  kclusts %>%
+  unnest(cols = c(glanced))
+
+```
+
+```{r}
+ggplot(clusterings, aes(k, tot.withinss)) +
+  geom_line() +
+  geom_point()
+
+```
+
+```{r}
+prep_01 <- clusterings %>% 
+  select(k,tot.withinss) %>% 
+  mutate(
+    tot.withinss_lag = lag(tot.withinss),
+    rate_of_change = tot.withinss - tot.withinss_lag,
+    rate_of_change_lag = lag(rate_of_change),
+    acceleration = rate_of_change - rate_of_change_lag
+  )
+
+prep_01
+```
+
 
 
 ### Rank
@@ -295,19 +812,301 @@ summary(kclust)
 
 ##### Correlation telework
 
+```{r}
+kclusts <- d %>%
+   make_clusters(
+    in_scale_or_rank = "rank",
+    in_working_or_observation_window = "observation",
+    in_weekday_correlation = "correlation telework",
+    in_number_of_clusters_start = 1,
+    in_number_of_clusters_end = 10
+  )
+```
+
+```{r}
+clusters <- 
+  kclusts %>%
+  unnest(cols = c(tidied))
+
+assignments <- 
+  kclusts %>% 
+  unnest(cols = c(augmented))
+
+clusterings <- 
+  kclusts %>%
+  unnest(cols = c(glanced))
+
+```
+
+```{r}
+ggplot(clusterings, aes(k, tot.withinss)) +
+  geom_line() +
+  geom_point()
+
+```
+
+```{r}
+prep_01 <- clusterings %>% 
+  select(k,tot.withinss) %>% 
+  mutate(
+    tot.withinss_lag = lag(tot.withinss),
+    rate_of_change = tot.withinss - tot.withinss_lag,
+    rate_of_change_lag = lag(rate_of_change),
+    acceleration = rate_of_change - rate_of_change_lag
+  )
+
+prep_01
+```
+
+
 
 ##### Correlation status
 
 
+```{r}
+kclusts <- d %>%
+   make_clusters(
+    in_scale_or_rank = "rank",
+    in_working_or_observation_window = "observation",
+    in_weekday_correlation = "correlation status",
+    in_number_of_clusters_start = 1,
+    in_number_of_clusters_end = 10
+  )
+```
+
+```{r}
+clusters <- 
+  kclusts %>%
+  unnest(cols = c(tidied))
+
+assignments <- 
+  kclusts %>% 
+  unnest(cols = c(augmented))
+
+clusterings <- 
+  kclusts %>%
+  unnest(cols = c(glanced))
+
+```
+
+```{r}
+ggplot(clusterings, aes(k, tot.withinss)) +
+  geom_line() +
+  geom_point()
+
+```
+
+```{r}
+prep_01 <- clusterings %>% 
+  select(k,tot.withinss) %>% 
+  mutate(
+    tot.withinss_lag = lag(tot.withinss),
+    rate_of_change = tot.withinss - tot.withinss_lag,
+    rate_of_change_lag = lag(rate_of_change),
+    acceleration = rate_of_change - rate_of_change_lag
+  )
+
+prep_01
+```
+
+
 ##### Proportion pairs
+
+
+```{r}
+kclusts <- d %>%
+   make_clusters(
+    in_scale_or_rank = "rank",
+    in_working_or_observation_window = "observation",
+    in_weekday_correlation = "proportion pairs",
+    in_number_of_clusters_start = 1,
+    in_number_of_clusters_end = 10
+  )
+```
+
+```{r}
+clusters <- 
+  kclusts %>%
+  unnest(cols = c(tidied))
+
+assignments <- 
+  kclusts %>% 
+  unnest(cols = c(augmented))
+
+clusterings <- 
+  kclusts %>%
+  unnest(cols = c(glanced))
+
+```
+
+```{r}
+ggplot(clusterings, aes(k, tot.withinss)) +
+  geom_line() +
+  geom_point()
+
+```
+
+```{r}
+prep_01 <- clusterings %>% 
+  select(k,tot.withinss) %>% 
+  mutate(
+    tot.withinss_lag = lag(tot.withinss),
+    rate_of_change = tot.withinss - tot.withinss_lag,
+    rate_of_change_lag = lag(rate_of_change),
+    acceleration = rate_of_change - rate_of_change_lag
+  )
+
+prep_01
+```
 
 
 #### Working
 
 ##### Correlation telework
 
+```{r}
+kclusts <- d %>%
+   make_clusters(
+    in_scale_or_rank = "rank",
+    in_working_or_observation_window = "working",
+    in_weekday_correlation = "correlation telework",
+    in_number_of_clusters_start = 1,
+    in_number_of_clusters_end = 10
+  )
+```
+
+```{r}
+clusters <- 
+  kclusts %>%
+  unnest(cols = c(tidied))
+
+assignments <- 
+  kclusts %>% 
+  unnest(cols = c(augmented))
+
+clusterings <- 
+  kclusts %>%
+  unnest(cols = c(glanced))
+
+```
+
+```{r}
+ggplot(clusterings, aes(k, tot.withinss)) +
+  geom_line() +
+  geom_point()
+
+```
+
+```{r}
+prep_01 <- clusterings %>% 
+  select(k,tot.withinss) %>% 
+  mutate(
+    tot.withinss_lag = lag(tot.withinss),
+    rate_of_change = tot.withinss - tot.withinss_lag,
+    rate_of_change_lag = lag(rate_of_change),
+    acceleration = rate_of_change - rate_of_change_lag
+  )
+
+prep_01
+```
+
+
 
 ##### Correlation status
 
 
+```{r}
+kclusts <- d %>%
+   make_clusters(
+    in_scale_or_rank = "rank",
+    in_working_or_observation_window = "working",
+    in_weekday_correlation = "correlation status",
+    in_number_of_clusters_start = 1,
+    in_number_of_clusters_end = 10
+  )
+```
+
+```{r}
+clusters <- 
+  kclusts %>%
+  unnest(cols = c(tidied))
+
+assignments <- 
+  kclusts %>% 
+  unnest(cols = c(augmented))
+
+clusterings <- 
+  kclusts %>%
+  unnest(cols = c(glanced))
+
+```
+
+```{r}
+ggplot(clusterings, aes(k, tot.withinss)) +
+  geom_line() +
+  geom_point()
+
+```
+
+```{r}
+prep_01 <- clusterings %>% 
+  select(k,tot.withinss) %>% 
+  mutate(
+    tot.withinss_lag = lag(tot.withinss),
+    rate_of_change = tot.withinss - tot.withinss_lag,
+    rate_of_change_lag = lag(rate_of_change),
+    acceleration = rate_of_change - rate_of_change_lag
+  )
+
+prep_01
+```
+
+
 ##### Proportion pairs
+
+
+```{r}
+kclusts <- d %>%
+   make_clusters(
+    in_scale_or_rank = "rank",
+    in_working_or_observation_window = "working",
+    in_weekday_correlation = "proportion pairs",
+    in_number_of_clusters_start = 1,
+    in_number_of_clusters_end = 10
+  )
+```
+
+```{r}
+clusters <- 
+  kclusts %>%
+  unnest(cols = c(tidied))
+
+assignments <- 
+  kclusts %>% 
+  unnest(cols = c(augmented))
+
+clusterings <- 
+  kclusts %>%
+  unnest(cols = c(glanced))
+
+```
+
+```{r}
+ggplot(clusterings, aes(k, tot.withinss)) +
+  geom_line() +
+  geom_point()
+
+```
+
+```{r}
+prep_01 <- clusterings %>% 
+  select(k,tot.withinss) %>% 
+  mutate(
+    tot.withinss_lag = lag(tot.withinss),
+    rate_of_change = tot.withinss - tot.withinss_lag,
+    rate_of_change_lag = lag(rate_of_change),
+    acceleration = rate_of_change - rate_of_change_lag
+  )
+
+prep_01
+```
