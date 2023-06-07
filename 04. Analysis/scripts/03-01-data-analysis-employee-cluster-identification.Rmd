@@ -515,6 +515,31 @@ kclusts <-
   pmap_dfr(make_clusters_d)
 ```
 
+Add underscore to specification.
+
+```{r}
+kclusts <- 
+  kclusts %>% 
+  mutate(
+    specification = str_replace_all(specification," ","_")
+  )
+```
+
+Check `specification` results.
+
+```{r}
+kclusts %>% 
+  count(specification)
+```
+
+Review data.
+
+```{r}
+kclusts %>% 
+  skim()
+```
+
+
 ## Save data {.tabset .tabset-pills}
 
 File name.
