@@ -1092,6 +1092,12 @@ clusterings <-
 ```
 
 ```{r}
+assignments %>% 
+  glimpse()
+```
+
+
+```{r}
 ggplot(clusterings, aes(k, tot.withinss)) +
   geom_line() +
   geom_point()
