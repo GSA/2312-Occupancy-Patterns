@@ -1,0 +1,1008 @@
+---
+title: "Data analysis for employee cluster descriptive statistics"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    theme: united
+    highlight: tango
+    code_folding: hide
+params:
+  author: "Ben Jaques-Leslie"
+  project_number: 2312
+  project_name: "Occupancy Patterns"
+  google_drive_home: "G:/Shared drives/MSG Projects/1.0 Real Estate Solutions (LQ1)/2312 Work Patterns"
+  data_folder_1: "prepared-data"
+  data_file_1: "clusters-employee-2023-06-01.rdata"
+  data_file_2: "prep_employees_2023-05-24.rdata"
+  in_number_of_clusters: 5
+  in_specification: "scale_working_proportion_pairs_1_10"
+  
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+tictoc::tic()
+if(!("arsenal" %in% installed.packages()[,"Package"]))
+{
+  install.packages("arsenal")
+}
+if(!("geomtextpath" %in% installed.packages()[,"Package"]))
+{
+  install.packages("geomtextpath")
+}
+if(!("oesrrr" %in% installed.packages()[,"Package"]))
+{
+  devtools::install_github(repo = "GSA/oesrrr")
+}
+library(oesrrr)
+library(tidyverse)
+library(janitor)
+library(skimr)
+library(DataExplorer)
+library(readr)
+library(arsenal)
+library(Hmisc)
+library(readxl)
+library(flextable)
+library(ggthemes)
+library(tidymodels)
+```
+
+```{r cohort dates}
+# date_cohort_month_start <- ymd(params$date_cohort_month)
+# date_cohort_month_end <- ceiling_date(date_cohort_month_start,unit = "month") %>% rollbackward()
+# date_observation_window_month_start <- date_cohort_month_start %m+% months(params$observation_window_length_months)
+# date_observation_window_month_end <- ceiling_date(date_observation_window_month_start,unit = "month") %>% rollbackward()
+```
+
+
+# Data preparation {.tabset .tabset-pills}
+
+**Project number**: `r params$project_number`
+
+**Project name**: `r params$project_name`
+
+**Author**: `r params$author`
+
+**Data folder 1**: `r params$data_folder_1`
+
+**Data file 1**: `r params$data_file_1`
+
+**Data file 2**: `r params$data_file_2`
+
+**Number of clusters**: `r params$in_number_of_clusters`
+
+**Specification** `r params$in_specification`
+
+## Load data {.tabset .tabset-pills}
+
+Load `r params$data_file_1` from `r params$data_folder_1` data folder.
+
+```{r}
+load(file = file.path(params$google_drive_home,"03. Data Collection",params$data_folder_1,params$data_file_1))
+```
+
+Review.
+
+```{r}
+kclusts %>% 
+  skim()
+```
+
+Load `r params$data_file_2` from `r params$data_folder_1` data folder.
+
+```{r}
+load(file = file.path(params$google_drive_home,"03. Data Collection",params$data_folder_1,params$data_file_2))
+```
+
+Review.
+
+```{r}
+prep_employees %>% 
+  skim()
+```
+
+## Select and unnest data {.tabset .tabset-pills}
+
+### Filter to specification and cluster
+
+Filter to data with `r params$in_number_of_clusters` clusters with specification `r params$in_specification`.
+
+```{r}
+clust <- 
+  kclusts %>% 
+  filter(
+    k == params$in_number_of_clusters &
+      specification == params$in_specification
+  )
+```
+
+### Unnest
+
+Filter to data with `r params$in_number_of_clusters` clusters with specification `r params$in_specification`.
+
+```{r}
+clusters <- 
+  clust %>%
+  unnest(cols = c(tidied))
+
+assignments <- 
+  clust %>% 
+  unnest(cols = c(augmented))
+
+clusterings <- 
+  clust %>%
+  unnest(cols = c(glanced))
+
+```
+
+```{r}
+assignments %>% 
+  glimpse()
+```
+
+### Join assignments to employee data
+
+```{r}
+d <-
+  assignments %>%
+  select(k, person_id, .cluster, specification) %>%
+  full_join(prep_employees) %>% 
+  mutate(
+    .cluster = fct_na_value_to_level(.cluster, level = "(Missing)")
+  )
+```
+Review data.
+
+```{r}
+d %>% 
+  skim()
+```
+
+## Work pattern statistics {.tabset .tabset-pills}
+
+```{r}
+summaries <- function(in_data,...)
+{
+  in_data %>% 
+  group_by(...) %>% 
+  summarise(
+    across(
+      .cols = c(daily_status_teleworking,daily_status_reporting_to_job_site,
+                daily_status_teleworking_working_prop,daily_status_reporting_to_job_site_working_prop,
+                daily_status_teleworking_observation_prop,daily_status_reporting_to_job_site_observation_prop,
+                starts_with("mon_daily_"),
+                starts_with("tue_daily_"),
+                starts_with("wed_daily_"),
+                starts_with("thu_daily_"),
+                starts_with("fri_daily_"),
+                ends_with("_cor_telework"),
+                ends_with("_cor_status"),
+                ends_with("prop_pairs"),
+                team_size_mode,
+                starts_with("days_colocated"),
+                starts_with("days_telework"),
+                working_days
+                ),
+      .fns = ~mean(.,na.rm = TRUE)
+    )
+  ) %>% 
+    mutate(
+      statistic = "mean"
+    )
+}
+
+filter_rule_base <- function(in_summaries_data,in_filter)
+{
+  filt_var_mod <- enquo(in_filter) 
+  in_summaries_data %>% 
+     dplyr::filter((!!filt_var_mod) == 1) %>% 
+    pivot_longer(cols = !!filt_var_mod) %>% 
+    mutate(
+      temp = str_remove(name,"rule_based_"),
+      temp = str_replace_all(temp,"_"," "),
+      temp = str_to_sentence(temp),
+      group = glue::glue("Rule-based: {temp}")
+    ) %>% 
+    select(-name, -value,-temp)
+}
+
+summaries_rule_based <- function(in_data,in_rule_based_var)
+{
+  d %>% 
+    summaries({{in_rule_based_var}}) %>% 
+    filter_rule_base({{in_rule_based_var}})
+}
+
+
+
+prep_a <- bind_rows(
+  d %>%
+    summaries() %>%
+    mutate(group = "Whole cohort"),
+  d %>%
+    summaries(.cluster) %>%
+    mutate(group = glue::glue("Cluster: {.cluster}")) %>%
+    select(-.cluster),
+  d %>% 
+    summaries_rule_based(rule_based_all_remote),
+  d %>% 
+    summaries_rule_based(rule_based_primarily_teleworking_observation),
+  d %>% 
+    summaries_rule_based(rule_based_primarily_teleworking_working),
+  d %>% 
+    summaries_rule_based(rule_based_primarily_reporting_to_job_site_observation),
+  d %>% 
+    summaries_rule_based(rule_based_primarily_reporting_to_job_site_working),
+  d %>% 
+    summaries_rule_based(rule_based_mostly_teleworking_observation),
+  d %>% 
+    summaries_rule_based(rule_based_mostly_teleworking_working),
+  d %>% 
+    summaries_rule_based(rule_based_mostly_reporting_to_job_site_observation),
+  d %>% 
+    summaries_rule_based(rule_based_mostly_reporting_to_job_site_working),
+  d %>% 
+    summaries_rule_based(rule_based_position_category_missing),
+  d %>% 
+    summaries_rule_based(rule_based_position_category_onsite_flexible),
+  d %>% 
+    summaries_rule_based(rule_based_position_category_offsite),
+  d %>% 
+    summaries_rule_based(rule_based_position_category_onsite_required),
+  d %>% 
+    summaries_rule_based(rule_based_position_category_position_has_changed),
+  d %>% 
+    summaries_rule_based(rule_based_position_category_not_specified),
+  d %>% 
+    summaries_rule_based(rule_based_telework_onsite_minimum),
+)
+```
+
+### Daily telework
+
+```{r}
+prep_a %>% 
+  select(group,statistic,starts_with("daily_status_teleworking")) %>% 
+  rename_all(.funs = ~str_to_sentence(str_replace_all(.,"_"," "))) %>% 
+  flextable() %>% 
+   colformat_double(
+    big.mark = ",", decimal.mark = ".",
+    digits = 2,
+    na_str = "na") %>% 
+  autofit() %>% 
+  theme_zebra()
+```
+
+### Daily telework by day of week
+
+#### Monday
+
+```{r}
+prep_a %>% 
+  select(group,statistic,starts_with("mon_daily_status_teleworking")) %>% 
+  rename_all(.funs = ~str_to_sentence(str_replace_all(.,"_"," "))) %>% 
+  flextable() %>% 
+   colformat_double(
+    big.mark = ",", decimal.mark = ".",
+    digits = 2,
+    na_str = "na") %>% 
+  autofit() %>% 
+  theme_zebra()
+```
+
+#### Tuesday
+
+```{r}
+prep_a %>% 
+  select(group,statistic,starts_with("tue_daily_status_teleworking")) %>% 
+  rename_all(.funs = ~str_to_sentence(str_replace_all(.,"_"," "))) %>% 
+  flextable() %>% 
+   colformat_double(
+    big.mark = ",", decimal.mark = ".",
+    digits = 2,
+    na_str = "na") %>% 
+  autofit() %>% 
+  theme_zebra()
+```
+
+#### Wednesday
+
+```{r}
+prep_a %>% 
+  select(group,statistic,starts_with("wed_daily_status_teleworking")) %>% 
+  rename_all(.funs = ~str_to_sentence(str_replace_all(.,"_"," "))) %>% 
+  flextable() %>% 
+   colformat_double(
+    big.mark = ",", decimal.mark = ".",
+    digits = 2,
+    na_str = "na") %>% 
+  autofit() %>% 
+  theme_zebra()
+```
+
+#### Thursday
+
+```{r}
+prep_a %>% 
+  select(group,statistic,starts_with("thu_daily_status_teleworking")) %>% 
+  rename_all(.funs = ~str_to_sentence(str_replace_all(.,"_"," "))) %>% 
+  flextable() %>% 
+   colformat_double(
+    big.mark = ",", decimal.mark = ".",
+    digits = 2,
+    na_str = "na") %>% 
+  autofit() %>% 
+  theme_zebra()
+```
+
+#### Friday
+
+```{r}
+prep_a %>% 
+  select(group,statistic,starts_with("fri_daily_status_teleworking")) %>% 
+  rename_all(.funs = ~str_to_sentence(str_replace_all(.,"_"," "))) %>% 
+  flextable() %>% 
+   colformat_double(
+    big.mark = ",", decimal.mark = ".",
+    digits = 2,
+    na_str = "na") %>% 
+  autofit() %>% 
+  theme_zebra()
+```
+
+### Daily reporting to site
+
+```{r}
+prep_a %>% 
+  select(group,statistic,starts_with("daily_status_reporting_to_job_site")) %>% 
+  rename_all(.funs = ~str_to_sentence(str_replace_all(.,"_"," "))) %>% 
+  flextable() %>% 
+   colformat_double(
+    big.mark = ",", decimal.mark = ".",
+    digits = 2,
+    na_str = "na") %>% 
+  autofit() %>% 
+  theme_zebra()
+```
+
+### Team size
+
+```{r}
+prep_a %>% 
+  select(group,statistic,starts_with("team_size")) %>% 
+  rename_all(.funs = ~str_to_sentence(str_replace_all(.,"_"," "))) %>% 
+  flextable() %>% 
+   colformat_double(
+    big.mark = ",", decimal.mark = ".",
+    digits = 2,
+    na_str = "na") %>% 
+  autofit() %>% 
+  theme_zebra()
+```
+
+### Working days
+
+```{r}
+prep_a %>% 
+  select(group,statistic,starts_with("working_days")) %>% 
+  rename_all(.funs = ~str_to_sentence(str_replace_all(.,"_"," "))) %>% 
+  flextable() %>% 
+   colformat_double(
+    big.mark = ",", decimal.mark = ".",
+    digits = 2,
+    na_str = "na") %>% 
+  autofit() %>% 
+  theme_zebra()
+```
+
+### Co-located days with at least one team member
+
+```{r}
+prep_a %>% 
+  select(group,statistic,starts_with("days_colocated_1")) %>% 
+  rename_all(.funs = ~str_to_sentence(str_replace_all(.,"_"," "))) %>% 
+  flextable() %>% 
+   colformat_double(
+    big.mark = ",", decimal.mark = ".",
+    digits = 2,
+    na_str = "na") %>% 
+  autofit() %>% 
+  theme_zebra()
+```
+
+### Co-located days with at whole team
+
+```{r}
+prep_a %>% 
+  select(group,statistic,starts_with("days_colocated_team_")) %>% 
+  rename_all(.funs = ~str_to_sentence(str_replace_all(.,"_"," "))) %>% 
+  flextable() %>% 
+   colformat_double(
+    big.mark = ",", decimal.mark = ".",
+    digits = 2,
+    na_str = "na") %>% 
+  autofit() %>% 
+  theme_zebra()
+```
+
+### Co-located days with supervisor
+
+```{r}
+prep_a %>% 
+  select(group,statistic,starts_with("days_colocated_supervisor_")) %>% 
+  rename_all(.funs = ~str_to_sentence(str_replace_all(.,"_"," "))) %>% 
+  flextable() %>% 
+   colformat_double(
+    big.mark = ",", decimal.mark = ".",
+    digits = 2,
+    na_str = "na") %>% 
+  autofit() %>% 
+  theme_zebra()
+```
+
+### Days team teleworks
+
+```{r}
+prep_a %>% 
+  select(group,statistic,starts_with("days_telework_team_")) %>% 
+  rename_all(.funs = ~str_to_sentence(str_replace_all(.,"_"," "))) %>% 
+  flextable() %>% 
+   colformat_double(
+    big.mark = ",", decimal.mark = ".",
+    digits = 2,
+    na_str = "na") %>% 
+  autofit() %>% 
+  theme_zebra()
+```
+
+The principle work pattern statistics are as follows:
+
+-   Employee work pattern statistics:
+
+    -   Proportion in employee time onsite by the day of the week
+
+    -   Correlations of by employee time between the days of the week
+
+    -   Number exiting employment
+
+    -   Number changing supervisors
+
+## Descriptive statistics {.tabset .tabset-pills}
+
+ Employee descriptive statistics
+
+    -   Number and proportion of employees by grade
+
+    -   Number and proportion of employees by occupational series
+
+    -   Number and proportion of employees by position category
+
+    -   Number and proportion of employees by GSA region
+
+    -   Number and proportion of employees by SSO
+
+    -   Number and proportion of employees by state
+
+    -   Number and proportion of employees by city
+
+    -   Number and proportion of employees by supervisor level
+
+
+## Distributions by cluster {.tabset .tabset-pills}
+
+### Function
+
+Function to create a density plot for a specific numeric variable. 
+
+```{r}
+gg_density <- function(in_data,in_variable)
+{
+  in_variable_sym <- sym(in_variable)
+  
+  spec <- unique(in_data$specification)
+  
+  clus <- unique(in_data$k)
+
+  in_data %>% 
+  ggplot(aes(x = !!in_variable_sym, color = .cluster, fill = .cluster)) +
+  geom_density(alpha = .25) +
+    geomtextpath::geom_textdensity(aes(label = .cluster), 
+                   hjust = "ymax", 
+                   vjust = 1, text_only = TRUE, text_smoothing = 0, straight = TRUE) + 
+    oescolorrrs::scale_color_oes(palette = 'accent colors') +
+    oescolorrrs::scale_fill_oes(palette = 'accent colors') +
+    theme_fivethirtyeight() +
+    labs(
+      title = glue::glue("Histogram of `{in_variable}`"),
+      caption = glue::glue("For specification {spec} with {clus} clusters.")
+    ) +
+    theme(
+      legend.position = "none",
+      panel.background = element_rect(fill = "white"),
+      plot.background = element_rect(fill = "white"),
+      # panel.border = element_blank()
+    )
+}
+```
+
+### List of numeric variables
+
+```{r}
+num_vars <- 
+  d %>% 
+  select_if(is.numeric) %>% 
+  select(-k) %>% 
+  names()
+
+num_vars
+```
+
+### Distributions
+
+```{r}
+num_vars[1:20] %>% 
+  map(~gg_density(d,in_variable = .))
+```
+
+## Descriptive 
+
+
+
+The descriptive statistics are:
+
+-  
+The employees statistics will be calculated for the following groups:
+
+1.  Whole cohort of employees
+2.  By rule-based categories of work pattern
+3.  By cluster defined categories of work pattern
+
+## Scale data {.tabset .tabset-pills}
+
+Scaling the data in two ways:
+
+1.  Normalize - Data will have the mean that that element subtracted and
+    then divided by the standard deviation, using the `scale()`
+    function[^2]
+
+2.  Rank - The rank of each element will be used instead of the element.
+
+[^2]: [Documentation for the scale
+    function.](https://www.rdocumentation.org/packages/base/versions/3.6.2/topics/scale)
+
+```{r}
+d <- 
+  prep_employees %>% 
+  mutate(
+    across(
+      .cols = c(daily_status_reporting_to_job_site_working_prop,
+                daily_status_teleworking_working_prop,
+                daily_status_reporting_to_job_site_observation_prop,
+                daily_status_teleworking_observation_prop,
+                starts_with("mon_"),
+                starts_with("tue_"),
+                starts_with("wed_"),
+                starts_with("thu_"),
+                starts_with("fri_"),
+                working_days,
+                team_size_mode,
+                starts_with("days_colocated_"),
+                starts_with("days_telework_"),
+                -days_colocated_1,
+                -days_colocated_supervisor,
+                -days_colocated_team,
+                -days_telework_team
+                ),
+      .fns = list(scale = scale,rank = rank),
+      .names = "{.col}_{.fn}"
+    )
+  )
+```
+
+Review data.
+
+```{r}
+d %>% 
+  skim()
+```
+
+
+## Create clusters {.tabset .tabset-pills}
+
+### Functions
+
+#### Selecting data for cluster analysis
+
+```{r}
+#' Selects the correct columns for employee cluster analysis
+#'
+#' @param in_data Data to use
+#' @param in_scale_or_rank Option for which scaling procedure: "scale" (normalization) or "rank" (rank order)
+#' @param in_working_or_observation_window Option for proportion denominator: "observation" (proportion of entire observation window) or "working" (proportion of period employ was working onsite or via telework)
+#' @param in_weekday_correlation Option for inter weekday relationship: "correlation telework" (telework correlation between days of the week), "correlation status" (work status correlation based on ordered work status by days of the week), or "proportion pairs" (proportion of telework in pairs)
+#'
+#' @return Dataframe with only selected columns and dropped null observations
+#' @export
+#'
+#' @examples
+select_cluster_cols <-
+  function(in_data,
+           in_scale_or_rank,
+           in_working_or_observation_window,
+           in_weekday_correlation)
+  {
+    stopifnot(in_scale_or_rank %in% c("scale", "rank"))
+    stopifnot(in_working_or_observation_window %in% c("observation", "working"))
+    stopifnot(in_weekday_correlation %in% c("correlation telework", "correlation status","proportion pairs"))
+    
+    if (in_scale_or_rank == "scale" &
+        in_working_or_observation_window == "observation" &
+        in_weekday_correlation == "correlation telework")
+    {
+      step_01 <-
+        in_data %>%
+        select(
+          person_id,
+          ends_with("_scale"),
+          -contains("_working_prop_"),
+          -contains("_cor_status_"),
+          -contains("_prop_pairs_"),
+        ) %>%
+        drop_na()
+    }
+    
+    if (in_scale_or_rank == "rank" &
+        in_working_or_observation_window == "observation" &
+        in_weekday_correlation == "correlation telework")
+    {
+      step_01 <-
+        in_data %>%
+        select(
+          person_id,
+          ends_with("_rank"),
+          -contains("_working_prop_"),
+          -contains("_cor_status_"),
+          -contains("_prop_pairs_"),
+        ) %>%
+        drop_na()
+    }
+    
+    if (in_scale_or_rank == "scale" &
+        in_working_or_observation_window == "working" &
+        in_weekday_correlation == "correlation telework")
+    {
+      step_01 <-
+        in_data %>%
+        select(
+          person_id,
+          ends_with("_scale"),
+          -contains("_observation_"),
+          -contains("_cor_status_"),
+          -contains("_prop_pairs_"),
+        ) %>%
+        drop_na()
+    }
+    
+    if (in_scale_or_rank == "rank" &
+        in_working_or_observation_window == "working" &
+        in_weekday_correlation == "correlation telework")
+    {
+      step_01 <-
+        in_data %>%
+        select(
+          person_id,
+          ends_with("_rank"),
+          -contains("_observation_"),
+          -contains("_cor_status_"),
+          -contains("_prop_pairs_"),
+        ) %>%
+        drop_na()
+    }
+    
+    if (in_scale_or_rank == "scale" &
+        in_working_or_observation_window == "observation" &
+        in_weekday_correlation == "correlation status")
+    {
+      step_01 <-
+        in_data %>%
+        select(
+          person_id,
+          ends_with("_scale"),
+          -contains("_working_prop_"),
+          -contains("_cor_telework_"),
+          -contains("_prop_pairs_"),
+        ) %>%
+        drop_na()
+    }
+    
+    if (in_scale_or_rank == "rank" &
+        in_working_or_observation_window == "observation" &
+        in_weekday_correlation == "correlation status")
+    {
+      step_01 <-
+        in_data %>%
+        select(
+          person_id,
+          ends_with("_rank"),
+          -contains("_working_prop_"),
+          -contains("_cor_telework_"),
+          -contains("_prop_pairs_"),
+        ) %>%
+        drop_na()
+    }
+    
+    if (in_scale_or_rank == "scale" &
+        in_working_or_observation_window == "working" &
+        in_weekday_correlation == "correlation status")
+    {
+      step_01 <-
+        in_data %>%
+        select(
+          person_id,
+          ends_with("_scale"),
+          -contains("_observation_"),
+          -contains("_cor_telework_"),
+          -contains("_prop_pairs_"),
+        ) %>%
+        drop_na()
+    }
+    
+    if (in_scale_or_rank == "rank" &
+        in_working_or_observation_window == "working" &
+        in_weekday_correlation == "correlation status")
+    {
+      step_01 <-
+        in_data %>%
+        select(
+          person_id,
+          ends_with("_rank"),
+          -contains("_observation_"),
+          -contains("_cor_telework_"),
+          -contains("_prop_pairs_"),
+        ) %>%
+        drop_na()
+    }
+    
+    if (in_scale_or_rank == "scale" &
+        in_working_or_observation_window == "observation" &
+        in_weekday_correlation == "proportion pairs")
+    {
+      step_01 <-
+        in_data %>%
+        select(
+          person_id,
+          ends_with("_scale"),
+          -contains("_working_prop_"),
+          -contains("_cor_status_"),
+          -contains("cor_telework"),
+        ) %>%
+        drop_na()
+    }
+    
+    if (in_scale_or_rank == "rank" &
+        in_working_or_observation_window == "observation" &
+        in_weekday_correlation == "proportion pairs")
+    {
+      step_01 <-
+        in_data %>%
+        select(
+          person_id,
+          ends_with("_rank"),
+          -contains("_working_prop_"),
+          -contains("_cor_status_"),
+          -contains("cor_telework"),
+        ) %>%
+        drop_na()
+    }
+    
+    if (in_scale_or_rank == "scale" &
+        in_working_or_observation_window == "working" &
+        in_weekday_correlation == "proportion pairs")
+    {
+      step_01 <-
+        in_data %>%
+        select(
+          person_id,
+          ends_with("_scale"),
+          -contains("_observation_"),
+          -contains("_cor_status_"),
+          -contains("cor_telework"),
+        ) %>%
+        drop_na()
+    }
+    
+    if (in_scale_or_rank == "rank" &
+        in_working_or_observation_window == "working" &
+        in_weekday_correlation == "proportion pairs")
+    {
+      step_01 <-
+        in_data %>%
+        select(
+          person_id,
+          ends_with("_rank"),
+          -contains("_observation_"),
+          -contains("_cor_status_"),
+          -contains("cor_telework"),
+        ) %>%
+        drop_na()
+    }
+    
+    out <- 
+      step_01 %>% 
+      as_tibble()
+    
+    return(out)
+  }
+```
+
+#### Making clusters of different sizes
+
+```{r}
+#' Make employee clusters of a variety of sizes and different specifications
+#'
+#' @param in_data Data to use
+#' @param in_scale_or_rank Option for which scaling procedure: "scale" (normalization) or "rank" (rank order)
+#' @param in_working_or_observation_window Option for proportion denominator: "observation" (proportion of entire observation window) or "working" (proportion of period employ was working onsite or via telework)
+#' @param in_weekday_correlation Option for inter weekday relationship: "correlation telework" (telework correlation between days of the week), "correlation status" (work status correlation based on ordered work status by days of the week), or "proportion pairs" (proportion of telework in pairs)
+#' @param in_number_of_clusters_start Minimum number of clusters to test
+#' @param in_number_of_clusters_end Maximum number of clusters to test
+#'
+#' @return Dataframe of clusters and associatied statistics
+#' @export
+#'
+#' @examples
+make_clusters <-
+  function(in_data,
+           in_scale_or_rank,
+           in_working_or_observation_window,
+           in_weekday_correlation,
+           in_number_of_clusters_start,
+           in_number_of_clusters_end)
+  {
+    stopifnot(in_scale_or_rank %in% c("scale", "rank"))
+    stopifnot(in_working_or_observation_window %in% c("observation", "working"))
+    stopifnot(
+      in_weekday_correlation %in% c(
+        "correlation telework",
+        "correlation status",
+        "proportion pairs"
+      )
+    )
+    stopifnot(in_number_of_clusters_start >= 1)
+    stopifnot(in_number_of_clusters_start <= in_number_of_clusters_end)
+    
+    step_01 <-
+      in_data %>%
+      select_cluster_cols(
+        in_scale_or_rank = in_scale_or_rank,
+        in_working_or_observation_window = in_working_or_observation_window,
+        in_weekday_correlation = in_weekday_correlation
+      )
+    
+    print(glue::glue("Review data for step 1. {Sys.time()}"))
+    
+    step_01 %>%
+      skim() %>%
+      print()
+    
+    print(glue::glue("Remove person_id. {Sys.time()}"))
+    
+    step_02 <-
+      step_01 %>%
+      select(-person_id)
+    
+    print(glue::glue("Review data for step 2. {Sys.time()}"))
+    
+    step_02 %>%
+      skim() %>%
+      print()
+    
+    print(
+      glue::glue(
+        "Create clusters of the data from {in_number_of_clusters_start} to {in_number_of_clusters_end}. {Sys.time()}"
+      )
+    )
+    
+    out <-
+      tibble(k = in_number_of_clusters_start:in_number_of_clusters_end) %>%
+      mutate(
+        kclust = map(k, ~ kmeans(step_02, .x)),
+        tidied = map(kclust, tidy),
+        glanced = map(kclust, glance),
+        augmented = map(kclust, augment, step_01)
+      )
+    
+    return(out)
+  }
+```
+
+#### Making clusters of different sizes, but only for `d` and adding specification
+
+```{r}
+make_clusters_d <- function(in_specification,
+                            in_scale_or_rank,
+                            in_working_or_observation_window,
+                            in_weekday_correlation,
+                            in_number_of_clusters_start,
+                            in_number_of_clusters_end)
+{
+  make_clusters(
+    in_data = d,
+    in_scale_or_rank = in_scale_or_rank,
+    in_working_or_observation_window = in_working_or_observation_window,
+    in_weekday_correlation = in_weekday_correlation,
+    in_number_of_clusters_start = in_number_of_clusters_start,
+    in_number_of_clusters_end = in_number_of_clusters_end
+  ) %>%
+    mutate(specification = in_specification)
+}
+```
+
+### Create clusters
+
+#### Create dataframe of all permutations
+
+This table shows all permutations of scaling (normalization, or rank), denominators for proportions (observation window or working days), and types of inter day correlations.
+
+```{r}
+specs <- 
+  tibble(
+  in_scale_or_rank = c(rep("scale", 6), rep("rank", 6)),
+  in_working_or_observation_window = rep(c(rep("observation", 3), rep("working", 3)), 2),
+  in_weekday_correlation = rep(
+    c(
+      "correlation telework",
+      "correlation status",
+      "proportion pairs"
+    ),
+    4
+  ),
+  in_number_of_clusters_start = rep(params$in_number_of_clusters_start, 12),
+  in_number_of_clusters_end = rep(params$in_number_of_clusters_end, 12)
+) %>% 
+  unite(col = "in_specification",everything(),remove = FALSE)
+```
+
+Review data.
+
+```{r}
+specs
+```
+
+#### Create clusters
+
+Iterate over `specs` creating and collecting dataframe of clusters from all of the above specifications.
+
+```{r}
+kclusts <- 
+  specs %>%
+  pmap_dfr(make_clusters_d)
+```
+
+## Save data {.tabset .tabset-pills}
+
+File name.
+
+```{r}
+file_name <- glue::glue("clusters-employee-{Sys.Date()}.rdata")
+file_name
+```
+
+
+```{r}
+save(kclusts, file = file.path(params$google_drive_home,"03. Data Collection","prepared-data",file_name))
+```
+
+Remove all data elements.
+
+```{r}
+rm(list = ls())
+gc()
+```
+
+## Extraction time {.tabset .tabset-pills}
+
+```{r}
+tictoc::toc()
+```
