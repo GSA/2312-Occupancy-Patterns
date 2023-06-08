@@ -12,7 +12,7 @@ params:
   project_name: "Occupancy Patterns"
   google_drive_home: "G:/Shared drives/MSG Projects/1.0 Real Estate Solutions (LQ1)/2312 Work Patterns"
   data_folder_1: "prepared-data"
-  data_file_1: "clusters-employee-2023-06-01.rdata"
+  data_file_1: "clusters-employee-2023-06-08.rdata"
   data_file_2: "prep_employees_2023-05-24.rdata"
   in_number_of_clusters: 5
   in_specification: "scale_working_proportion_pairs_1_10"
