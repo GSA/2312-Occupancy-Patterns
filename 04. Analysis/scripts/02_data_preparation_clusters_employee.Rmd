@@ -1222,6 +1222,25 @@ prep_building <-
   left_join(prep_xx)
 ```
 
+### Exit employment
+
+Identify employees who had a report date earlier than the last reporting day.
+
+```{r}
+prep_a <-
+  cohort_panel %>% 
+  filter(date < max(date)) %>%
+  select(person_id, date) %>%
+  distinct()
+```
+
+Review data.
+
+```{r}
+prep_a %>% 
+  skim()
+```
+
 ## Define rule-based groups {.tabset .tabset-pills}
 
 The analysis plan defines nine rule-based groups for analysis:
