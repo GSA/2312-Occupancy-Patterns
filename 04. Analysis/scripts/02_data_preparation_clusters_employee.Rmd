@@ -290,7 +290,7 @@ For following variables are aggregated for the whole period by day of the week f
 
 -   Correlation of work status between days of the week
 
-#### Proportion of days remote by day of the week
+#### Proportion of days remote or reporting to site by day of the week
 
 First, calculating the number of days in the observation window.
 
@@ -349,7 +349,13 @@ Now collect only the results for telework.
 ```{r}
 prep_xx <- 
   prep_day_of_week %>% 
-  select(person_id,date_day_of_week,daily_status_teleworking_working_prop,daily_status_teleworking_observation_prop) %>% 
+  select(person_id,date_day_of_week,
+         daily_status_teleworking,
+         daily_status_teleworking_working_prop,
+         daily_status_teleworking_observation_prop,
+         daily_status_reporting_to_job_site,
+         daily_status_reporting_to_job_site_working_prop,
+         daily_status_reporting_to_job_site_observation_prop) %>% 
   pivot_longer(cols = starts_with("daily_status")) %>% 
   mutate(date_day_of_week = str_to_lower(date_day_of_week)) %>% 
   unite("name",date_day_of_week,name) %>% 
@@ -1229,8 +1235,20 @@ Identify employees who had a report date earlier than the last reporting day.
 ```{r}
 prep_a <-
   cohort_panel %>% 
-  filter(date < max(date)) %>%
-  select(person_id, date) %>%
+  select(person_id,date,daily_status_imputed) %>% 
+  arrange(person_id,date) %>% 
+  group_by(person_id) %>% 
+  summarise(
+    across(
+      .cols = c(date,daily_status_imputed),
+      .fns = last
+    )
+  ) %>% 
+  ungroup() %>%
+  mutate(
+    exit_employment = case_when(date < max(date) ~ 1,
+                                TRUE ~ 0)
+  ) %>% 
   distinct()
 ```
 
@@ -1239,6 +1257,99 @@ Review data.
 ```{r}
 prep_a %>% 
   skim()
+```
+
+Review grouping by `daily_status_imputed`.
+
+```{r}
+prep_a %>% 
+  group_by(daily_status_imputed) %>% 
+  skim()
+```
+
+Remove `daily_status_imputed`.
+
+```{r}
+prep_xx <- 
+  prep_a %>% 
+  select(-daily_status_imputed)
+```
+
+Review data.
+
+```{r}
+prep_xx %>% 
+  skim()
+```
+
+Check: These have the same number of unique `person_id`.
+
+```{r}
+cohort_ids %>% 
+  summarise(n_distinct(person_id)) %>% 
+  pull() ==
+  prep_xx %>% 
+  summarise(n_distinct(person_id)) %>% 
+  pull()
+```
+
+Join to `prep_building`.
+
+```{r}
+prep_building <- 
+  prep_building %>% 
+  left_join(prep_xx)
+```
+
+### Number of supervisors
+
+Count number of unique supervisors per employee.
+
+```{r}
+prep_xx <-
+  cohort_panel %>% 
+  select(person_id,supervisor_e_mail_address) %>% 
+  group_by(person_id) %>% 
+  summarise(
+    across(
+      .cols = c(supervisor_e_mail_address),
+      .fns = c(n_distinct = n_distinct),
+      .names = "{.col}_{.fn}"
+    )
+  ) %>% 
+  ungroup() %>%
+  mutate(
+    multiple_supervisors = case_when(supervisor_e_mail_address_n_distinct > 1 ~ 1,
+                                     supervisor_e_mail_address_n_distinct == 1 ~ 0,
+                                TRUE ~ 0)
+  ) %>% 
+  distinct()
+```
+
+Review data.
+
+```{r}
+prep_xx %>% 
+  skim()
+```
+
+Check: These have the same number of unique `person_id`.
+
+```{r}
+cohort_ids %>% 
+  summarise(n_distinct(person_id)) %>% 
+  pull() ==
+  prep_xx %>% 
+  summarise(n_distinct(person_id)) %>% 
+  pull()
+```
+
+Join to `prep_building`.
+
+```{r}
+prep_building <- 
+  prep_building %>% 
+  left_join(prep_xx)
 ```
 
 ## Define rule-based groups {.tabset .tabset-pills}
