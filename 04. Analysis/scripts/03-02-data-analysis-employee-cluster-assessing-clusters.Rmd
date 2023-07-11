@@ -15,7 +15,10 @@ params:
   data_file_1: "clusters-employee-2023-06-08.rdata"
   data_file_2: "prep_employees_2023-05-24.rdata"
   in_number_of_clusters: 5
+  in_number_of_clusters_start: 1
+  in_number_of_clusters_end: 10
   in_specification: "scale_working_proportion_pairs_1_10"
+  in_seed: 27
   
 ---
 
@@ -45,6 +48,10 @@ library(ggthemes)
 library(tidymodels)
 ```
 
+```{r}
+set.seed(params$in_seed)
+```
+
 # Data preparation {.tabset .tabset-pills}
 
 **Project number**: `r params$project_number`
@@ -60,6 +67,8 @@ library(tidymodels)
 **Number of clusters**: `r params$in_number_of_clusters`
 
 **Specification** `r params$in_specification`
+
+**Random seed** `r params$in_seed`
 
 ## Load data {.tabset .tabset-pills}
 
@@ -89,6 +98,88 @@ Review.
 prep_employees %>% 
   skim()
 ```
+
+### Functions
+
+#### Selecting data for cluster analysis
+
+```{r}
+source(here::here("04. Analysis","scripts","select_cluster_cols.R"))
+```
+
+#### Making clusters of different sizes
+
+```{r}
+source(here::here("04. Analysis","scripts","make_clusters.R"))
+```
+
+#### Making clusters visualizations using PCA
+
+```{r}
+source(here::here("04. Analysis","scripts","make_fviz_clusters.R"))
+```
+
+#### Creating d for cluster analysis
+
+```{r}
+source(here::here("04. Analysis","scripts","prep_employees_to_d.R"))
+```
+
+#### Making clusters  visualizations using PCA of different sizes, but only for `d` and adding specification
+
+```{r}
+make_fviz_clusters_d <- function(in_specification,
+                            in_scale_or_rank,
+                            in_working_or_observation_window,
+                            in_weekday_correlation,
+                            in_number_of_clusters_start,
+                            in_number_of_clusters_end)
+{
+  make_fviz_clusters(
+    in_data = d,
+    in_scale_or_rank = in_scale_or_rank,
+    in_working_or_observation_window = in_working_or_observation_window,
+    in_weekday_correlation = in_weekday_correlation,
+    in_number_of_clusters_start = in_number_of_clusters_start,
+    in_number_of_clusters_end = in_number_of_clusters_end
+  ) %>%
+    mutate(specification = in_specification)
+}
+```
+
+### Create clusters
+
+#### Create dataframe of all permutations
+
+This table shows all permutations of scaling (normalization, or rank), denominators for proportions (observation window or working days), and types of inter day correlations.
+
+```{r}
+source(here::here("04. Analysis","scripts","make_specs.R"))
+```
+
+Review data.
+
+```{r}
+specs
+```
+
+#### Create clusters
+
+Iterate over `specs` creating and collecting dataframe of clusters from all of the above specifications.
+
+```{r}
+v <- 
+  specs %>%
+  pmap_dfr(make_fviz_clusters_d)
+```
+
+
+```{r}
+v %>% #count(specification)
+  filter(specification == params$in_specification) %>% 
+  .$fviz_cluster
+```
+
 
 ```{r}
 clusters <- 
@@ -148,6 +239,7 @@ fviz_cluster(object = clust$kclust[[1]],
              data = prep_employees %>% select(where(is.numeric)) %>% drop_na()
              )
 ```
+
 
 
 ## Select and unnest data {.tabset .tabset-pills}
