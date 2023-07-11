@@ -18,6 +18,7 @@ params:
   observation_window_length_months: 6
   in_number_of_clusters_start: 1
   in_number_of_clusters_end: 10
+  in_seed: 27
   
 ---
 
@@ -54,7 +55,7 @@ date_observation_window_month_end <- ceiling_date(date_observation_window_month_
 ```
 
 ```{r}
-set.seed(27)
+set.seed(params$in_seed)
 ```
 
 
@@ -77,6 +78,8 @@ set.seed(27)
 **Observation window**: `r nice_month_year(date_cohort_month_start)` to `r nice_month_year(date_observation_window_month_end)` (`r params$observation_window_length_months` months)
 
 **Number of clusters**: Testing `r params$in_number_of_clusters_start` to `r params$in_number_of_clusters_end`
+
+**Random seed** `r params$in_seed`
 
 ## Load data {.tabset .tabset-pills}
 
@@ -150,307 +153,17 @@ d %>%
 #### Selecting data for cluster analysis
 
 ```{r}
-#' Selects the correct columns for employee cluster analysis
-#'
-#' @param in_data Data to use
-#' @param in_scale_or_rank Option for which scaling procedure: "scale" (normalization) or "rank" (rank order)
-#' @param in_working_or_observation_window Option for proportion denominator: "observation" (proportion of entire observation window) or "working" (proportion of period employ was working onsite or via telework)
-#' @param in_weekday_correlation Option for inter weekday relationship: "correlation telework" (telework correlation between days of the week), "correlation status" (work status correlation based on ordered work status by days of the week), or "proportion pairs" (proportion of telework in pairs)
-#'
-#' @return Dataframe with only selected columns and dropped null observations
-#' @export
-#'
-#' @examples
-select_cluster_cols <-
-  function(in_data,
-           in_scale_or_rank,
-           in_working_or_observation_window,
-           in_weekday_correlation)
-  {
-    stopifnot(in_scale_or_rank %in% c("scale", "rank"))
-    stopifnot(in_working_or_observation_window %in% c("observation", "working"))
-    stopifnot(in_weekday_correlation %in% c("correlation telework", "correlation status","proportion pairs"))
-    
-    if (in_scale_or_rank == "scale" &
-        in_working_or_observation_window == "observation" &
-        in_weekday_correlation == "correlation telework")
-    {
-      step_01 <-
-        in_data %>%
-        select(
-          person_id,
-          ends_with("_scale"),
-          -contains("_working_prop_"),
-          -contains("_cor_status_"),
-          -contains("_prop_pairs_"),
-        ) %>%
-        drop_na()
-    }
-    
-    if (in_scale_or_rank == "rank" &
-        in_working_or_observation_window == "observation" &
-        in_weekday_correlation == "correlation telework")
-    {
-      step_01 <-
-        in_data %>%
-        select(
-          person_id,
-          ends_with("_rank"),
-          -contains("_working_prop_"),
-          -contains("_cor_status_"),
-          -contains("_prop_pairs_"),
-        ) %>%
-        drop_na()
-    }
-    
-    if (in_scale_or_rank == "scale" &
-        in_working_or_observation_window == "working" &
-        in_weekday_correlation == "correlation telework")
-    {
-      step_01 <-
-        in_data %>%
-        select(
-          person_id,
-          ends_with("_scale"),
-          -contains("_observation_"),
-          -contains("_cor_status_"),
-          -contains("_prop_pairs_"),
-        ) %>%
-        drop_na()
-    }
-    
-    if (in_scale_or_rank == "rank" &
-        in_working_or_observation_window == "working" &
-        in_weekday_correlation == "correlation telework")
-    {
-      step_01 <-
-        in_data %>%
-        select(
-          person_id,
-          ends_with("_rank"),
-          -contains("_observation_"),
-          -contains("_cor_status_"),
-          -contains("_prop_pairs_"),
-        ) %>%
-        drop_na()
-    }
-    
-    if (in_scale_or_rank == "scale" &
-        in_working_or_observation_window == "observation" &
-        in_weekday_correlation == "correlation status")
-    {
-      step_01 <-
-        in_data %>%
-        select(
-          person_id,
-          ends_with("_scale"),
-          -contains("_working_prop_"),
-          -contains("_cor_telework_"),
-          -contains("_prop_pairs_"),
-        ) %>%
-        drop_na()
-    }
-    
-    if (in_scale_or_rank == "rank" &
-        in_working_or_observation_window == "observation" &
-        in_weekday_correlation == "correlation status")
-    {
-      step_01 <-
-        in_data %>%
-        select(
-          person_id,
-          ends_with("_rank"),
-          -contains("_working_prop_"),
-          -contains("_cor_telework_"),
-          -contains("_prop_pairs_"),
-        ) %>%
-        drop_na()
-    }
-    
-    if (in_scale_or_rank == "scale" &
-        in_working_or_observation_window == "working" &
-        in_weekday_correlation == "correlation status")
-    {
-      step_01 <-
-        in_data %>%
-        select(
-          person_id,
-          ends_with("_scale"),
-          -contains("_observation_"),
-          -contains("_cor_telework_"),
-          -contains("_prop_pairs_"),
-        ) %>%
-        drop_na()
-    }
-    
-    if (in_scale_or_rank == "rank" &
-        in_working_or_observation_window == "working" &
-        in_weekday_correlation == "correlation status")
-    {
-      step_01 <-
-        in_data %>%
-        select(
-          person_id,
-          ends_with("_rank"),
-          -contains("_observation_"),
-          -contains("_cor_telework_"),
-          -contains("_prop_pairs_"),
-        ) %>%
-        drop_na()
-    }
-    
-    if (in_scale_or_rank == "scale" &
-        in_working_or_observation_window == "observation" &
-        in_weekday_correlation == "proportion pairs")
-    {
-      step_01 <-
-        in_data %>%
-        select(
-          person_id,
-          ends_with("_scale"),
-          -contains("_working_prop_"),
-          -contains("_cor_status_"),
-          -contains("cor_telework"),
-        ) %>%
-        drop_na()
-    }
-    
-    if (in_scale_or_rank == "rank" &
-        in_working_or_observation_window == "observation" &
-        in_weekday_correlation == "proportion pairs")
-    {
-      step_01 <-
-        in_data %>%
-        select(
-          person_id,
-          ends_with("_rank"),
-          -contains("_working_prop_"),
-          -contains("_cor_status_"),
-          -contains("cor_telework"),
-        ) %>%
-        drop_na()
-    }
-    
-    if (in_scale_or_rank == "scale" &
-        in_working_or_observation_window == "working" &
-        in_weekday_correlation == "proportion pairs")
-    {
-      step_01 <-
-        in_data %>%
-        select(
-          person_id,
-          ends_with("_scale"),
-          -contains("_observation_"),
-          -contains("_cor_status_"),
-          -contains("cor_telework"),
-        ) %>%
-        drop_na()
-    }
-    
-    if (in_scale_or_rank == "rank" &
-        in_working_or_observation_window == "working" &
-        in_weekday_correlation == "proportion pairs")
-    {
-      step_01 <-
-        in_data %>%
-        select(
-          person_id,
-          ends_with("_rank"),
-          -contains("_observation_"),
-          -contains("_cor_status_"),
-          -contains("cor_telework"),
-        ) %>%
-        drop_na()
-    }
-    
-    out <- 
-      step_01 %>% 
-      as_tibble()
-    
-    return(out)
-  }
+source(here::here("04. Analysis","scripts","select_cluster_cols.R"))
 ```
 
 #### Making clusters of different sizes
 
 ```{r}
-#' Make employee clusters of a variety of sizes and different specifications
-#'
-#' @param in_data Data to use
-#' @param in_scale_or_rank Option for which scaling procedure: "scale" (normalization) or "rank" (rank order)
-#' @param in_working_or_observation_window Option for proportion denominator: "observation" (proportion of entire observation window) or "working" (proportion of period employ was working onsite or via telework)
-#' @param in_weekday_correlation Option for inter weekday relationship: "correlation telework" (telework correlation between days of the week), "correlation status" (work status correlation based on ordered work status by days of the week), or "proportion pairs" (proportion of telework in pairs)
-#' @param in_number_of_clusters_start Minimum number of clusters to test
-#' @param in_number_of_clusters_end Maximum number of clusters to test
-#'
-#' @return Dataframe of clusters and associatied statistics
-#' @export
-#'
-#' @examples
-make_clusters <-
-  function(in_data,
-           in_scale_or_rank,
-           in_working_or_observation_window,
-           in_weekday_correlation,
-           in_number_of_clusters_start,
-           in_number_of_clusters_end)
-  {
-    stopifnot(in_scale_or_rank %in% c("scale", "rank"))
-    stopifnot(in_working_or_observation_window %in% c("observation", "working"))
-    stopifnot(
-      in_weekday_correlation %in% c(
-        "correlation telework",
-        "correlation status",
-        "proportion pairs"
-      )
-    )
-    stopifnot(in_number_of_clusters_start >= 1)
-    stopifnot(in_number_of_clusters_start <= in_number_of_clusters_end)
-    
-    step_01 <-
-      in_data %>%
-      select_cluster_cols(
-        in_scale_or_rank = in_scale_or_rank,
-        in_working_or_observation_window = in_working_or_observation_window,
-        in_weekday_correlation = in_weekday_correlation
-      )
-    
-    print(glue::glue("Review data for step 1. {Sys.time()}"))
-    
-    step_01 %>%
-      skim() %>%
-      print()
-    
-    print(glue::glue("Remove person_id. {Sys.time()}"))
-    
-    step_02 <-
-      step_01 %>%
-      select(-person_id)
-    
-    print(glue::glue("Review data for step 2. {Sys.time()}"))
-    
-    step_02 %>%
-      skim() %>%
-      print()
-    
-    print(
-      glue::glue(
-        "Create clusters of the data from {in_number_of_clusters_start} to {in_number_of_clusters_end}. {Sys.time()}"
-      )
-    )
-    
-    out <-
-      tibble(k = in_number_of_clusters_start:in_number_of_clusters_end) %>%
-      mutate(
-        kclust = map(k, ~ kmeans(step_02, .x)),
-        tidied = map(kclust, tidy),
-        glanced = map(kclust, glance),
-        augmented = map(kclust, augment, step_01)
-      )
-    
-    return(out)
-  }
+source(here::here("04. Analysis","scripts","make_clusters.R"))
 ```
+
+
+
 
 #### Making clusters of different sizes, but only for `d` and adding specification
 
@@ -480,23 +193,9 @@ make_clusters_d <- function(in_specification,
 
 This table shows all permutations of scaling (normalization, or rank), denominators for proportions (observation window or working days), and types of inter day correlations.
 
+
 ```{r}
-specs <- 
-  tibble(
-  in_scale_or_rank = c(rep("scale", 6), rep("rank", 6)),
-  in_working_or_observation_window = rep(c(rep("observation", 3), rep("working", 3)), 2),
-  in_weekday_correlation = rep(
-    c(
-      "correlation telework",
-      "correlation status",
-      "proportion pairs"
-    ),
-    4
-  ),
-  in_number_of_clusters_start = rep(params$in_number_of_clusters_start, 12),
-  in_number_of_clusters_end = rep(params$in_number_of_clusters_end, 12)
-) %>% 
-  unite(col = "in_specification",everything(),remove = FALSE)
+source(here::here("04. Analysis","scripts","make_specs.R"))
 ```
 
 Review data.
