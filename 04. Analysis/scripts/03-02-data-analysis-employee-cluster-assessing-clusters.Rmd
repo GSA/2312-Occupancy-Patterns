@@ -99,33 +99,33 @@ prep_employees %>%
   skim()
 ```
 
-### Functions
+## Functions {.tabset .tabset-pills}
 
-#### Selecting data for cluster analysis
+### Selecting data for cluster analysis
 
 ```{r}
 source(here::here("04. Analysis","scripts","select_cluster_cols.R"))
 ```
 
-#### Making clusters of different sizes
+### Making clusters of different sizes
 
 ```{r}
 source(here::here("04. Analysis","scripts","make_clusters.R"))
 ```
 
-#### Making clusters visualizations using PCA
+### Making clusters visualizations using PCA
 
 ```{r}
 source(here::here("04. Analysis","scripts","make_fviz_clusters.R"))
 ```
 
-#### Creating d for cluster analysis
+### Creating d for cluster analysis
 
 ```{r}
 source(here::here("04. Analysis","scripts","prep_employees_to_d.R"))
 ```
 
-#### Making clusters  visualizations using PCA of different sizes, but only for `d` and adding specification
+### Making clusters  visualizations using PCA of different sizes, but only for `d` and adding specification
 
 ```{r}
 make_fviz_clusters_d <- function(in_specification,
@@ -147,7 +147,40 @@ make_fviz_clusters_d <- function(in_specification,
 }
 ```
 
-### Create clusters
+## Intra-cluster visualizations {.tabset .tabset-pills}
+
+### Unnest
+
+```{r}
+clusters <- 
+  kclusts %>%
+  unnest(cols = c(tidied))
+
+assignments <- 
+  kclusts %>% 
+  unnest(cols = c(augmented))
+
+clusterings <- 
+  kclusts %>%
+  unnest(cols = c(glanced))
+
+```
+
+### Elbow
+
+```{r}
+clusterings %>% 
+  ggplot(aes(x = k, y = tot.withinss, color = specification)) +
+  geom_line() +
+  geom_point() +
+  facet_wrap(facets = vars(specification),
+             scales = "free")
+
+```
+
+## Inter-cluster visaulizations {.tabset .tabset-pills}
+
+### Two-dimensional groupings
 
 #### Create dataframe of all permutations
 
@@ -201,15 +234,7 @@ clusterings %>% skim()
 ```
 
 
-```{r}
-clusterings %>% 
-  ggplot(aes(x = k, y = tot.withinss, color = specification)) +
-  geom_line() +
-  geom_point() +
-  facet_wrap(facets = vars(specification),
-             scales = "free")
 
-```
 
 ```{r}
 clust <- 
@@ -268,25 +293,7 @@ kclusts %>%
   count(specification)
 ```
 
-### Unnest
 
-Filter to data with `r params$in_number_of_clusters` clusters with specification `r params$in_specification`.
-
-
-```{r}
-clusters <- 
-  kclusts %>%
-  unnest(cols = c(tidied))
-
-assignments <- 
-  kclusts %>% 
-  unnest(cols = c(augmented))
-
-clusterings <- 
-  kclusts %>%
-  unnest(cols = c(glanced))
-
-```
 
 
 ## Scale data {.tabset .tabset-pills}
