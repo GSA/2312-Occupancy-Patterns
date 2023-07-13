@@ -46,6 +46,7 @@ library(readxl)
 library(flextable)
 library(ggthemes)
 library(tidymodels)
+library(cluster)
 ```
 
 ```{r}
@@ -177,6 +178,74 @@ clusterings %>%
              scales = "free")
 
 ```
+
+### Average silhouette
+
+```{r}
+avg_sil <- function(k) {
+  km.res <- kmeans(df, centers = k, nstart = 25)
+  ss <- silhouette(km.res$cluster, dist(df))
+  mean(ss[, 3])
+}
+
+k.values <- 2:15
+
+# extract avg silhouette for 2-15 clusters
+avg_sil_values <- map_dbl(k.values, avg_sil)
+
+step_01 <- tibble(
+  k = k.values,
+  silh = avg_sil_values
+)
+
+step_01 %>% 
+  ggplot(aes(x = k.values, y = silh)) +
+  geom_point() +
+  geom_line()
+
+plot(k.values, avg_sil_values,
+       type = "b", pch = 19, frame = FALSE, 
+       xlab = "Number of clusters K",
+       ylab = "Average Silhouettes")
+
+fviz_nbclust(df, kmeans, method = "silhouette") +
+  theme_economist()
+```
+
+```{r}
+df <- iris %>% select(where(is.numeric)) %>% drop_na()
+```
+
+```{r}
+d %>% 
+  select_cluster_cols(in_scale_or_rank = "scale",
+                      in_working_or_observation_window = "working",
+                      in_weekday_correlation = "correlation telework") %>% 
+  select(where(is.numeric)) %>% 
+  fviz_nbclust(., kmeans, method = "silhouette") +
+  theme_fivethirtyeight()
+```
+
+
+
+### Gap statistic
+
+```{r}
+gap_stat <- d %>% 
+  select_cluster_cols(in_scale_or_rank = "scale",
+                      in_working_or_observation_window = "working",
+                      in_weekday_correlation = "correlation telework") %>%
+  select(where(is.numeric)) %>% 
+  clusGap(., FUN = kmeans, nstart = 25,
+                    K.max = 10, B = 50)
+```
+
+```{r}
+fviz_gap_stat(gap_stat)
+```
+
+
+
 
 ## Inter-cluster visaulizations {.tabset .tabset-pills}
 
