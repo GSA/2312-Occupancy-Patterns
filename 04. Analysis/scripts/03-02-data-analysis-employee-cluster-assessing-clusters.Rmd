@@ -126,7 +126,7 @@ source(here::here("04. Analysis","scripts","make_fviz_clusters.R"))
 source(here::here("04. Analysis","scripts","prep_employees_to_d.R"))
 ```
 
-### Making clusters  visualizations using PCA of different sizes, but only for `d` and adding specification
+### Making clusters visualizations using PCA of different sizes, but only for `d` and adding specification
 
 ```{r}
 make_fviz_clusters_d <- function(in_specification,
@@ -146,6 +146,91 @@ make_fviz_clusters_d <- function(in_specification,
   ) %>%
     mutate(specification = in_specification)
 }
+```
+
+### Making elbow visualizations
+
+```{r}
+make_elbow_d <- function(in_specification,
+                         in_scale_or_rank,
+                         in_working_or_observation_window,
+                         in_weekday_correlation)
+{
+  d %>%
+    select_cluster_cols(
+      in_scale_or_rank = in_scale_or_rank,
+      in_working_or_observation_window = in_working_or_observation_window,
+      in_weekday_correlation = in_weekday_correlation
+    ) %>%
+    select(where(is.numeric)) %>%
+    fviz_nbclust(., kmeans, method = "wss") +
+    theme_fivethirtyeight()
+}
+
+```
+
+### Making silhouette visualizations
+
+```{r}
+make_silhouette_d <- function(in_specification,
+                              in_scale_or_rank,
+                              in_working_or_observation_window,
+                              in_weekday_correlation)
+{
+  d %>%
+    select_cluster_cols(
+      in_scale_or_rank = in_scale_or_rank,
+      in_working_or_observation_window = in_working_or_observation_window,
+      in_weekday_correlation = in_weekday_correlation
+    ) %>%
+    select(where(is.numeric)) %>%
+    fviz_nbclust(., kmeans, method = "silhouette") +
+    theme_fivethirtyeight()
+}
+
+```
+
+### Making gap statistic visualizations
+
+```{r}
+make_gap_stat_d <- function(in_specification,
+                              in_scale_or_rank,
+                              in_working_or_observation_window,
+                              in_weekday_correlation)
+{
+  d %>%
+    select_cluster_cols(
+      in_scale_or_rank = in_scale_or_rank,
+      in_working_or_observation_window = in_working_or_observation_window,
+      in_weekday_correlation = in_weekday_correlation
+    ) %>%
+    select(where(is.numeric)) %>%
+    fviz_nbclust(.,  kmeans, 
+               nstart = 25,
+               method = "gap_stat", 
+               nboot = 10,
+               # algorithm="Lloyd",
+               algorithm="MacQueen",
+               iter.max=200,
+               verbose = TRUE) +
+    theme_fivethirtyeight()
+}
+
+```
+
+
+## Create dataframe of all permutations {.tabset .tabset-pills}
+
+This table shows all permutations of scaling (normalization, or rank), denominators for proportions (observation window or working days), and types of inter day correlations.
+
+```{r}
+source(here::here("04. Analysis","scripts","make_specs.R"))
+```
+
+Review data.
+
+```{r}
+specs
 ```
 
 ## Intra-cluster visualizations {.tabset .tabset-pills}
@@ -174,47 +259,18 @@ clusterings %>%
   ggplot(aes(x = k, y = tot.withinss, color = specification)) +
   geom_line() +
   geom_point() +
-  facet_wrap(facets = vars(specification),
-             scales = "free")
+  # facet_wrap(facets = vars(specification),
+  #            scales = "free") +
+  facet_grid(
+    rows = "specification",
+    scales = "free"
+  ) +
+  theme(
+    legend.position = "none"
+  )
 
 ```
 
-### Average silhouette
-
-```{r}
-avg_sil <- function(k) {
-  km.res <- kmeans(df, centers = k, nstart = 25)
-  ss <- silhouette(km.res$cluster, dist(df))
-  mean(ss[, 3])
-}
-
-k.values <- 2:15
-
-# extract avg silhouette for 2-15 clusters
-avg_sil_values <- map_dbl(k.values, avg_sil)
-
-step_01 <- tibble(
-  k = k.values,
-  silh = avg_sil_values
-)
-
-step_01 %>% 
-  ggplot(aes(x = k.values, y = silh)) +
-  geom_point() +
-  geom_line()
-
-plot(k.values, avg_sil_values,
-       type = "b", pch = 19, frame = FALSE, 
-       xlab = "Number of clusters K",
-       ylab = "Average Silhouettes")
-
-fviz_nbclust(df, kmeans, method = "silhouette") +
-  theme_economist()
-```
-
-```{r}
-df <- iris %>% select(where(is.numeric)) %>% drop_na()
-```
 
 ```{r}
 d %>% 
@@ -222,29 +278,66 @@ d %>%
                       in_working_or_observation_window = "working",
                       in_weekday_correlation = "correlation telework") %>% 
   select(where(is.numeric)) %>% 
-  fviz_nbclust(., kmeans, method = "silhouette") +
+  fviz_nbclust(., kmeans, method = "wss") +
   theme_fivethirtyeight()
 ```
 
+```{r}
+make_elbow_d(in_scale_or_rank = "scale",
+                      in_working_or_observation_window = "working",
+                      in_weekday_correlation = "correlation telework")
+```
 
+### Average silhouette
+
+```{r}
+make_silhouette_d(in_scale_or_rank = "scale",
+                      in_working_or_observation_window = "working",
+                      in_weekday_correlation = "correlation telework")
+```
+
+```{r}
+kclusts <- 
+  specs %>%
+  pmap_dfr(make_clusters_d)
+```
+
+Add underscore to specification.
+
+```{r}
+kclusts <- 
+  kclusts %>% 
+  mutate(
+    specification = str_replace_all(specification," ","_")
+  )
+```
 
 ### Gap statistic
 
 ```{r}
-gap_stat <- d %>% 
+gc()
+d %>% 
   select_cluster_cols(in_scale_or_rank = "scale",
                       in_working_or_observation_window = "working",
-                      in_weekday_correlation = "correlation telework") %>%
+                      in_weekday_correlation = "correlation telework") %>% 
   select(where(is.numeric)) %>% 
-  clusGap(., FUN = kmeans, nstart = 25,
-                    K.max = 10, B = 50)
+  fviz_nbclust(.,  kmeans, 
+               nstart = 25,
+               method = "gap_stat", 
+               nboot = 10,
+               # algorithm="Lloyd",
+               algorithm="MacQueen",
+               iter.max=200,
+               verbose = TRUE) +
+  theme_fivethirtyeight()
 ```
 
 ```{r}
-fviz_gap_stat(gap_stat)
+gc()
+make_gap_stat_d(in_scale_or_rank = "scale",
+                      in_working_or_observation_window = "working",
+                      in_weekday_correlation = "correlation telework")
 ```
-
-
 
 
 ## Inter-cluster visaulizations {.tabset .tabset-pills}
@@ -265,7 +358,7 @@ Review data.
 specs
 ```
 
-#### Create clusters
+#### Create cluster visualizations
 
 Iterate over `specs` creating and collecting dataframe of clusters from all of the above specifications.
 
@@ -277,7 +370,7 @@ v <-
 
 
 ```{r}
-v %>% #count(specification)
+v %>% 
   filter(specification == params$in_specification) %>% 
   .$fviz_cluster
 ```
