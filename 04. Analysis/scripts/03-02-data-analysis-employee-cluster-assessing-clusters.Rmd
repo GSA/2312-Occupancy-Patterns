@@ -19,7 +19,6 @@ params:
   in_number_of_clusters_end: 10
   in_specification: "scale_working_proportion_pairs_1_10"
   in_seed: 27
-  
 ---
 
 ```{r setup, include=FALSE}
@@ -86,7 +85,6 @@ kclusts %>%
   skim()
 ```
 
-
 Load `r params$data_file_2` from `r params$data_folder_1` data folder.
 
 ```{r}
@@ -150,6 +148,8 @@ make_fviz_clusters_d <- function(in_specification,
 
 ### Making elbow visualizations
 
+Generates 1 to 10 new clusters for specifications and creates elbow charts for each specification.
+
 ```{r}
 make_elbow_d <- function(in_specification,
                          in_scale_or_rank,
@@ -163,13 +163,28 @@ make_elbow_d <- function(in_specification,
       in_weekday_correlation = in_weekday_correlation
     ) %>%
     select(where(is.numeric)) %>%
-    fviz_nbclust(., kmeans, method = "wss") +
-    theme_fivethirtyeight()
+    fviz_nbclust(
+      .,
+      kmeans,
+      method = "wss",
+      nstart = 25,
+      nboot = 10,
+      # algorithm="Lloyd",
+      algorithm = "MacQueen",
+      iter.max = 200,
+      verbose = TRUE
+    ) +
+    theme_fivethirtyeight() +
+  labs(
+    subtitle = in_specification
+  )
 }
 
 ```
 
 ### Making silhouette visualizations
+
+Generates 1 to 10 new clusters for specifications and creates average silhouette charts for each specification.
 
 ```{r}
 make_silhouette_d <- function(in_specification,
@@ -184,19 +199,34 @@ make_silhouette_d <- function(in_specification,
       in_weekday_correlation = in_weekday_correlation
     ) %>%
     select(where(is.numeric)) %>%
-    fviz_nbclust(., kmeans, method = "silhouette") +
-    theme_fivethirtyeight()
+    fviz_nbclust(
+      .,
+      kmeans,
+      method = "silhouette",
+      nstart = 25,
+      nboot = 10,
+      # algorithm="Lloyd",
+      algorithm = "MacQueen",
+      iter.max = 200,
+      verbose = TRUE
+    ) +
+    theme_fivethirtyeight() +
+  labs(
+    subtitle = in_specification
+  )
 }
 
 ```
 
 ### Making gap statistic visualizations
 
+Generates 1 to 10 new clusters for specifications and creates gap statistic charts for each specification.
+
 ```{r}
 make_gap_stat_d <- function(in_specification,
-                              in_scale_or_rank,
-                              in_working_or_observation_window,
-                              in_weekday_correlation)
+                            in_scale_or_rank,
+                            in_working_or_observation_window,
+                            in_weekday_correlation)
 {
   d %>%
     select_cluster_cols(
@@ -205,19 +235,59 @@ make_gap_stat_d <- function(in_specification,
       in_weekday_correlation = in_weekday_correlation
     ) %>%
     select(where(is.numeric)) %>%
-    fviz_nbclust(.,  kmeans, 
-               nstart = 25,
-               method = "gap_stat", 
-               nboot = 10,
-               # algorithm="Lloyd",
-               algorithm="MacQueen",
-               iter.max=200,
-               verbose = TRUE) +
-    theme_fivethirtyeight()
+    fviz_nbclust(
+      .,
+      kmeans,
+      nstart = 25,
+      method = "gap_stat",
+      nboot = 10,
+      # algorithm="Lloyd",
+      algorithm = "MacQueen",
+      iter.max = 200,
+      verbose = TRUE
+    ) +
+    theme_fivethirtyeight() +
+  labs(
+    subtitle = in_specification
+  )
 }
 
 ```
 
+### Making silhouette diagram visualizations[^1]
+
+[^1]: <https://rdrr.io/cran/factoextra/man/fviz_silhouette.html>
+
+Generates a specific number of clusters for specifications and creates silhouette diagram charts for each specification and cluster number.
+
+```{r}
+make_fviz_silhouette_d <- function(in_specification,
+                            in_scale_or_rank,
+                            in_working_or_observation_window,
+                            in_weekday_correlation,
+                            in_clusters)
+{
+  step_01 <- 
+    d %>%
+    select_cluster_cols(
+      in_scale_or_rank = in_scale_or_rank,
+      in_working_or_observation_window = in_working_or_observation_window,
+      in_weekday_correlation = in_weekday_correlation
+    ) %>%
+    select(where(is.numeric)) 
+  
+  km.res <- kmeans(step_01, in_clusters, nstart = 2)
+  
+  sil <- silhouette(km.res$cluster, dist(step_01))
+  
+  fviz_silhouette(sil) +
+    theme_fivethirtyeight() +
+  labs(
+    subtitle = in_specification
+  )
+}
+
+```
 
 ## Create dataframe of all permutations {.tabset .tabset-pills}
 
@@ -235,673 +305,155 @@ specs
 
 ## Intra-cluster visualizations {.tabset .tabset-pills}
 
-### Unnest
-
-```{r}
-clusters <- 
-  kclusts %>%
-  unnest(cols = c(tidied))
-
-assignments <- 
-  kclusts %>% 
-  unnest(cols = c(augmented))
-
-clusterings <- 
-  kclusts %>%
-  unnest(cols = c(glanced))
-
-```
-
 ### Elbow
 
 ```{r}
-clusterings %>% 
-  ggplot(aes(x = k, y = tot.withinss, color = specification)) +
-  geom_line() +
-  geom_point() +
-  # facet_wrap(facets = vars(specification),
-  #            scales = "free") +
-  facet_grid(
-    rows = "specification",
-    scales = "free"
-  ) +
-  theme(
-    legend.position = "none"
-  )
-
-```
-
-
-```{r}
-d %>% 
-  select_cluster_cols(in_scale_or_rank = "scale",
-                      in_working_or_observation_window = "working",
-                      in_weekday_correlation = "correlation telework") %>% 
-  select(where(is.numeric)) %>% 
-  fviz_nbclust(., kmeans, method = "wss") +
-  theme_fivethirtyeight()
-```
-
-```{r}
-make_elbow_d(in_scale_or_rank = "scale",
-                      in_working_or_observation_window = "working",
-                      in_weekday_correlation = "correlation telework")
-```
-
-### Average silhouette
-
-```{r}
-make_silhouette_d(in_scale_or_rank = "scale",
-                      in_working_or_observation_window = "working",
-                      in_weekday_correlation = "correlation telework")
-```
-
-```{r}
-kclusts <- 
+elbows <- 
   specs %>%
-  pmap_dfr(make_clusters_d)
+   select(
+    in_scale_or_rank,
+    in_working_or_observation_window,
+    in_weekday_correlation,
+    in_specification
+  ) %>%
+  distinct() %>% 
+  pmap(make_elbow_d)
 ```
 
-Add underscore to specification.
+The elbow charts below look consistent across the different specifications of clusters. Five clusters appears to be an acceptable number of clusters by this metric.
 
 ```{r}
-kclusts <- 
-  kclusts %>% 
-  mutate(
-    specification = str_replace_all(specification," ","_")
-  )
+elbows
+```
+
+### Silhouette score
+
+```{r}
+silhouette_scores <-
+  specs %>%
+  select(
+    in_scale_or_rank,
+    in_working_or_observation_window,
+    in_weekday_correlation,
+    in_specification
+  ) %>%
+  distinct() %>%
+  # slice_head(n = 1) %>%
+  pmap(make_silhouette_d)
+```
+
+The mean silhouette coefficient measures how close a point in one cluster is the the points in neighboring clusters.
+
+Mathematically this is:
+
+$$
+\frac{b-a}{max(a,b)}
+$$
+
+where $a$ is the mean distance to other points in the same cluster and $b$ is the mean nearest cluster distance[^2].
+
+[^2]: <https://medium.com/geekculture/stop-using-the-elbow-method-96bcfbbbe9fd>
+
+Average silhouette charts below suggest a different number of clusters than the elbow charts above. Most specifications recommend only two clusters, though three clusters are recommended for the specification where the observation window time is used to calculate percentages, the intra-workday correlations are calculated from an indicator for telework, and scaling is done by ranks.
+
+```{r}
+silhouette_scores
 ```
 
 ### Gap statistic
 
 ```{r}
 gc()
-d %>% 
-  select_cluster_cols(in_scale_or_rank = "scale",
-                      in_working_or_observation_window = "working",
-                      in_weekday_correlation = "correlation telework") %>% 
-  select(where(is.numeric)) %>% 
-  fviz_nbclust(.,  kmeans, 
-               nstart = 25,
-               method = "gap_stat", 
-               nboot = 10,
-               # algorithm="Lloyd",
-               algorithm="MacQueen",
-               iter.max=200,
-               verbose = TRUE) +
-  theme_fivethirtyeight()
+gap_stats <- 
+  specs %>%
+   select(
+    in_scale_or_rank,
+    in_working_or_observation_window,
+    in_weekday_correlation,
+    in_specification
+  ) %>%
+  distinct() %>% 
+  pmap(make_gap_stat_d)
 ```
 
 ```{r}
-gc()
-make_gap_stat_d(in_scale_or_rank = "scale",
-                      in_working_or_observation_window = "working",
-                      in_weekday_correlation = "correlation telework")
+gap_stats
 ```
-
 
 ## Inter-cluster visaulizations {.tabset .tabset-pills}
 
-### Two-dimensional groupings
-
-#### Create dataframe of all permutations
-
-This table shows all permutations of scaling (normalization, or rank), denominators for proportions (observation window or working days), and types of inter day correlations.
-
-```{r}
-source(here::here("04. Analysis","scripts","make_specs.R"))
-```
-
-Review data.
-
-```{r}
-specs
-```
-
-#### Create cluster visualizations
+### PCA cluster visualizations
 
 Iterate over `specs` creating and collecting dataframe of clusters from all of the above specifications.
 
 ```{r}
-v <- 
+pca <- 
   specs %>%
+  slice_head(n = 1) %>% 
   pmap_dfr(make_fviz_clusters_d)
 ```
 
-
 ```{r}
-v %>% 
-  filter(specification == params$in_specification) %>% 
+pca %>% 
+  # filter(specification == params$in_specification) %>% 
   .$fviz_cluster
 ```
 
+### Silhouette diagram visualizations
 
 ```{r}
-clusters <- 
-  kclusts %>%
-  unnest(cols = c(tidied))
-
-assignments <- 
-  kclusts %>% 
-  unnest(cols = c(augmented))
-
-clusterings <- 
-  kclusts %>%
-  unnest(cols = c(glanced))
-
-```
-
-```{r}
-clusterings %>% skim()
-```
-
-
-
-
-```{r}
-clust <- 
-  kclusts %>% 
-  filter(
-    k == 5 &
-      specification == params$in_specification
-  )
-```
-
-```{r}
-# prep_01 <- clust %>%
-#   unnest(cols = c(kclust))
-
-# prep_01 <- clust$kclust
-
-clust$kclust[[1]] %>% summary()
-
-clust %>% 
-  unnest(cols = c(augmented)) %>% 
-  summary()
-```
-
-
-```{r}
-fviz_cluster(object = clust$kclust[[1]], 
-             data = prep_employees %>% select(where(is.numeric)) %>% drop_na()
-             )
-```
-
-
-
-## Select and unnest data {.tabset .tabset-pills}
-
-### Filter to specification and cluster
-
-Filter to data with `r params$in_number_of_clusters` clusters with specification `r params$in_specification`.
-
-```{r}
-clust <- 
-  kclusts %>% 
-  filter(
-    k == params$in_number_of_clusters
-    &
-      specification == params$in_specification
-  )
-```
-
-```{r}
-clust$kclust %>% head()
-```
-
-
-```{r}
-kclusts %>% 
-  count(specification)
-```
-
-
-
-
-## Scale data {.tabset .tabset-pills}
-
-Scaling the data in two ways:
-
-1.  Normalize - Data will have the mean that that element subtracted and
-    then divided by the standard deviation, using the `scale()`
-    function[^2]
-
-2.  Rank - The rank of each element will be used instead of the element.
-
-[^2]: [Documentation for the scale
-    function.](https://www.rdocumentation.org/packages/base/versions/3.6.2/topics/scale)
-
-```{r}
-d <- 
-  prep_employees %>% 
-  mutate(
-    across(
-      .cols = c(daily_status_reporting_to_job_site_working_prop,
-                daily_status_teleworking_working_prop,
-                daily_status_reporting_to_job_site_observation_prop,
-                daily_status_teleworking_observation_prop,
-                starts_with("mon_"),
-                starts_with("tue_"),
-                starts_with("wed_"),
-                starts_with("thu_"),
-                starts_with("fri_"),
-                working_days,
-                team_size_mode,
-                starts_with("days_colocated_"),
-                starts_with("days_telework_"),
-                -days_colocated_1,
-                -days_colocated_supervisor,
-                -days_colocated_team,
-                -days_telework_team
-                ),
-      .fns = list(scale = scale,rank = rank),
-      .names = "{.col}_{.fn}"
-    )
-  )
-```
-
-Review data.
-
-```{r}
-d %>% 
-  skim()
-```
-
-
-## Create clusters {.tabset .tabset-pills}
-
-### Functions
-
-#### Selecting data for cluster analysis
-
-```{r}
-#' Selects the correct columns for employee cluster analysis
-#'
-#' @param in_data Data to use
-#' @param in_scale_or_rank Option for which scaling procedure: "scale" (normalization) or "rank" (rank order)
-#' @param in_working_or_observation_window Option for proportion denominator: "observation" (proportion of entire observation window) or "working" (proportion of period employ was working onsite or via telework)
-#' @param in_weekday_correlation Option for inter weekday relationship: "correlation telework" (telework correlation between days of the week), "correlation status" (work status correlation based on ordered work status by days of the week), or "proportion pairs" (proportion of telework in pairs)
-#'
-#' @return Dataframe with only selected columns and dropped null observations
-#' @export
-#'
-#' @examples
-select_cluster_cols <-
-  function(in_data,
-           in_scale_or_rank,
-           in_working_or_observation_window,
-           in_weekday_correlation)
-  {
-    stopifnot(in_scale_or_rank %in% c("scale", "rank"))
-    stopifnot(in_working_or_observation_window %in% c("observation", "working"))
-    stopifnot(in_weekday_correlation %in% c("correlation telework", "correlation status","proportion pairs"))
-    
-    if (in_scale_or_rank == "scale" &
-        in_working_or_observation_window == "observation" &
-        in_weekday_correlation == "correlation telework")
-    {
-      step_01 <-
-        in_data %>%
-        select(
-          person_id,
-          ends_with("_scale"),
-          -contains("_working_prop_"),
-          -contains("_cor_status_"),
-          -contains("_prop_pairs_"),
-        ) %>%
-        drop_na()
-    }
-    
-    if (in_scale_or_rank == "rank" &
-        in_working_or_observation_window == "observation" &
-        in_weekday_correlation == "correlation telework")
-    {
-      step_01 <-
-        in_data %>%
-        select(
-          person_id,
-          ends_with("_rank"),
-          -contains("_working_prop_"),
-          -contains("_cor_status_"),
-          -contains("_prop_pairs_"),
-        ) %>%
-        drop_na()
-    }
-    
-    if (in_scale_or_rank == "scale" &
-        in_working_or_observation_window == "working" &
-        in_weekday_correlation == "correlation telework")
-    {
-      step_01 <-
-        in_data %>%
-        select(
-          person_id,
-          ends_with("_scale"),
-          -contains("_observation_"),
-          -contains("_cor_status_"),
-          -contains("_prop_pairs_"),
-        ) %>%
-        drop_na()
-    }
-    
-    if (in_scale_or_rank == "rank" &
-        in_working_or_observation_window == "working" &
-        in_weekday_correlation == "correlation telework")
-    {
-      step_01 <-
-        in_data %>%
-        select(
-          person_id,
-          ends_with("_rank"),
-          -contains("_observation_"),
-          -contains("_cor_status_"),
-          -contains("_prop_pairs_"),
-        ) %>%
-        drop_na()
-    }
-    
-    if (in_scale_or_rank == "scale" &
-        in_working_or_observation_window == "observation" &
-        in_weekday_correlation == "correlation status")
-    {
-      step_01 <-
-        in_data %>%
-        select(
-          person_id,
-          ends_with("_scale"),
-          -contains("_working_prop_"),
-          -contains("_cor_telework_"),
-          -contains("_prop_pairs_"),
-        ) %>%
-        drop_na()
-    }
-    
-    if (in_scale_or_rank == "rank" &
-        in_working_or_observation_window == "observation" &
-        in_weekday_correlation == "correlation status")
-    {
-      step_01 <-
-        in_data %>%
-        select(
-          person_id,
-          ends_with("_rank"),
-          -contains("_working_prop_"),
-          -contains("_cor_telework_"),
-          -contains("_prop_pairs_"),
-        ) %>%
-        drop_na()
-    }
-    
-    if (in_scale_or_rank == "scale" &
-        in_working_or_observation_window == "working" &
-        in_weekday_correlation == "correlation status")
-    {
-      step_01 <-
-        in_data %>%
-        select(
-          person_id,
-          ends_with("_scale"),
-          -contains("_observation_"),
-          -contains("_cor_telework_"),
-          -contains("_prop_pairs_"),
-        ) %>%
-        drop_na()
-    }
-    
-    if (in_scale_or_rank == "rank" &
-        in_working_or_observation_window == "working" &
-        in_weekday_correlation == "correlation status")
-    {
-      step_01 <-
-        in_data %>%
-        select(
-          person_id,
-          ends_with("_rank"),
-          -contains("_observation_"),
-          -contains("_cor_telework_"),
-          -contains("_prop_pairs_"),
-        ) %>%
-        drop_na()
-    }
-    
-    if (in_scale_or_rank == "scale" &
-        in_working_or_observation_window == "observation" &
-        in_weekday_correlation == "proportion pairs")
-    {
-      step_01 <-
-        in_data %>%
-        select(
-          person_id,
-          ends_with("_scale"),
-          -contains("_working_prop_"),
-          -contains("_cor_status_"),
-          -contains("cor_telework"),
-        ) %>%
-        drop_na()
-    }
-    
-    if (in_scale_or_rank == "rank" &
-        in_working_or_observation_window == "observation" &
-        in_weekday_correlation == "proportion pairs")
-    {
-      step_01 <-
-        in_data %>%
-        select(
-          person_id,
-          ends_with("_rank"),
-          -contains("_working_prop_"),
-          -contains("_cor_status_"),
-          -contains("cor_telework"),
-        ) %>%
-        drop_na()
-    }
-    
-    if (in_scale_or_rank == "scale" &
-        in_working_or_observation_window == "working" &
-        in_weekday_correlation == "proportion pairs")
-    {
-      step_01 <-
-        in_data %>%
-        select(
-          person_id,
-          ends_with("_scale"),
-          -contains("_observation_"),
-          -contains("_cor_status_"),
-          -contains("cor_telework"),
-        ) %>%
-        drop_na()
-    }
-    
-    if (in_scale_or_rank == "rank" &
-        in_working_or_observation_window == "working" &
-        in_weekday_correlation == "proportion pairs")
-    {
-      step_01 <-
-        in_data %>%
-        select(
-          person_id,
-          ends_with("_rank"),
-          -contains("_observation_"),
-          -contains("_cor_status_"),
-          -contains("cor_telework"),
-        ) %>%
-        drop_na()
-    }
-    
-    out <- 
-      step_01 %>% 
-      as_tibble()
-    
-    return(out)
-  }
-```
-
-#### Making clusters of different sizes
-
-```{r}
-#' Make employee clusters of a variety of sizes and different specifications
-#'
-#' @param in_data Data to use
-#' @param in_scale_or_rank Option for which scaling procedure: "scale" (normalization) or "rank" (rank order)
-#' @param in_working_or_observation_window Option for proportion denominator: "observation" (proportion of entire observation window) or "working" (proportion of period employ was working onsite or via telework)
-#' @param in_weekday_correlation Option for inter weekday relationship: "correlation telework" (telework correlation between days of the week), "correlation status" (work status correlation based on ordered work status by days of the week), or "proportion pairs" (proportion of telework in pairs)
-#' @param in_number_of_clusters_start Minimum number of clusters to test
-#' @param in_number_of_clusters_end Maximum number of clusters to test
-#'
-#' @return Dataframe of clusters and associatied statistics
-#' @export
-#'
-#' @examples
-make_clusters <-
-  function(in_data,
-           in_scale_or_rank,
-           in_working_or_observation_window,
-           in_weekday_correlation,
-           in_number_of_clusters_start,
-           in_number_of_clusters_end)
-  {
-    stopifnot(in_scale_or_rank %in% c("scale", "rank"))
-    stopifnot(in_working_or_observation_window %in% c("observation", "working"))
-    stopifnot(
-      in_weekday_correlation %in% c(
-        "correlation telework",
-        "correlation status",
-        "proportion pairs"
-      )
-    )
-    stopifnot(in_number_of_clusters_start >= 1)
-    stopifnot(in_number_of_clusters_start <= in_number_of_clusters_end)
-    
-    step_01 <-
-      in_data %>%
-      select_cluster_cols(
-        in_scale_or_rank = in_scale_or_rank,
-        in_working_or_observation_window = in_working_or_observation_window,
-        in_weekday_correlation = in_weekday_correlation
-      )
-    
-    print(glue::glue("Review data for step 1. {Sys.time()}"))
-    
-    step_01 %>%
-      skim() %>%
-      print()
-    
-    print(glue::glue("Remove person_id. {Sys.time()}"))
-    
-    step_02 <-
-      step_01 %>%
-      select(-person_id)
-    
-    print(glue::glue("Review data for step 2. {Sys.time()}"))
-    
-    step_02 %>%
-      skim() %>%
-      print()
-    
-    print(
-      glue::glue(
-        "Create clusters of the data from {in_number_of_clusters_start} to {in_number_of_clusters_end}. {Sys.time()}"
-      )
-    )
-    
-    out <-
-      tibble(k = in_number_of_clusters_start:in_number_of_clusters_end) %>%
-      mutate(
-        kclust = map(k, ~ kmeans(step_02, .x)),
-        tidied = map(kclust, tidy),
-        glanced = map(kclust, glance),
-        augmented = map(kclust, augment, step_01)
-      )
-    
-    return(out)
-  }
-```
-
-#### Making clusters of different sizes, but only for `d` and adding specification
-
-```{r}
-make_clusters_d <- function(in_specification,
-                            in_scale_or_rank,
-                            in_working_or_observation_window,
-                            in_weekday_correlation,
-                            in_number_of_clusters_start,
-                            in_number_of_clusters_end)
-{
-  make_clusters(
-    in_data = d,
-    in_scale_or_rank = in_scale_or_rank,
-    in_working_or_observation_window = in_working_or_observation_window,
-    in_weekday_correlation = in_weekday_correlation,
-    in_number_of_clusters_start = in_number_of_clusters_start,
-    in_number_of_clusters_end = in_number_of_clusters_end
-  ) %>%
-    mutate(specification = in_specification)
-}
-```
-
-### Create clusters
-
-#### Create dataframe of all permutations
-
-This table shows all permutations of scaling (normalization, or rank), denominators for proportions (observation window or working days), and types of inter day correlations.
-
-```{r}
-specs <- 
-  tibble(
-  in_scale_or_rank = c(rep("scale", 6), rep("rank", 6)),
-  in_working_or_observation_window = rep(c(rep("observation", 3), rep("working", 3)), 2),
-  in_weekday_correlation = rep(
-    c(
-      "correlation telework",
-      "correlation status",
-      "proportion pairs"
-    ),
-    4
-  ),
-  in_number_of_clusters_start = rep(params$in_number_of_clusters_start, 12),
-  in_number_of_clusters_end = rep(params$in_number_of_clusters_end, 12)
-) %>% 
-  unite(col = "in_specification",everything(),remove = FALSE)
-```
-
-Review data.
-
-```{r}
-specs
-```
-
-#### Create clusters
-
-Iterate over `specs` creating and collecting dataframe of clusters from all of the above specifications.
-
-```{r}
-kclusts <- 
+silhouette_diagrams <- 
   specs %>%
-  pmap_dfr(make_clusters_d)
+   select(
+    in_scale_or_rank,
+    in_working_or_observation_window,
+    in_weekday_correlation,
+    in_specification
+  ) %>%
+  distinct() %>% 
+  slice(rep(1:n(), each = 10)) %>% 
+  rownames_to_column(var = "temp_01") %>% 
+  mutate(temp_02 = as.numeric(temp_01),
+         temp_03 = temp_02/10,
+         temp_04 = ceiling(temp_03),
+         temp_05 = temp_04*10-10,
+         temp_06 = temp_02 - temp_05) %>% 
+  rename(in_clusters = temp_06) %>% 
+  select(-starts_with("temp_")) %>% 
+  filter(in_clusters > 1) %>% 
+  # slice(2) %>% 
+  pmap(make_fviz_silhouette_d)
 ```
+
+```{r}
+silhouette_diagrams
+```
+
+## Notes {.tabset .tabset-pills}
+
+<https://towardsdatascience.com/silhouette-method-better-than-elbow-method-to-find-optimal-clusters-378d62ff6891>
 
 ## Save data {.tabset .tabset-pills}
 
 File name.
 
-```{r}
+```{r eval=FALSE, include=FALSE}
 file_name <- glue::glue("clusters-employee-{Sys.Date()}.rdata")
 file_name
 ```
 
-
-```{r}
+```{r eval=FALSE, include=FALSE}
 save(kclusts, file = file.path(params$google_drive_home,"03. Data Collection","prepared-data",file_name))
 ```
 
 Remove all data elements.
 
-```{r}
+```{r eval=FALSE, include=FALSE}
 rm(list = ls())
 gc()
 ```
 
-## Extraction time {.tabset .tabset-pills}
+## Analysis time {.tabset .tabset-pills}
 
 ```{r}
 tictoc::toc()
