@@ -17,7 +17,7 @@ select_cluster_cols <-
   {
     stopifnot(in_scale_or_rank %in% c("scale", "rank"))
     stopifnot(in_working_or_observation_window %in% c("observation", "working"))
-    stopifnot(in_weekday_correlation %in% c("correlation telework", "correlation status","proportion pairs"))
+    stopifnot(in_weekday_correlation %in% c("correlation telework", "correlation status","proportion pairs","none"))
     
     if (in_scale_or_rank == "scale" &
         in_working_or_observation_window == "observation" &
@@ -207,6 +207,74 @@ select_cluster_cols <-
           -contains("_observation_"),
           -contains("_cor_status_"),
           -contains("cor_telework"),
+        ) %>%
+        drop_na()
+    }
+    
+    if (in_scale_or_rank == "scale" &
+        in_working_or_observation_window == "observation" &
+        in_weekday_correlation == "none")
+    {
+      step_01 <-
+        in_data %>%
+        select(
+          person_id,
+          ends_with("_scale"),
+          -contains("_working_prop_"),
+          -contains("_cor_status_"),
+          -contains("_prop_pairs_"),
+          -contains("cor_telework")
+        ) %>%
+        drop_na()
+    }
+    
+    if (in_scale_or_rank == "rank" &
+        in_working_or_observation_window == "observation" &
+        in_weekday_correlation == "none")
+    {
+      step_01 <-
+        in_data %>%
+        select(
+          person_id,
+          ends_with("_rank"),
+          -contains("_working_prop_"),
+          -contains("_cor_status_"),
+          -contains("_prop_pairs_"),
+          -contains("cor_telework")
+        ) %>%
+        drop_na()
+    }
+    
+    if (in_scale_or_rank == "scale" &
+        in_working_or_observation_window == "working" &
+        in_weekday_correlation == "none")
+    {
+      step_01 <-
+        in_data %>%
+        select(
+          person_id,
+          ends_with("_scale"),
+          -contains("_observation_"),
+          -contains("_cor_status_"),
+          -contains("_prop_pairs_"),
+          -contains("cor_telework")
+        ) %>%
+        drop_na()
+    }
+    
+    if (in_scale_or_rank == "rank" &
+        in_working_or_observation_window == "working" &
+        in_weekday_correlation == "none")
+    {
+      step_01 <-
+        in_data %>%
+        select(
+          person_id,
+          ends_with("_rank"),
+          -contains("_observation_"),
+          -contains("_cor_status_"),
+          -contains("_prop_pairs_"),
+          -contains("cor_telework")
         ) %>%
         drop_na()
     }
