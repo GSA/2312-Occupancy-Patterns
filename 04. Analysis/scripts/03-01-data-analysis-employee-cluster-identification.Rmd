@@ -172,6 +172,7 @@ make_clusters_d <- function(in_specification,
                             in_scale_or_rank,
                             in_working_or_observation_window,
                             in_weekday_correlation,
+                            in_remove_other_statuses,
                             in_number_of_clusters_start,
                             in_number_of_clusters_end)
 {
@@ -180,6 +181,7 @@ make_clusters_d <- function(in_specification,
     in_scale_or_rank = in_scale_or_rank,
     in_working_or_observation_window = in_working_or_observation_window,
     in_weekday_correlation = in_weekday_correlation,
+    in_remove_other_statuses = in_remove_other_statuses,
     in_number_of_clusters_start = in_number_of_clusters_start,
     in_number_of_clusters_end = in_number_of_clusters_end
   ) %>%

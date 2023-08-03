@@ -4,6 +4,7 @@
 #' @param in_scale_or_rank Option for which scaling procedure: "scale" (normalization) or "rank" (rank order)
 #' @param in_working_or_observation_window Option for proportion denominator: "observation" (proportion of entire observation window) or "working" (proportion of period employ was working onsite or via telework)
 #' @param in_weekday_correlation Option for inter weekday relationship: "correlation telework" (telework correlation between days of the week), "correlation status" (work status correlation based on ordered work status by days of the week), or "proportion pairs" (proportion of telework in pairs)
+#' @param in_remove_other_statuses TRUE/FALSE to remove statuses: missing, other, no response, and permanent departure
 #'
 #' @return Dataframe with only selected columns and dropped null observations
 #' @export
@@ -13,7 +14,8 @@ select_cluster_cols <-
   function(in_data,
            in_scale_or_rank,
            in_working_or_observation_window,
-           in_weekday_correlation)
+           in_weekday_correlation,
+           in_remove_other_statuses)
   {
     stopifnot(in_scale_or_rank %in% c("scale", "rank"))
     stopifnot(in_working_or_observation_window %in% c("observation", "working"))
@@ -277,6 +279,18 @@ select_cluster_cols <-
           -contains("cor_telework")
         ) %>%
         drop_na()
+    }
+    
+    if(in_remove_other_statuses)
+    {
+      step_01 <- 
+        step_01 %>% 
+        select(
+          -daily_status_missing,
+          -daily_status_no_response,
+          -daily_status_other,
+          -daily_status_permanent_departure
+        )
     }
     
     out <- 

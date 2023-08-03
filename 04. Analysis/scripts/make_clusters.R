@@ -6,8 +6,9 @@
 #' @param in_weekday_correlation Option for inter weekday relationship: "correlation telework" (telework correlation between days of the week), "correlation status" (work status correlation based on ordered work status by days of the week), or "proportion pairs" (proportion of telework in pairs)
 #' @param in_number_of_clusters_start Minimum number of clusters to test
 #' @param in_number_of_clusters_end Maximum number of clusters to test
+#' @param in_remove_other_statuses TRUE/FALSE to remove statuses: missing, other, no response, and permanent departure
 #'
-#' @return Dataframe of clusters and associatied statistics
+#' @return Dataframe of clusters and associated statistics
 #' @export
 #'
 #' @examples
@@ -16,6 +17,7 @@ make_clusters <-
            in_scale_or_rank,
            in_working_or_observation_window,
            in_weekday_correlation,
+           in_remove_other_statuses,
            in_number_of_clusters_start,
            in_number_of_clusters_end)
   {
@@ -36,7 +38,8 @@ make_clusters <-
       select_cluster_cols(
         in_scale_or_rank = in_scale_or_rank,
         in_working_or_observation_window = in_working_or_observation_window,
-        in_weekday_correlation = in_weekday_correlation
+        in_weekday_correlation = in_weekday_correlation,
+        in_remove_other_statuses = in_remove_other_statuses
       )
     
     print(glue::glue("Review data for step 1. {Sys.time()}"))
