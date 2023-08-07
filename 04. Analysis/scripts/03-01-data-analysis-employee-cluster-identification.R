@@ -21,7 +21,7 @@ unique_identifier_1 <- c("date","person_id")
 date_cohort_month <-  "2022-03-01"
 observation_window_length_months <-  6
 in_number_of_clusters_start <- 1
-in_number_of_clusters_end <- 10
+in_number_of_clusters_end <- 20
 
 # Determine file name -----------------------------------------------------
 
