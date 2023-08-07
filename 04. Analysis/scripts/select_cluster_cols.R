@@ -286,10 +286,10 @@ select_cluster_cols <-
       step_01 <- 
         step_01 %>% 
         select(
-          -daily_status_missing,
-          -daily_status_no_response,
-          -daily_status_other,
-          -daily_status_permanent_departure
+          -starts_with("daily_status_missing"),
+          -starts_with("daily_status_no_response"),
+          -starts_with("daily_status_other"),
+          -starts_with("daily_status_permanent_departure")
         )
     }
     
