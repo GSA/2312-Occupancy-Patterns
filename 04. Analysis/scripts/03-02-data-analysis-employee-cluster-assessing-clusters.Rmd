@@ -137,13 +137,15 @@ make_elbow_d <- function(in_specification,
                          in_scale_or_rank,
                          in_working_or_observation_window,
                          in_weekday_correlation, 
+                         in_remove_other_statuses,
                             in_max_clusters)
 {
   d %>%
     select_cluster_cols(
       in_scale_or_rank = in_scale_or_rank,
       in_working_or_observation_window = in_working_or_observation_window,
-      in_weekday_correlation = in_weekday_correlation
+      in_weekday_correlation = in_weekday_correlation,
+      in_remove_other_statuses = in_remove_other_statuses
     ) %>%
     select(where(is.numeric)) %>%
     fviz_nbclust(
@@ -174,14 +176,16 @@ Generates `r params$in_number_of_clusters_start` to `r params$in_number_of_clust
 make_silhouette_d <- function(in_specification,
                               in_scale_or_rank,
                               in_working_or_observation_window,
-                              in_weekday_correlation, 
+                              in_weekday_correlation,
+                              in_remove_other_statuses,
                             in_max_clusters)
 {
   d %>%
     select_cluster_cols(
       in_scale_or_rank = in_scale_or_rank,
       in_working_or_observation_window = in_working_or_observation_window,
-      in_weekday_correlation = in_weekday_correlation
+      in_weekday_correlation = in_weekday_correlation,
+      in_remove_other_statuses = in_remove_other_statuses
     ) %>%
     select(where(is.numeric)) %>%
     fviz_nbclust(
@@ -213,13 +217,15 @@ make_gap_stat_d <- function(in_specification,
                             in_scale_or_rank,
                             in_working_or_observation_window,
                             in_weekday_correlation, 
+                            in_remove_other_statuses,
                             in_max_clusters)
 {
   d %>%
     select_cluster_cols(
       in_scale_or_rank = in_scale_or_rank,
       in_working_or_observation_window = in_working_or_observation_window,
-      in_weekday_correlation = in_weekday_correlation
+      in_weekday_correlation = in_weekday_correlation,
+      in_remove_other_statuses = in_remove_other_statuses
     ) %>%
     select(where(is.numeric)) %>%
     fviz_nbclust(
@@ -253,6 +259,7 @@ make_fviz_silhouette_d <- function(in_specification,
                             in_scale_or_rank,
                             in_working_or_observation_window,
                             in_weekday_correlation,
+                            in_remove_other_statuses,
                             in_clusters)
 {
   step_01 <- 
@@ -260,7 +267,8 @@ make_fviz_silhouette_d <- function(in_specification,
     select_cluster_cols(
       in_scale_or_rank = in_scale_or_rank,
       in_working_or_observation_window = in_working_or_observation_window,
-      in_weekday_correlation = in_weekday_correlation
+      in_weekday_correlation = in_weekday_correlation,
+      in_remove_other_statuses = in_remove_other_statuses
     ) %>%
     select(where(is.numeric)) 
   
@@ -302,7 +310,8 @@ elbows <-
     in_scale_or_rank,
     in_working_or_observation_window,
     in_weekday_correlation,
-    in_specification
+    in_specification,
+    in_remove_other_statuses
   ) %>%
    mutate(
     in_max_clusters = params$in_number_of_clusters_end
@@ -326,7 +335,8 @@ silhouette_scores <-
     in_scale_or_rank,
     in_working_or_observation_window,
     in_weekday_correlation,
-    in_specification
+    in_specification,
+    in_remove_other_statuses
   ) %>%
   mutate(
     in_max_clusters = params$in_number_of_clusters_end
@@ -364,7 +374,8 @@ gap_stats <-
     in_scale_or_rank,
     in_working_or_observation_window,
     in_weekday_correlation,
-    in_specification
+    in_specification,
+    in_remove_other_statuses
   ) %>%
    mutate(
     in_max_clusters = params$in_number_of_clusters_end
@@ -401,11 +412,12 @@ pca %>%
 ```{r}
 silhouette_diagrams <- 
   specs %>%
-   select(
+    select(
     in_scale_or_rank,
     in_working_or_observation_window,
     in_weekday_correlation,
-    in_specification
+    in_specification,
+    in_remove_other_statuses
   ) %>%
   distinct() %>% 
   slice(rep(1:n(), each = params$in_number_of_clusters_end)) %>% 
@@ -418,7 +430,7 @@ silhouette_diagrams <-
   rename(in_clusters = temp_06) %>% 
   select(-starts_with("temp_")) %>% 
   filter(in_clusters > 1) %>% 
-  slice(2) %>%
+  # slice(2) %>%
   pmap(make_fviz_silhouette_d)
 ```
 
