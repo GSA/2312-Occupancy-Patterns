@@ -27,7 +27,8 @@ make_clusters <-
       in_weekday_correlation %in% c(
         "correlation telework",
         "correlation status",
-        "proportion pairs"
+        "proportion pairs",
+        "none"
       )
     )
     stopifnot(in_number_of_clusters_start >= 1)
