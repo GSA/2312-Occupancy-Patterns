@@ -12,10 +12,11 @@ params:
   project_name: "Occupancy Patterns"
   google_drive_home: "G:/Shared drives/MSG Projects/1.0 Real Estate Solutions (LQ1)/2312 Work Patterns"
   data_folder_1: "prepared-data"
-  data_file_1: "clusters-employee-2023-06-08.rdata"
-  data_file_2: "prep_employees_2023-05-24.rdata"
-  in_number_of_clusters: 5
-  in_specification: "scale_working_proportion_pairs_1_10"
+  data_file_1: "clusters-employee-2023-08-07.rdata"
+  data_file_2: "prep_employees_2023-06-13.rdata"
+  in_number_of_clusters_1: 2
+  in_number_of_clusters_2: 5
+  in_specification: "scale_observation_none_1_20_TRUE"
   
 ---
 
@@ -29,6 +30,10 @@ if(!("arsenal" %in% installed.packages()[,"Package"]))
 if(!("geomtextpath" %in% installed.packages()[,"Package"]))
 {
   install.packages("geomtextpath")
+}
+if(!("oesrrr" %in% installed.packages()[,"Package"]))
+{
+  devtools::install_github(repo = "GSA/oesrrr")
 }
 if(!("oesrrr" %in% installed.packages()[,"Package"]))
 {
@@ -106,50 +111,122 @@ prep_employees %>%
 
 ### Filter to specification and cluster
 
-Filter to data with `r params$in_number_of_clusters` clusters with specification `r params$in_specification`.
+Filter to data with `r params$in_number_of_clusters_1` clusters with specification `r params$in_specification`.
 
 ```{r}
-clust <- 
+clust_1 <- 
   kclusts %>% 
   filter(
-    k == params$in_number_of_clusters &
+    k == params$in_number_of_clusters_1 &
+      specification == params$in_specification
+  )
+```
+
+Filter to data with `r params$in_number_of_clusters_2` clusters with specification `r params$in_specification`.
+
+```{r}
+clust_2 <- 
+  kclusts %>% 
+  filter(
+    k == params$in_number_of_clusters_2 &
       specification == params$in_specification
   )
 ```
 
 ### Unnest
 
-Filter to data with `r params$in_number_of_clusters` clusters with specification `r params$in_specification`.
+Filter to data with `r params$in_number_of_clusters_2` clusters with specification `r params$in_specification`.
 
 ```{r}
-clusters <- 
-  clust %>%
+clusters_1 <- 
+  clust_1 %>%
   unnest(cols = c(tidied))
 
-assignments <- 
-  clust %>% 
+assignments_1 <- 
+  clust_1 %>% 
   unnest(cols = c(augmented))
 
-clusterings <- 
-  clust %>%
+clusterings_1 <- 
+  clust_1 %>%
   unnest(cols = c(glanced))
 
 ```
+
+Check data. 
+
+```{r}
+assignments_1 %>% 
+  glimpse()
+```
+
+Filter to data with `r params$in_number_of_clusters_2` clusters with specification `r params$in_specification`.
+
+```{r}
+clusters_2 <- 
+  clust_2 %>%
+  unnest(cols = c(tidied))
+
+assignments_2 <- 
+  clust_2 %>% 
+  unnest(cols = c(augmented))
+
+clusterings_2 <- 
+  clust_2 %>%
+  unnest(cols = c(glanced))
+
+```
+
+Check data. 
+
+```{r}
+assignments_2 %>% 
+  glimpse()
+```
+
+### Join assignments to employee data
+
+Function to rename `.cluster` column to include the number of clusters.
+
+```{r}
+rename_to_k <- function(in_data)
+{
+  tot_cluster <- in_data %>% select(k) %>% distinct() %>% pull()
+  out_data <-
+    in_data %>% rename_with( ~ glue::glue("{.x}_{tot_cluster}"), .cluster)
+  return(out_data)
+}
+```
+
+Apply function to assignments and join. 
+
+```{r}
+assignments <-
+  assignments_1 %>%
+  rename_to_k() %>%
+  select(person_id, starts_with(".cluster")) %>%
+  full_join(assignments_2 %>%
+              rename_to_k() %>%
+              select(person_id, starts_with(".cluster")))
+```
+Check data. 
 
 ```{r}
 assignments %>% 
   glimpse()
 ```
 
-### Join assignments to employee data
+Join to `prep_employees`
 
 ```{r}
 d <-
   assignments %>%
-  select(k, person_id, .cluster, specification) %>%
+  select(person_id, starts_with(".cluster")) %>%
   full_join(prep_employees) %>% 
   mutate(
-    .cluster = fct_na_value_to_level(.cluster, level = "(Missing)")
+    across(
+      .cols = starts_with(".cluster"),
+      .fns = ~fct_na_value_to_level(., level = "(Missing)")
+    )
   )
 ```
 Review data.
@@ -221,9 +298,13 @@ prep_a <- bind_rows(
     summaries() %>%
     mutate(group = "Whole cohort"),
   d %>%
-    summaries(.cluster) %>%
-    mutate(group = glue::glue("Cluster: {.cluster}")) %>%
-    select(-.cluster),
+    summaries(.cluster_2) %>%
+    mutate(group = glue::glue("Cluster 2: {.cluster_2}")) %>%
+    select(-.cluster_2),
+  d %>%
+    summaries(.cluster_5) %>%
+    mutate(group = glue::glue("Cluster 5: {.cluster_5}")) %>%
+    select(-.cluster_5),
   d %>% 
     summaries_rule_based(rule_based_all_remote),
   d %>% 
@@ -496,26 +577,59 @@ The principle work pattern statistics are as follows:
 Function to create a density plot for a specific numeric variable. 
 
 ```{r}
-gg_density <- function(in_data,in_variable)
+gg_density <- function(in_data,in_variable,in_cluster_number)
 {
   in_variable_sym <- sym(in_variable)
   
-  spec <- unique(in_data$specification)
+  # spec <- unique(in_data$specification)
+  # 
+  # clus <- unique(in_data$k)
   
-  clus <- unique(in_data$k)
+  if(in_cluster_number==2)
+  {
+    step_01 <-
+      in_data %>%
+      ggplot(aes(
+        x = !!in_variable_sym,
+        color = .cluster_2,
+        fill = .cluster_2
+      )) +
+      geom_density(alpha = .25) +
+      geomtextpath::geom_textdensity(
+        aes(label = .cluster_2),
+        hjust = "ymax",
+        vjust = 1,
+        text_only = TRUE,
+        text_smoothing = 0,
+        straight = TRUE
+      )
+  }
+  
+  if(in_cluster_number==5)
+  {
+    step_01 <-
+      in_data %>%
+      ggplot(aes(
+        x = !!in_variable_sym,
+        color = .cluster_5,
+        fill = .cluster_5
+      )) +
+      geom_density(alpha = .25) +
+      geomtextpath::geom_textdensity(
+        aes(label = .cluster_5),
+        hjust = "ymax",
+        vjust = 1,
+        text_only = TRUE,
+        text_smoothing = 0,
+        straight = TRUE
+      )
+  }
 
-  in_data %>% 
-  ggplot(aes(x = !!in_variable_sym, color = .cluster, fill = .cluster)) +
-  geom_density(alpha = .25) +
-    geomtextpath::geom_textdensity(aes(label = .cluster), 
-                   hjust = "ymax", 
-                   vjust = 1, text_only = TRUE, text_smoothing = 0, straight = TRUE) + 
-    oescolorrrs::scale_color_oes(palette = 'accent colors') +
-    oescolorrrs::scale_fill_oes(palette = 'accent colors') +
+  step_01 +
     theme_fivethirtyeight() +
     labs(
       title = glue::glue("Histogram of `{in_variable}`"),
-      caption = glue::glue("For specification {spec} with {clus} clusters.")
+      caption = glue::glue("For {in_cluster_number} clusters.")
     ) +
     theme(
       legend.position = "none",
@@ -532,7 +646,6 @@ gg_density <- function(in_data,in_variable)
 num_vars <- 
   d %>% 
   select_if(is.numeric) %>% 
-  select(-k) %>% 
   names()
 
 num_vars
@@ -542,8 +655,217 @@ num_vars
 
 ```{r}
 num_vars[1:20] %>% 
-  map(~gg_density(d,in_variable = .))
+  map(~gg_density(d,in_variable = .,in_cluster_number = 2))
 ```
+
+### Telework
+
+#### Number of days
+
+```{r}
+gg_density(d,"daily_status_teleworking", in_cluster_number = 2)
+```
+
+```{r}
+gg_density(d,"daily_status_teleworking", in_cluster_number = 5)
+```
+
+#### Proportion of observation window
+
+```{r}
+gg_density(d,"daily_status_teleworking_observation_prop", in_cluster_number = 2)
+```
+
+```{r}
+gg_density(d,"daily_status_teleworking_observation_prop", in_cluster_number = 5)
+```
+
+### Reporting to job site
+
+#### Number of days
+
+```{r}
+gg_density(d,"daily_status_reporting_to_job_site", in_cluster_number = 2)
+```
+
+```{r}
+gg_density(d,"daily_status_reporting_to_job_site", in_cluster_number = 5)
+```
+
+#### Proportion of observation window
+
+```{r}
+gg_density(d,"daily_status_reporting_to_job_site_observation_prop", in_cluster_number = 2)
+```
+
+```{r}
+gg_density(d,"daily_status_reporting_to_job_site_observation_prop", in_cluster_number = 5)
+```
+
+### Collocation with at least one team member
+
+#### Number of days
+
+```{r}
+gg_density(d,"days_colocated_1", in_cluster_number = 2)
+```
+
+```{r}
+gg_density(d,"days_colocated_1", in_cluster_number = 5)
+```
+
+#### Proportion of observation window
+
+```{r}
+gg_density(d,"days_colocated_1_observation_prop", in_cluster_number = 2)
+```
+
+```{r}
+gg_density(d,"days_colocated_1_observation_prop", in_cluster_number = 5)
+```
+
+### Collocation with supervisor
+
+#### Number of days
+
+```{r}
+gg_density(d,"days_colocated_supervisor", in_cluster_number = 2)
+```
+
+```{r}
+gg_density(d,"days_colocated_supervisor", in_cluster_number = 5)
+```
+
+#### Proportion of observation window
+
+```{r}
+gg_density(d,"days_colocated_supervisor_observation_prop", in_cluster_number = 2)
+```
+
+```{r}
+gg_density(d,"days_colocated_supervisor_observation_prop", in_cluster_number = 5)
+```
+
+### Collocation with teamn
+
+#### Number of days
+
+```{r}
+gg_density(d,"days_colocated_team", in_cluster_number = 2)
+```
+
+```{r}
+gg_density(d,"days_colocated_team", in_cluster_number = 5)
+```
+
+#### Proportion of observation window
+
+```{r}
+gg_density(d,"days_colocated_team_observation_prop", in_cluster_number = 2)
+```
+
+```{r}
+gg_density(d,"days_colocated_team_observation_prop", in_cluster_number = 5)
+```
+
+### Whole team telewords
+
+#### Number of days
+
+```{r}
+gg_density(d,"days_colocated_team", in_cluster_number = 2)
+```
+
+```{r}
+gg_density(d,"days_colocated_team", in_cluster_number = 5)
+```
+
+#### Proportion of observation window
+
+```{r}
+gg_density(d,"days_colocated_team_observation_prop", in_cluster_number = 2)
+```
+
+```{r}
+gg_density(d,"days_colocated_team_observation_prop", in_cluster_number = 5)
+```
+
+### Working days
+
+#### Number of days
+
+```{r}
+gg_density(d,"working_days", in_cluster_number = 2)
+```
+
+```{r}
+gg_density(d,"working_days", in_cluster_number = 5)
+```
+
+### Team size
+
+#### Number of employees
+
+```{r}
+gg_density(d,"team_size_mode", in_cluster_number = 2)
+```
+
+```{r}
+gg_density(d,"team_size_mode", in_cluster_number = 5)
+```
+
+#### Proportion of observation window
+
+```{r}
+gg_density(d,"daily_status_reporting_to_job_site_observation_prop", in_cluster_number = 2)
+```
+
+```{r}
+gg_density(d,"daily_status_reporting_to_job_site_observation_prop", in_cluster_number = 5)
+```
+
+## Summary statistics
+
+```{r}
+d %>% 
+  group_by(.cluster_2) %>% 
+  skim(daily_status_reporting_to_job_site,
+       daily_status_reporting_to_job_site_observation_prop,
+       daily_status_teleworking,
+       daily_status_teleworking_observation_prop,
+       days_colocated_1,
+       days_colocated_1_observation_prop,
+       days_colocated_supervisor,
+       days_colocated_supervisor_observation_prop,
+       days_colocated_team,
+       days_colocated_team_observation_prop,
+       days_telework_team,
+       days_telework_team_observation_prop,
+       working_days,
+       team_size_mode) %>% 
+  as.data.frame()
+```
+
+```{r}
+d %>% 
+  group_by(.cluster_5) %>% 
+  skim(daily_status_reporting_to_job_site,
+       daily_status_reporting_to_job_site_observation_prop,
+       daily_status_teleworking,
+       daily_status_teleworking_observation_prop,
+       days_colocated_1,
+       days_colocated_1_observation_prop,
+       days_colocated_supervisor,
+       days_colocated_supervisor_observation_prop,
+       days_colocated_team,
+       days_colocated_team_observation_prop,
+       days_telework_team,
+       days_telework_team_observation_prop,
+       working_days,
+       team_size_mode) %>% 
+  as.data.frame()
+```
+
 
 ## Descriptive 
 
