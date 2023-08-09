@@ -114,7 +114,8 @@ make_fviz_clusters_d <- function(in_specification,
                             in_working_or_observation_window,
                             in_weekday_correlation,
                             in_number_of_clusters_start,
-                            in_number_of_clusters_end)
+                            in_number_of_clusters_end,
+                            in_remove_other_statuses )
 {
   make_fviz_clusters(
     in_data = d,
@@ -122,7 +123,8 @@ make_fviz_clusters_d <- function(in_specification,
     in_working_or_observation_window = in_working_or_observation_window,
     in_weekday_correlation = in_weekday_correlation,
     in_number_of_clusters_start = in_number_of_clusters_start,
-    in_number_of_clusters_end = in_number_of_clusters_end
+    in_number_of_clusters_end = in_number_of_clusters_end,
+    in_remove_other_statuses  = in_remove_other_statuses 
   ) %>%
     mutate(specification = in_specification)
 }
@@ -397,7 +399,7 @@ Iterate over `specs` creating and collecting dataframe of clusters from all of t
 ```{r}
 pca <- 
   specs %>%
-  slice_head(n = 1) %>% 
+  # slice_head(n = 1) %>% 
   pmap_dfr(make_fviz_clusters_d)
 ```
 
