@@ -1774,7 +1774,7 @@ Join to `prep_building`.
 ```{r}
 prep_building <- 
   prep_building %>% 
-  left_join(prep_xx)
+  left_join(prep_xx, by = "person_id")
 ```
 
 ## Addressing blanks, nulls, and other values
