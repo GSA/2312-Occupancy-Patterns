@@ -17,7 +17,8 @@ make_fviz_clusters <-
            in_working_or_observation_window,
            in_weekday_correlation,
            in_number_of_clusters_start,
-           in_number_of_clusters_end)
+           in_number_of_clusters_end,
+           in_remove_other_statuses)
   {
     stopifnot(in_scale_or_rank %in% c("scale", "rank"))
     stopifnot(in_working_or_observation_window %in% c("observation", "working"))
@@ -25,7 +26,8 @@ make_fviz_clusters <-
       in_weekday_correlation %in% c(
         "correlation telework",
         "correlation status",
-        "proportion pairs"
+        "proportion pairs",
+        "none"
       )
     )
     stopifnot(in_number_of_clusters_start >= 1)
@@ -36,7 +38,8 @@ make_fviz_clusters <-
       select_cluster_cols(
         in_scale_or_rank = in_scale_or_rank,
         in_working_or_observation_window = in_working_or_observation_window,
-        in_weekday_correlation = in_weekday_correlation
+        in_weekday_correlation = in_weekday_correlation,
+        in_remove_other_statuses
       )
     
     print(glue::glue("Review data for step 1. {Sys.time()}"))
