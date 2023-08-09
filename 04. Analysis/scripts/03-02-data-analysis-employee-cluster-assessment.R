@@ -16,7 +16,7 @@ project_number <- 2312
 project_name <- "Occupancy Patterns"
 google_drive_home <- "G:/Shared drives/MSG Projects/1.0 Real Estate Solutions (LQ1)/2312 Work Patterns"
 data_folder_1 <- "prepared-data"
-data_file_1 <- "prep_employees_2023-05-24.rdata"
+data_file_1 <- "prep_employees_2023-08-09.rdata"
 in_number_of_clusters_start <- 1
 in_number_of_clusters_end <- 20
 in_seed <- 27
