@@ -22,6 +22,7 @@ params:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+options(scipen=999)
 tictoc::tic()
 if(!("arsenal" %in% installed.packages()[,"Package"]))
 {
@@ -236,7 +237,127 @@ d %>%
   skim()
 ```
 
+
+
+## Cluster descriptions {.tabset .tabset-pills}
+
+Clusters 2(1): **Teleworkers**
+
+Very low number of days reporting to the job site. Majority of time telework. Very few days co-located with at least one team member, a supervisor, or the whole team. Many days where the whole team is co-located, but not the majority. High number of working days.
+
+Clusters 2(2): **Everyone else**
+
+Higher number of days reporting to job site, but with large variance. Lower proportion of days teleworking, but still about a quarter of days. Again, higher variance of telework. Some days co-located with at least one team member and the majority of days working at the site. Many days working onsite with supervisor, but very few days where the whole team is co-located. Very few days where the whole team is co-located. Lower number of working days.
+
+Clusters 5(1): **Teleworkers**
+
+Very low number of days (~3) reporting to the job site. Most days (~119) employees telework. Hardly any days co-located with at least one team member (<1), supervisor (<1), or whole team (<1). Many days (~54) where entire team works remotely. Many working days (~122). Team is average size (~6).
+
+Clusters 5(2): **Teleworkers that go to the office sometimes**
+
+A few days (~14) working at the job site, but high variation. Majority of days(~98) employees telework. Some days co-located with at least one team member (~6) or supervisor (~3). Few days co-located with entire team (~1).  Some days (~19) where the entire team works remotely. Many working days (~112). Team is large (~9).
+
+Clusters 5(3): **Hybrid workers**
+
+Some days (~69) with employees working to the job site. Staff often telework (~48), but high variance. Many days co-located with at least one team member (~29) or with supervisor (~13). Few days co-located with entire team (~1). Few days (~5) where the whole team is remote.  Many working days (~115). Team is average size (~6).
+
+Clusters 5(4): **Onsite workers**
+
+Employees that report to the job site for most days (~97). Some days (~22) telework. Many days co-located with at least one team member (~74), supervisor (~60), or whole team (~17), but high variance. Few days (~4) where the whole team is remote, but high variance. Many working days (~119). Team is smaller (~5)
+
+Clusters 5(5): **Non-workers**
+Low number of days (~5) reporting to the site, but high variance. Some days (~27) telework, but high variance. Few days co-located with at least one team member (2)  or with supervisor (~1). Almost no days (<1) with the whole team co-located. Several days (~9) where the entire team works remotely. Few working days (~34) and high variance. Team is large (~9) and high variance. 
+
 ## Work pattern statistics {.tabset .tabset-pills}
+
+### Summary statistics
+
+```{r}
+d %>% 
+  group_by(.cluster_2) %>% 
+  skim(daily_status_reporting_to_job_site,
+       daily_status_reporting_to_job_site_observation_prop,
+       daily_status_teleworking,
+       daily_status_teleworking_observation_prop,
+       days_colocated_1,
+       days_colocated_1_observation_prop,
+       days_colocated_supervisor,
+       days_colocated_supervisor_observation_prop,
+       days_colocated_team,
+       days_colocated_team_observation_prop,
+       days_telework_team,
+       days_telework_team_observation_prop,
+       working_days,
+       team_size_mode) %>% 
+  as.data.frame()
+```
+
+
+
+```{r}
+d %>% 
+  group_by(.cluster_5) %>% 
+  skim(daily_status_reporting_to_job_site,
+       daily_status_reporting_to_job_site_observation_prop,
+       daily_status_teleworking,
+       daily_status_teleworking_observation_prop,
+       days_colocated_1,
+       days_colocated_1_observation_prop,
+       days_colocated_supervisor,
+       days_colocated_supervisor_observation_prop,
+       days_colocated_team,
+       days_colocated_team_observation_prop,
+       days_telework_team,
+       days_telework_team_observation_prop,
+       working_days,
+       team_size_mode) %>% 
+  as.data.frame()
+```
+
+### Summary statistics
+
+```{r}
+d %>% 
+  group_by(.cluster_2) %>% 
+  skim(starts_with("rule_based_"),
+       -ends_with("working")) %>% 
+  as.data.frame()
+```
+
+
+
+```{r}
+d %>% 
+  group_by(.cluster_5) %>% 
+  skim(starts_with("rule_based_"),
+       -ends_with("working")) %>% 
+  as.data.frame()
+```
+
+
+```{r}
+d %>% 
+  group_by(.cluster_2) %>% 
+  skim(exit_employment,
+       multiple_supervisors,
+       gsa_sso) %>% 
+  as.data.frame()
+```
+
+
+
+```{r}
+d %>% 
+  group_by(.cluster_5) %>% 
+  skim(exit_employment,
+       multiple_supervisors,
+       gsa_sso) 
+```
+
+```{r}
+names(d)
+```
+
 
 ```{r}
 summaries <- function(in_data,...)
@@ -339,6 +460,8 @@ prep_a <- bind_rows(
     summaries_rule_based(rule_based_telework_onsite_minimum),
 )
 ```
+
+
 
 ### Daily telework
 
@@ -824,47 +947,7 @@ gg_density(d,"daily_status_reporting_to_job_site_observation_prop", in_cluster_n
 gg_density(d,"daily_status_reporting_to_job_site_observation_prop", in_cluster_number = 5)
 ```
 
-## Summary statistics
 
-```{r}
-d %>% 
-  group_by(.cluster_2) %>% 
-  skim(daily_status_reporting_to_job_site,
-       daily_status_reporting_to_job_site_observation_prop,
-       daily_status_teleworking,
-       daily_status_teleworking_observation_prop,
-       days_colocated_1,
-       days_colocated_1_observation_prop,
-       days_colocated_supervisor,
-       days_colocated_supervisor_observation_prop,
-       days_colocated_team,
-       days_colocated_team_observation_prop,
-       days_telework_team,
-       days_telework_team_observation_prop,
-       working_days,
-       team_size_mode) %>% 
-  as.data.frame()
-```
-
-```{r}
-d %>% 
-  group_by(.cluster_5) %>% 
-  skim(daily_status_reporting_to_job_site,
-       daily_status_reporting_to_job_site_observation_prop,
-       daily_status_teleworking,
-       daily_status_teleworking_observation_prop,
-       days_colocated_1,
-       days_colocated_1_observation_prop,
-       days_colocated_supervisor,
-       days_colocated_supervisor_observation_prop,
-       days_colocated_team,
-       days_colocated_team_observation_prop,
-       days_telework_team,
-       days_telework_team_observation_prop,
-       working_days,
-       team_size_mode) %>% 
-  as.data.frame()
-```
 
 
 ## Descriptive 
