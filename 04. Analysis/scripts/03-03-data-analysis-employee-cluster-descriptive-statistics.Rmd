@@ -12,8 +12,8 @@ params:
   project_name: "Occupancy Patterns"
   google_drive_home: "G:/Shared drives/MSG Projects/1.0 Real Estate Solutions (LQ1)/2312 Work Patterns"
   data_folder_1: "prepared-data"
-  data_file_1: "clusters-employee-2023-08-07.rdata"
-  data_file_2: "prep_employees_2023-06-13.rdata"
+  data_file_1: "clusters-employee-2023-08-09.rdata"
+  data_file_2: "prep_employees_2023-08-09.rdata"
   in_number_of_clusters_1: 2
   in_number_of_clusters_2: 5
   in_specification: "scale_observation_none_1_20_TRUE"
@@ -314,6 +314,7 @@ d %>%
   as.data.frame()
 ```
 
+
 ### Summary statistics
 
 ```{r}
@@ -334,17 +335,104 @@ d %>%
   as.data.frame()
 ```
 
+```{r}
+d %>% names()
+```
+
+```{r}
+d %>%
+  group_by(.cluster_2) %>%
+  skim(exit_employment,multiple_supervisors)
+```
+
+```{r}
+d %>%
+  group_by(.cluster_5) %>%
+  skim(exit_employment,multiple_supervisors)
+```
 
 ```{r}
 d %>% 
   group_by(.cluster_2) %>% 
-  skim(exit_employment,
-       multiple_supervisors,
-       gsa_sso) %>% 
-  as.data.frame()
+  count(sso) %>% 
+  ungroup() %>% 
+  left_join(
+    d %>% 
+  count(.cluster_2, name = "tot")
+  ) %>% 
+  mutate(
+    prop = n/tot
+  ) %>% 
+  ggplot(aes(x = sso, y =  prop,fill = .cluster_2)) +
+  geom_col(position = "dodge") 
 ```
 
 
+```{r}
+d %>% 
+  group_by(.cluster_5) %>% 
+  count(sso) %>% 
+  ungroup() %>% 
+  left_join(
+    d %>% 
+  count(.cluster_5, name = "tot")
+  ) %>% 
+  mutate(
+    prop = n/tot
+  ) %>% 
+  ggplot(aes(x = sso, y =  prop,fill = .cluster_5)) +
+  geom_col(position = "dodge") +
+  facet_wrap(facets = vars(sso), scales = "free")
+```
+
+
+## Cluster descriptions {.tabset .tabset-pills}
+
+Clusters 2(1): **Teleworkers**
+
+Very low number of days reporting to the job site. Majority of time telework. Very few days co-located with at least one team member, a supervisor, or the whole team. Many days where the whole team is co-located, but not the majority. High number of working days.
+
+Few people exit employment (~3%) and some have multiple supervisors (~26%).
+
+Disproportionately from FAS, GSA IT, OCFO, OGP, and OHRM, and fewer in PBS
+
+Clusters 2(2): **Everyone else**
+
+Higher number of days reporting to job site, but with large variance. Lower proportion of days teleworking, but still about a quarter of days. Again, higher variance of telework. Some days co-located with at least one team member and the majority of days working at the site. Many days working onsite with supervisor, but very few days where the whole team is co-located. Very few days where the whole team is co-located. Lower number of working days.
+
+Some people exit employment (~15%) and some have multiple supervisors (~22%).
+
+Majority are from PBS.
+
+Clusters 5(1): **Teleworkers**
+
+Very low number of days (~3) reporting to the job site. Most days (~119) employees telework. Hardly any days co-located with at least one team member (<1), supervisor (<1), or whole team (<1). Many days (~54) where entire team works remotely. Many working days (~122). Team is average size (~6).
+
+Almost no one (<.1%) exit employment. Some have multiple employers (20-30%).
+
+Clusters 5(2): **Teleworkers that go to the office sometimes**
+
+A few days (~14) working at the job site, but high variation. Majority of days(~98) employees telework. Some days co-located with at least one team member (~6) or supervisor (~3). Few days co-located with entire team (~1).  Some days (~19) where the entire team works remotely. Many working days (~112). Team is large (~9).
+
+Very few people exit employment (~3%). Some have multiple employers (20-30%).
+
+Clusters 5(3): **Hybrid workers**
+
+Some days (~69) with employees working to the job site. Staff often telework (~48), but high variance. Many days co-located with at least one team member (~29) or with supervisor (~13). Few days co-located with entire team (~1). Few days (~5) where the whole team is remote.  Many working days (~115). Team is average size (~6).
+
+Very few people exit employment (~2%). Some have multiple employers (20-30%).
+
+Clusters 5(4): **Onsite workers**
+
+Employees that report to the job site for most days (~97). Some days (~22) telework. Many days co-located with at least one team member (~74), supervisor (~60), or whole team (~17), but high variance. Few days (~4) where the whole team is remote, but high variance. Many working days (~119). Team is smaller (~5).
+
+Very few people exit employment (~2%). Some have multiple employers (20-30%).
+
+Clusters 5(5): **Non-workers**
+
+Low number of days (~5) reporting to the site, but high variance. Some days (~27) telework, but high variance. Few days co-located with at least one team member (2)  or with supervisor (~1). Almost no days (<1) with the whole team co-located. Several days (~9) where the entire team works remotely. Few working days (~34) and high variance. Team is large (~9) and high variance.
+
+Many people exit employment (~54%). Some have multiple employers (20-30%).
 
 ```{r}
 d %>% 
