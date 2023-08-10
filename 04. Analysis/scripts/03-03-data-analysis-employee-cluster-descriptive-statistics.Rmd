@@ -364,7 +364,8 @@ d %>%
     prop = n/tot
   ) %>% 
   ggplot(aes(x = sso, y =  prop,fill = .cluster_2)) +
-  geom_col(position = "dodge") 
+  geom_col(position = "dodge")  +
+  facet_wrap(facets = vars(sso), scales = "free")
 ```
 
 
@@ -422,11 +423,15 @@ Some days (~69) with employees working to the job site. Staff often telework (~4
 
 Very few people exit employment (~2%). Some have multiple employers (20-30%).
 
+Majority are freom PBS.
+
 Clusters 5(4): **Onsite workers**
 
 Employees that report to the job site for most days (~97). Some days (~22) telework. Many days co-located with at least one team member (~74), supervisor (~60), or whole team (~17), but high variance. Few days (~4) where the whole team is remote, but high variance. Many working days (~119). Team is smaller (~5).
 
 Very few people exit employment (~2%). Some have multiple employers (20-30%).
+
+Majority are freom PBS.
 
 Clusters 5(5): **Non-workers**
 
