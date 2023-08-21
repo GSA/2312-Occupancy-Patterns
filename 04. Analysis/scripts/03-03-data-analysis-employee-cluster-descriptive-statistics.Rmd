@@ -10,7 +10,7 @@ params:
   author: "Ben Jaques-Leslie"
   project_number: 2312
   project_name: "Occupancy Patterns"
-  google_drive_home: "G:/Shared drives/MSG Projects/1.0 Real Estate Solutions (LQ1)/2312 Work Patterns"
+  google_drive_home: "G:/Shared drives/GSA Evaluation Division/Projects/1.0 Real Estate Solutions (LQ1)/2312 Work Patterns"
   data_folder_1: "prepared-data"
   data_file_1: "clusters-employee-2023-08-09.rdata"
   data_file_2: "prep_employees_2023-08-09.rdata"
@@ -27,6 +27,10 @@ tictoc::tic()
 if(!("arsenal" %in% installed.packages()[,"Package"]))
 {
   install.packages("arsenal")
+}
+if(!("beepr" %in% installed.packages()[,"Package"]))
+{
+  install.packages("beepr")
 }
 if(!("geomtextpath" %in% installed.packages()[,"Package"]))
 {
@@ -53,6 +57,8 @@ library(flextable)
 library(ggthemes)
 library(tidymodels)
 ```
+
+
 
 ```{r cohort dates}
 # date_cohort_month_start <- ymd(params$date_cohort_month)
@@ -315,7 +321,11 @@ d %>%
 ```
 
 
-### Summary statistics
+### Cluster summary statistics
+
+#### Rule-based groups
+
+##### Two clusters
 
 ```{r}
 d %>% 
@@ -325,7 +335,7 @@ d %>%
   as.data.frame()
 ```
 
-
+##### Five clusters
 
 ```{r}
 d %>% 
@@ -339,17 +349,27 @@ d %>%
 d %>% names()
 ```
 
+#### Exiting employment and multiple supervisors
+
+##### Two clusters
+
 ```{r}
 d %>%
   group_by(.cluster_2) %>%
   skim(exit_employment,multiple_supervisors)
 ```
 
+##### Five clusters
+
 ```{r}
 d %>%
   group_by(.cluster_5) %>%
   skim(exit_employment,multiple_supervisors)
 ```
+
+#### SSO
+
+##### Two clusters
 
 ```{r}
 d %>% 
@@ -363,11 +383,12 @@ d %>%
   mutate(
     prop = n/tot
   ) %>% 
-  ggplot(aes(x = sso, y =  prop,fill = .cluster_2)) +
+  ggplot(aes(x = .cluster_2, y =  prop,fill = .cluster_2)) +
   geom_col(position = "dodge")  +
-  facet_wrap(facets = vars(sso), scales = "free")
+  facet_wrap(facets = vars(sso), scales = "free_y")
 ```
 
+##### Five clusters
 
 ```{r}
 d %>% 
@@ -381,9 +402,53 @@ d %>%
   mutate(
     prop = n/tot
   ) %>% 
-  ggplot(aes(x = sso, y =  prop,fill = .cluster_5)) +
+  ggplot(aes(x = .cluster_5, y =  prop,fill = .cluster_5)) +
   geom_col(position = "dodge") +
-  facet_wrap(facets = vars(sso), scales = "free")
+  facet_wrap(facets = vars(sso)
+             , scales = "free_y"
+             )
+```
+
+#### SSO
+
+##### Two clusters
+
+```{r}
+d %>% 
+  group_by(.cluster_2) %>% 
+  count(short_id) %>% 
+  ungroup() %>% 
+  left_join(
+    d %>% 
+  count(.cluster_2, name = "tot")
+  ) %>% 
+  mutate(
+    prop = n/tot
+  ) %>% 
+  ggplot(aes(x = .cluster_2, y =  prop,fill = .cluster_2)) +
+  geom_col(position = "dodge")  +
+  facet_wrap(facets = vars(short_id), scales = "free_y")
+```
+
+##### Five clusters
+
+```{r}
+d %>% 
+  group_by(.cluster_5) %>% 
+  count(sso) %>% 
+  ungroup() %>% 
+  left_join(
+    d %>% 
+  count(.cluster_5, name = "tot")
+  ) %>% 
+  mutate(
+    prop = n/tot
+  ) %>% 
+  ggplot(aes(x = .cluster_5, y =  prop,fill = .cluster_5)) +
+  geom_col(position = "dodge") +
+  facet_wrap(facets = vars(sso)
+             , scales = "free_y"
+             )
 ```
 
 
@@ -411,11 +476,15 @@ Very low number of days (~3) reporting to the job site. Most days (~119) employe
 
 Almost no one (<.1%) exit employment. Some have multiple employers (20-30%).
 
+High proportion in FAS, GSAIT, OCFO, OGP, OHRM, OSDBU and lower in PBS, OCE, IOA, and OMA.
+
 Clusters 5(2): **Teleworkers that go to the office sometimes**
 
 A few days (~14) working at the job site, but high variation. Majority of days(~98) employees telework. Some days co-located with at least one team member (~6) or supervisor (~3). Few days co-located with entire team (~1).  Some days (~19) where the entire team works remotely. Many working days (~112). Team is large (~9).
 
 Very few people exit employment (~3%). Some have multiple employers (20-30%).
+
+High proportion in FAS, GSAIT, OCFO, OCR, OGP, OHRM, OSDBU and lower in PBS, OCE, OSC, OSDBU, IOA, and OMA.
 
 Clusters 5(3): **Hybrid workers**
 
@@ -423,7 +492,7 @@ Some days (~69) with employees working to the job site. Staff often telework (~4
 
 Very few people exit employment (~2%). Some have multiple employers (20-30%).
 
-Majority are freom PBS.
+High proportion in IOA, OGC, OMA, OSC, and PBS and lower in FAS, GSA IT, OCE, OCFO, OCR, OGP, OHRM, and OSDBU.
 
 Clusters 5(4): **Onsite workers**
 
@@ -431,7 +500,7 @@ Employees that report to the job site for most days (~97). Some days (~22) telew
 
 Very few people exit employment (~2%). Some have multiple employers (20-30%).
 
-Majority are freom PBS.
+High proportion in OAS, and PBS, and lower in FAS, GSA IT, IOA, OCE, OCFO, OCIA, OCR, OGC, OGP, OHRM, OMA, OSC, and OSDBU.
 
 Clusters 5(5): **Non-workers**
 
@@ -439,16 +508,27 @@ Low number of days (~5) reporting to the site, but high variance. Some days (~27
 
 Many people exit employment (~54%). Some have multiple employers (20-30%).
 
+High proportion in FAS, GSA IT, OCE, OCIA, OCR, OSC, and OSDBU and lower in OMA.
+
 ```{r}
 d %>% 
   group_by(.cluster_5) %>% 
   skim(exit_employment,
-       multiple_supervisors,
-       gsa_sso) 
+       multiple_supervisors) 
 ```
 
 ```{r}
 names(d)
+```
+
+# CONTINUE FROM HERE
+
+```{r}
+beepr::beep(sound = 5)
+```
+
+```{r}
+
 ```
 
 
