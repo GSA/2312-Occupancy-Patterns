@@ -409,46 +409,148 @@ d %>%
              )
 ```
 
-#### SSO
+#### GSA Region
 
 ##### Two clusters
 
 ```{r}
-d %>% 
-  group_by(.cluster_2) %>% 
-  count(short_id) %>% 
-  ungroup() %>% 
-  left_join(
-    d %>% 
-  count(.cluster_2, name = "tot")
-  ) %>% 
-  mutate(
-    prop = n/tot
-  ) %>% 
-  ggplot(aes(x = .cluster_2, y =  prop,fill = .cluster_2)) +
+level_10 <- 
+  d %>% 
+  count(gsa_region) %>% 
+  arrange(desc(n)) %>% 
+  slice(10) %>% 
+  pull(n)
+
+d %>%
+  # mutate(gsa_region = fct_lump_min(gsa_region, min = level_10)) %>%
+  group_by(.cluster_2) %>%
+  count(gsa_region) %>%
+  ungroup() %>%
+  left_join(d %>%
+              count(.cluster_2, name = "tot")) %>%
+  mutate(prop = n / tot) %>%
+  ggplot(aes(x = .cluster_2, y =  prop, fill = .cluster_2)) +
   geom_col(position = "dodge")  +
-  facet_wrap(facets = vars(short_id), scales = "free_y")
+  facet_wrap(facets = vars(gsa_region), scales = "free_y")
 ```
 
 ##### Five clusters
 
 ```{r}
-d %>% 
-  group_by(.cluster_5) %>% 
-  count(sso) %>% 
-  ungroup() %>% 
-  left_join(
-    d %>% 
-  count(.cluster_5, name = "tot")
-  ) %>% 
-  mutate(
-    prop = n/tot
-  ) %>% 
-  ggplot(aes(x = .cluster_5, y =  prop,fill = .cluster_5)) +
-  geom_col(position = "dodge") +
-  facet_wrap(facets = vars(sso)
-             , scales = "free_y"
-             )
+level_10 <- 
+  d %>% 
+  count(gsa_region) %>% 
+  arrange(desc(n)) %>% 
+  slice(10) %>% 
+  pull(n)
+
+d %>%
+  # mutate(gsa_region = fct_lump_min(gsa_region, min = level_10)) %>%
+  group_by(.cluster_5) %>%
+  count(gsa_region) %>%
+  ungroup() %>%
+  left_join(d %>%
+              count(.cluster_5, name = "tot")) %>%
+  mutate(prop = n / tot) %>%
+  ggplot(aes(x = .cluster_5, y =  prop, fill = .cluster_5)) +
+  geom_col(position = "dodge")  +
+  facet_wrap(facets = vars(gsa_region), scales = "free_y")
+```
+
+#### Position category
+
+##### Two clusters
+
+```{r}
+level_10 <- 
+  d %>% 
+  count(position_category_description) %>% 
+  arrange(desc(n)) %>% 
+  slice(10) %>% 
+  pull(n)
+
+d %>%
+  # mutate(position_category_description = fct_lump_min(position_category_description, min = level_10)) %>%
+  group_by(.cluster_2) %>%
+  count(position_category_description) %>%
+  ungroup() %>%
+  left_join(d %>%
+              count(.cluster_2, name = "tot")) %>%
+  mutate(prop = n / tot) %>%
+  ggplot(aes(x = .cluster_2, y =  prop, fill = .cluster_2)) +
+  geom_col(position = "dodge")  +
+  facet_wrap(facets = vars(position_category_description), scales = "free_y")
+```
+
+##### Five clusters
+
+```{r}
+level_10 <- 
+  d %>% 
+  count(position_category_description) %>% 
+  arrange(desc(n)) %>% 
+  slice(10) %>% 
+  pull(n)
+
+d %>%
+  # mutate(position_category_description = fct_lump_min(position_category_description, min = level_10)) %>%
+  group_by(.cluster_5) %>%
+  count(position_category_description) %>%
+  ungroup() %>%
+  left_join(d %>%
+              count(.cluster_5, name = "tot")) %>%
+  mutate(prop = n / tot) %>%
+  ggplot(aes(x = .cluster_5, y =  prop, fill = .cluster_5)) +
+  geom_col(position = "dodge")  +
+  facet_wrap(facets = vars(position_category_description), scales = "free_y")
+```
+
+#### Position category
+
+##### Two clusters
+
+```{r}
+level_10 <- 
+  d %>% 
+  count(grade) %>% 
+  arrange(desc(n)) %>% 
+  slice(10) %>% 
+  pull(n)
+
+d %>%
+  mutate(grade = fct_lump_min(grade, min = level_10)) %>%
+  group_by(.cluster_2) %>%
+  count(grade) %>%
+  ungroup() %>%
+  left_join(d %>%
+              count(.cluster_2, name = "tot")) %>%
+  mutate(prop = n / tot) %>%
+  ggplot(aes(x = .cluster_2, y =  prop, fill = .cluster_2)) +
+  geom_col(position = "dodge")  +
+  facet_wrap(facets = vars(grade), scales = "free_y")
+```
+
+##### Five clusters
+
+```{r}
+level_10 <- 
+  d %>% 
+  count(grade) %>% 
+  arrange(desc(n)) %>% 
+  slice(10) %>% 
+  pull(n)
+
+d %>%
+  mutate(grade = fct_lump_min(grade, min = level_10)) %>%
+  group_by(.cluster_5) %>%
+  count(grade) %>%
+  ungroup() %>%
+  left_join(d %>%
+              count(.cluster_5, name = "tot")) %>%
+  mutate(prop = n / tot) %>%
+  ggplot(aes(x = .cluster_5, y =  prop, fill = .cluster_5)) +
+  geom_col(position = "dodge")  +
+  facet_wrap(facets = vars(grade), scales = "free_y")
 ```
 
 
@@ -458,64 +560,85 @@ Clusters 2(1): **Teleworkers**
 
 Very low number of days reporting to the job site. Majority of time telework. Very few days co-located with at least one team member, a supervisor, or the whole team. Many days where the whole team is co-located, but not the majority. High number of working days.
 
+Position categories tend to be Offsite, Onsite Flexible, and Position Has Changed. A very small proportion of Onsite Required. 
+
 Few people exit employment (~3%) and some have multiple supervisors (~26%).
 
-Disproportionately from FAS, GSA IT, OCFO, OGP, and OHRM, and fewer in PBS
+Disproportionately from FAS, GSA IT, OCFO, OGP, and OHRM, and fewer in PBS.
+
+Disproportionately in Region 0.
 
 Clusters 2(2): **Everyone else**
 
 Higher number of days reporting to job site, but with large variance. Lower proportion of days teleworking, but still about a quarter of days. Again, higher variance of telework. Some days co-located with at least one team member and the majority of days working at the site. Many days working onsite with supervisor, but very few days where the whole team is co-located. Very few days where the whole team is co-located. Lower number of working days.
 
+Position categories tend to be Onsite Required. All (Missing) and most are in this cluster.
+
 Some people exit employment (~15%) and some have multiple supervisors (~22%).
 
 Majority are from PBS.
+
+Disproportionately in all regions apart from 0.
 
 Clusters 5(1): **Teleworkers**
 
 Very low number of days (~3) reporting to the job site. Most days (~119) employees telework. Hardly any days co-located with at least one team member (<1), supervisor (<1), or whole team (<1). Many days (~54) where entire team works remotely. Many working days (~122). Team is average size (~6).
 
+Position categories tend to be Offsite and Position Has Changed. A small proportion of Onsite Required.
+
 Almost no one (<.1%) exit employment. Some have multiple employers (20-30%).
 
 High proportion in FAS, GSAIT, OCFO, OGP, OHRM, OSDBU and lower in PBS, OCE, IOA, and OMA.
+
+Disproportionately in Region 0 and Region 2.
 
 Clusters 5(2): **Teleworkers that go to the office sometimes**
 
 A few days (~14) working at the job site, but high variation. Majority of days(~98) employees telework. Some days co-located with at least one team member (~6) or supervisor (~3). Few days co-located with entire team (~1).  Some days (~19) where the entire team works remotely. Many working days (~112). Team is large (~9).
 
+Position categories tend to be Offsite and Position Has Changed. A small proportion of Onsite Required.
+
 Very few people exit employment (~3%). Some have multiple employers (20-30%).
 
 High proportion in FAS, GSAIT, OCFO, OCR, OGP, OHRM, OSDBU and lower in PBS, OCE, OSC, OSDBU, IOA, and OMA.
+
+Disproportionately in Region 0.
 
 Clusters 5(3): **Hybrid workers**
 
 Some days (~69) with employees working to the job site. Staff often telework (~48), but high variance. Many days co-located with at least one team member (~29) or with supervisor (~13). Few days co-located with entire team (~1). Few days (~5) where the whole team is remote.  Many working days (~115). Team is average size (~6).
 
+Position categories tend to be Onsite Flexible.
+
 Very few people exit employment (~2%). Some have multiple employers (20-30%).
 
 High proportion in IOA, OGC, OMA, OSC, and PBS and lower in FAS, GSA IT, OCE, OCFO, OCR, OGP, OHRM, and OSDBU.
+
+Disproportionately in Region 1, Region 4, Region 5, Region 8, Region 9, and Region 10.
 
 Clusters 5(4): **Onsite workers**
 
 Employees that report to the job site for most days (~97). Some days (~22) telework. Many days co-located with at least one team member (~74), supervisor (~60), or whole team (~17), but high variance. Few days (~4) where the whole team is remote, but high variance. Many working days (~119). Team is smaller (~5).
 
+Position categories tend to be Onsite Required.
+
 Very few people exit employment (~2%). Some have multiple employers (20-30%).
 
 High proportion in OAS, and PBS, and lower in FAS, GSA IT, IOA, OCE, OCFO, OCIA, OCR, OGC, OGP, OHRM, OMA, OSC, and OSDBU.
+
+Disproportionately in Region 1, Region 2, Region 3, Region 6, Region 7, Region 8, Region 9, Region 10, and Region 11. Very low proportion in Region 0.
 
 Clusters 5(5): **Non-workers**
 
 Low number of days (~5) reporting to the site, but high variance. Some days (~27) telework, but high variance. Few days co-located with at least one team member (2)  or with supervisor (~1). Almost no days (<1) with the whole team co-located. Several days (~9) where the entire team works remotely. Few working days (~34) and high variance. Team is large (~9) and high variance.
 
+Appear across all position categories and make up all of those that are (Missing).
+
 Many people exit employment (~54%). Some have multiple employers (20-30%).
 
 High proportion in FAS, GSA IT, OCE, OCIA, OCR, OSC, and OSDBU and lower in OMA.
 
-```{r}
-d %>% 
-  group_by(.cluster_5) %>% 
-  skim(exit_employment,
-       multiple_supervisors) 
-```
+Fairly even dispersion across regions. 
 
 ```{r}
 names(d)
