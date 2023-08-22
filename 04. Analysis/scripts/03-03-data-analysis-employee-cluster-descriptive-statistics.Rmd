@@ -245,35 +245,6 @@ d %>%
 
 
 
-## Cluster descriptions {.tabset .tabset-pills}
-
-Clusters 2(1): **Teleworkers**
-
-Very low number of days reporting to the job site. Majority of time telework. Very few days co-located with at least one team member, a supervisor, or the whole team. Many days where the whole team is co-located, but not the majority. High number of working days.
-
-Clusters 2(2): **Everyone else**
-
-Higher number of days reporting to job site, but with large variance. Lower proportion of days teleworking, but still about a quarter of days. Again, higher variance of telework. Some days co-located with at least one team member and the majority of days working at the site. Many days working onsite with supervisor, but very few days where the whole team is co-located. Very few days where the whole team is co-located. Lower number of working days.
-
-Clusters 5(1): **Teleworkers**
-
-Very low number of days (~3) reporting to the job site. Most days (~119) employees telework. Hardly any days co-located with at least one team member (<1), supervisor (<1), or whole team (<1). Many days (~54) where entire team works remotely. Many working days (~122). Team is average size (~6).
-
-Clusters 5(2): **Teleworkers that go to the office sometimes**
-
-A few days (~14) working at the job site, but high variation. Majority of days(~98) employees telework. Some days co-located with at least one team member (~6) or supervisor (~3). Few days co-located with entire team (~1).  Some days (~19) where the entire team works remotely. Many working days (~112). Team is large (~9).
-
-Clusters 5(3): **Hybrid workers**
-
-Some days (~69) with employees working to the job site. Staff often telework (~48), but high variance. Many days co-located with at least one team member (~29) or with supervisor (~13). Few days co-located with entire team (~1). Few days (~5) where the whole team is remote.  Many working days (~115). Team is average size (~6).
-
-Clusters 5(4): **Onsite workers**
-
-Employees that report to the job site for most days (~97). Some days (~22) telework. Many days co-located with at least one team member (~74), supervisor (~60), or whole team (~17), but high variance. Few days (~4) where the whole team is remote, but high variance. Many working days (~119). Team is smaller (~5)
-
-Clusters 5(5): **Non-workers**
-Low number of days (~5) reporting to the site, but high variance. Some days (~27) telework, but high variance. Few days co-located with at least one team member (2)  or with supervisor (~1). Almost no days (<1) with the whole team co-located. Several days (~9) where the entire team works remotely. Few working days (~34) and high variance. Team is large (~9) and high variance. 
-
 ## Work pattern statistics {.tabset .tabset-pills}
 
 ### Summary statistics
@@ -505,7 +476,7 @@ d %>%
   facet_wrap(facets = vars(position_category_description), scales = "free_y")
 ```
 
-#### Position category
+#### Grade
 
 ##### Two clusters
 
@@ -553,6 +524,207 @@ d %>%
   facet_wrap(facets = vars(grade), scales = "free_y")
 ```
 
+#### Occupational series
+
+##### Two clusters
+
+```{r}
+level_10 <- 
+  d %>% 
+  count(occupational_series) %>% 
+  arrange(desc(n)) %>% 
+  slice(10) %>% 
+  pull(n)
+
+d %>%
+  mutate(occupational_series = fct_lump_min(occupational_series, min = level_10)) %>%
+  group_by(.cluster_2) %>%
+  count(occupational_series) %>%
+  ungroup() %>%
+  left_join(d %>%
+              count(.cluster_2, name = "tot")) %>%
+  mutate(prop = n / tot) %>%
+  ggplot(aes(x = .cluster_2, y =  prop, fill = .cluster_2)) +
+  geom_col(position = "dodge")  +
+  facet_wrap(facets = vars(occupational_series), scales = "free_y")
+```
+
+##### Five clusters
+
+```{r}
+level_10 <- 
+  d %>% 
+  count(occupational_series) %>% 
+  arrange(desc(n)) %>% 
+  slice(10) %>% 
+  pull(n)
+
+d %>%
+  mutate(occupational_series = fct_lump_min(occupational_series, min = level_10)) %>%
+  group_by(.cluster_5) %>%
+  count(occupational_series) %>%
+  ungroup() %>%
+  left_join(d %>%
+              count(.cluster_5, name = "tot")) %>%
+  mutate(prop = n / tot) %>%
+  ggplot(aes(x = .cluster_5, y =  prop, fill = .cluster_5)) +
+  geom_col(position = "dodge")  +
+  facet_wrap(facets = vars(occupational_series), scales = "free_y")
+```
+
+#### Position title
+
+##### Two clusters
+
+```{r}
+level_10 <- 
+  d %>% 
+  count(position_title) %>% 
+  arrange(desc(n)) %>% 
+  slice(10) %>% 
+  pull(n)
+
+d %>%
+  mutate(position_title = fct_lump_min(position_title, min = level_10)) %>%
+  group_by(.cluster_2) %>%
+  count(position_title) %>%
+  ungroup() %>%
+  left_join(d %>%
+              count(.cluster_2, name = "tot")) %>%
+  mutate(prop = n / tot) %>%
+  ggplot(aes(x = .cluster_2, y =  prop, fill = .cluster_2)) +
+  geom_col(position = "dodge")  +
+  facet_wrap(facets = vars(position_title), scales = "free_y", ncol = 3) +
+  theme(
+    legend.position = "none"
+  )
+```
+
+##### Five clusters
+
+```{r}
+level_10 <- 
+  d %>% 
+  count(position_title) %>% 
+  arrange(desc(n)) %>% 
+  slice(10) %>% 
+  pull(n)
+
+d %>%
+  mutate(position_title = fct_lump_min(position_title, min = level_10)) %>%
+  group_by(.cluster_5) %>%
+  count(position_title) %>%
+  ungroup() %>%
+  left_join(d %>%
+              count(.cluster_5, name = "tot")) %>%
+  mutate(prop = n / tot) %>%
+  ggplot(aes(x = .cluster_5, y =  prop, fill = .cluster_5)) +
+  geom_col(position = "dodge")  +
+   facet_wrap(facets = vars(position_title), scales = "free_y", ncol = 3) +
+  theme(
+    legend.position = "none"
+  )
+```
+
+#### State
+
+##### Two clusters
+
+```{r}
+level_10 <- 
+  d %>% 
+  count(location_state) %>% 
+  arrange(desc(n)) %>% 
+  slice(10) %>% 
+  pull(n)
+
+d %>%
+  mutate(location_state = fct_lump_min(location_state, min = level_10)) %>%
+  group_by(.cluster_2) %>%
+  count(location_state) %>%
+  ungroup() %>%
+  left_join(d %>%
+              count(.cluster_2, name = "tot")) %>%
+  mutate(prop = n / tot) %>%
+  ggplot(aes(x = .cluster_2, y =  prop, fill = .cluster_2)) +
+  geom_col(position = "dodge")  +
+  facet_wrap(facets = vars(location_state), scales = "free_y")
+```
+
+##### Five clusters
+
+```{r}
+level_10 <- 
+  d %>%
+  count(location_state) %>% 
+  arrange(desc(n)) %>% 
+  slice(10) %>% 
+  pull(n)
+
+d %>%
+  mutate(location_state = fct_lump_min(location_state, min = level_10)) %>%
+  group_by(.cluster_5) %>%
+  count(location_state) %>%
+  ungroup() %>%
+  left_join(d %>%
+              count(.cluster_5, name = "tot")) %>%
+  mutate(prop = n / tot) %>%
+  ggplot(aes(x = .cluster_5, y =  prop, fill = .cluster_5)) +
+  geom_col(position = "dodge")  +
+  facet_wrap(facets = vars(location_state), scales = "free_y")
+```
+
+#### City, State
+
+##### Two clusters
+
+```{r}
+level_10 <- 
+  d %>% 
+  unite(loc, location_city, location_state, sep = ", ") %>% 
+  count(loc) %>% 
+  arrange(desc(n)) %>% 
+  slice(15) %>% 
+  pull(n)
+
+d %>%
+  unite(loc, location_city, location_state, sep = ", ") %>% 
+  mutate(loc = fct_lump_min(loc, min = level_10)) %>%
+  group_by(.cluster_2) %>%
+  count(loc) %>%
+  ungroup() %>%
+  left_join(d %>%
+              count(.cluster_2, name = "tot")) %>%
+  mutate(prop = n / tot) %>%
+  ggplot(aes(x = .cluster_2, y =  prop, fill = .cluster_2)) +
+  geom_col(position = "dodge")  +
+  facet_wrap(facets = vars(loc), scales = "free_y")
+```
+
+##### Five clusters
+
+```{r}
+level_10 <- 
+  d %>%
+  unite(loc, location_city, location_state, sep = ", ") %>% 
+  count(loc) %>% 
+  arrange(desc(n)) %>% 
+  slice(15) %>% 
+  pull(n)
+
+d %>%
+  unite(loc, location_city, location_state, sep = ", ") %>% 
+  mutate(loc = fct_lump_min(loc, min = level_10)) %>%
+  group_by(.cluster_5) %>%
+  count(loc) %>%
+  ungroup() %>%
+  left_join(d %>%
+              count(.cluster_5, name = "tot")) %>%
+  mutate(prop = n / tot) %>%
+  ggplot(aes(x = .cluster_5, y =  prop, fill = .cluster_5)) +
+  geom_col(position = "dodge")  +
+  facet_wrap(facets = vars(loc), scales = "free_y")
+```
 
 ## Cluster descriptions {.tabset .tabset-pills}
 
@@ -566,7 +738,15 @@ Few people exit employment (~3%) and some have multiple supervisors (~26%).
 
 Disproportionately from FAS, GSA IT, OCFO, OGP, and OHRM, and fewer in PBS.
 
-Disproportionately in Region 0.
+Disproportionately in Region 0. 
+
+More often located in the states of Georgia, Illinois, Maryland, Pennsylvania, and Virginia, and in the cities of Alexandria (VA), Arlington (VA), Atlanta (GA), Auburn (WA), Chicago (IL), Fort Worth (TX), Philadelphia (PA), San Diego (CA), and San Francisco (CA).
+
+Primarily Grades 13, 14, and 15.
+
+Higher proportion in series 0301 (Miscellaneous Administration and Program Series), 0343 (Management and Program Analysis Series), 0501 (Financial Administration and Program Series), 0560 (Budget Analysis Series), 1102 (Contracting Series), 1170 (Realty Series), 2150 (Transportation Operations Series), and 2210 (Information Technology Management Series).
+
+More likely to be Budget Analysts, Contract Specialists, Program Analysts, Realty Specialists, Supervisory Contract Specialists, Transportation Operations Specialists, and other less common series. 
 
 Clusters 2(2): **Everyone else**
 
@@ -580,6 +760,14 @@ Majority are from PBS.
 
 Disproportionately in all regions apart from 0.
 
+More often located in DC, and less common states, and in the cities of Boston (MA), Kansas City (MO), Los Angeles (CA), and Washington DC. 
+
+Primarily in Grades below 13.
+
+Higher proportion in series 1176 (Building Management Series).
+
+More likely to be Building Management Specialists, Building Managers, and Construction Control Representatives. 
+
 Clusters 5(1): **Teleworkers**
 
 Very low number of days (~3) reporting to the job site. Most days (~119) employees telework. Hardly any days co-located with at least one team member (<1), supervisor (<1), or whole team (<1). Many days (~54) where entire team works remotely. Many working days (~122). Team is average size (~6).
@@ -591,6 +779,14 @@ Almost no one (<.1%) exit employment. Some have multiple employers (20-30%).
 High proportion in FAS, GSAIT, OCFO, OGP, OHRM, OSDBU and lower in PBS, OCE, IOA, and OMA.
 
 Disproportionately in Region 0 and Region 2.
+
+More often located in the states of Georgia, Maryland, Missouri, New York, Pennsylvania, and Virginia, and in the cities of Alexandria (VA), New York (NY), and Philadelphia (PA).
+
+Higher proportions in Grades 13, 14, and 15.
+
+Higher proportion in series 0343 (Management and Program Analysis Series), 0501 (Financial Administration and Program Series), 0560 (Budget Analysis Series), 1102 (Contracting Series), and 2210 (Information Technology Management Series).
+
+More likely to be Budget Analysts, Contract Specialists, Program Analysts, and Supervisory Constract Specialists. 
 
 Clusters 5(2): **Teleworkers that go to the office sometimes**
 
@@ -604,6 +800,14 @@ High proportion in FAS, GSAIT, OCFO, OCR, OGP, OHRM, OSDBU and lower in PBS, OCE
 
 Disproportionately in Region 0.
 
+More often located in the states of Georgia, Illinois, Maryland, and Virginia, and in the cities of Alexandria (VA), Arlington (VA), and San Diego (CA). 
+
+Higher proportions in Grades 13, 14, and 15.
+
+Higher proportion in series series 0343 (Management and Program Analysis Series), 0501 (Financial Administration and Program Series), 0560 (Budget Analysis Series), 1102 (Contracting Series), and 2210 (Information Technology Management Series).
+
+More likely to be Budget Analysts, Contract Specialists, Program Analysts, Realty Specialists, and Supervisory Constract Specialists. 
+
 Clusters 5(3): **Hybrid workers**
 
 Some days (~69) with employees working to the job site. Staff often telework (~48), but high variance. Many days co-located with at least one team member (~29) or with supervisor (~13). Few days co-located with entire team (~1). Few days (~5) where the whole team is remote.  Many working days (~115). Team is average size (~6).
@@ -615,6 +819,14 @@ Very few people exit employment (~2%). Some have multiple employers (20-30%).
 High proportion in IOA, OGC, OMA, OSC, and PBS and lower in FAS, GSA IT, OCE, OCFO, OCR, OGP, OHRM, and OSDBU.
 
 Disproportionately in Region 1, Region 4, Region 5, Region 8, Region 9, and Region 10.
+
+More often located in the states of California, Georgia, Illinois, and DC, and in the cities of Atlanta (GA), Auburn (WA), Boston (MA), Chicago (IL), Kansas City (MO), Lakewood (CO),  Los Angeles (CA), San Diego (CA), San Francisco (CA) and Washington DC. 
+
+Higher proportions in Grades 00 and 13.
+
+Higher proportion in series 1101 (General Business and Industry Series), 1170 (Realty Series), 2150 (Transportation Operations Series), and other less common series. 
+
+More likely to be Construction Control Representatives, Program Managers, Realty Specialists, and Transportation Operations Specialists. 
 
 Clusters 5(4): **Onsite workers**
 
@@ -628,6 +840,14 @@ High proportion in OAS, and PBS, and lower in FAS, GSA IT, IOA, OCE, OCFO, OCIA,
 
 Disproportionately in Region 1, Region 2, Region 3, Region 6, Region 7, Region 8, Region 9, Region 10, and Region 11. Very low proportion in Region 0.
 
+More often located in the states of New York, DC, and less common states, and in the cities of Los Angeles (CA), and Washington DC. 
+
+Higher proportions in Grades 05, 11, 12, and other grades with few people in them. 
+
+Higher proportion in series in series 1176 (Building Management Series).
+
+More likely to be Building Management Specialists, Building Managers, and Construction Control Representatives.
+
 Clusters 5(5): **Non-workers**
 
 Low number of days (~5) reporting to the site, but high variance. Some days (~27) telework, but high variance. Few days co-located with at least one team member (2)  or with supervisor (~1). Almost no days (<1) with the whole team co-located. Several days (~9) where the entire team works remotely. Few working days (~34) and high variance. Team is large (~9) and high variance.
@@ -639,6 +859,14 @@ Many people exit employment (~54%). Some have multiple employers (20-30%).
 High proportion in FAS, GSA IT, OCE, OCIA, OCR, OSC, and OSDBU and lower in OMA.
 
 Fairly even dispersion across regions. 
+
+More often located in DC, and in the cities of Alexandria (VA), Arlington (VA), and Washington DC. 
+
+Higher proportions in Grades 04, 15, and other grades with few people in them. 
+
+Higher proportion in series 0301 (Miscellaneous Administration and Program Series), but common in all series. 
+
+Fairly dispersed across position titles. 
 
 ```{r}
 names(d)
