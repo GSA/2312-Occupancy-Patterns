@@ -872,6 +872,11 @@ Fairly dispersed across position titles.
 names(d)
 ```
 
+
+```{r}
+d %>% count(duty_station_code)
+```
+
 # CONTINUE FROM HERE
 
 ```{r}
