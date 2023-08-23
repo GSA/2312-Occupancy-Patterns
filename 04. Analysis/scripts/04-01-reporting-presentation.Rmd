@@ -19,6 +19,8 @@ params:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE,
+                      warning = FALSE,
+                      message = FALSE,
                       fig.width = 8,
                       fig.height = 4,
                       dpi = 300)
@@ -44,6 +46,7 @@ if(!("oesrrr" %in% installed.packages()[,"Package"]))
 {
   devtools::install_github(repo = "GSA/oesrrr")
 }
+install.packages("tigris")
 library(oesrrr)
 library(tidyverse)
 library(janitor)
@@ -57,6 +60,10 @@ library(flextable)
 library(ggthemes)
 library(tidymodels)
 library(patchwork)
+library(sf)
+library(tigris)
+options(tigris_class = "sf")
+options(tigris_use_cache = TRUE)
 ```
 
 ```{r include=FALSE}
@@ -504,4 +511,926 @@ p_1 <-
     axis.text.x = element_text(size = 8))
 
 p_1
+```
+
+# Clusters and position categories
+
+```{r}
+prep_d_01 <- 
+  d %>% 
+  group_by(position_category_description) %>% 
+  count() %>% 
+  ungroup() %>% 
+  arrange(desc(n))
+
+prep_v_01 <- 
+  prep_d_01 %>% 
+  slice(3) %>% 
+  pull(n)
+
+prep_d_02 <-
+  d %>%
+  mutate(position_category_description = fct_lump_min(position_category_description, min = prep_v_01),
+         position_category_description = fct_infreq(position_category_description)) %>%
+  group_by(position_category_description,.cluster_5) %>%
+  count() %>%
+  ungroup() %>%
+  arrange(desc(n)) %>% 
+  rename(num = n) %>% 
+  mutate(
+    position_category_description = fct_relevel(position_category_description, 
+                                               "Offsite",
+                                               "Onsite Flexible",
+                                               "Onsite Required",
+                                               "Other")
+  )
+
+prep_d_03 <- 
+  prep_d_02 %>% 
+  filter(position_category_description != "Other")
+
+prep_d_04 <- 
+  d %>% 
+  group_by(.cluster_5) %>% 
+  count() %>% 
+  ungroup() %>% 
+  arrange(desc(n)) %>% 
+  rename(tot = n)
+
+prep_d_05 <- 
+  prep_d_03 %>% 
+  full_join(prep_d_04) %>% 
+  mutate(
+    n = num/tot,
+    text = scales::comma(num)
+  ) 
+```
+
+```{r}
+p_1 <- 
+  prep_d_05 %>% 
+  ggplot(
+    aes(x = .cluster_5, y = n, fill = .cluster_5)
+  ) +
+  geom_col() +
+  scale_y_continuous(labels = scales::percent) +
+  ylab("Percent of cluster in position category") +
+  facet_wrap(facets = vars(position_category_description), nrow = 1) +
+  theme_light() +
+  theme(
+    legend.position = "None",
+    axis.title.x = element_blank(),
+    axis.text.x = element_text(size = 8))
+
+p_1
+```
+
+# Teleworkers, office visitors, and regions
+
+```{r}
+prep_d_01 <- 
+  d %>% 
+  group_by(gsa_region,.cluster_5) %>% 
+  count() %>% 
+  ungroup() %>% 
+  arrange(desc(n)) %>% 
+  rename(num = n)
+
+prep_d_02 <- 
+  d %>% 
+  group_by(.cluster_5) %>% 
+  count() %>% 
+  ungroup() %>% 
+  arrange(desc(n)) %>% 
+  rename(tot = n)
+
+prep_d_03 <- 
+  prep_d_01 %>% 
+  full_join(prep_d_02) %>% 
+  mutate(
+    n = num/tot,
+    text = scales::comma(num)
+  ) %>% 
+  mutate(
+    gsa_region = fct_reorder(gsa_region,as.numeric(gsa_region))
+  )
+
+prep_d_04 <- 
+  prep_d_03 %>% 
+  filter(.cluster_5 == "Teleworkers" |
+           .cluster_5 == "Office\nvisitors"
+           )
+```
+
+```{r}
+p_1 <- 
+  prep_d_04 %>% 
+  ggplot(
+    aes(x = gsa_region, y = n, fill = gsa_region)
+  ) +
+  geom_col() +
+  scale_y_continuous(labels = scales::percent) +
+  ylab("Percent of cluster in region") +
+  facet_wrap(facets = vars(.cluster_5), nrow = 1) +
+  theme_light() +
+  theme(
+    legend.position = "None",
+    axis.title.x = element_blank(),
+    axis.text.x = element_text(size = 8))
+
+p_1
+```
+
+# Hybrid, onsite, and disconnected workers and regions
+
+```{r}
+prep_d_01 <- 
+  d %>% 
+  group_by(gsa_region,.cluster_5) %>% 
+  count() %>% 
+  ungroup() %>% 
+  arrange(desc(n)) %>% 
+  rename(num = n)
+
+prep_d_02 <- 
+  d %>% 
+  group_by(.cluster_5) %>% 
+  count() %>% 
+  ungroup() %>% 
+  arrange(desc(n)) %>% 
+  rename(tot = n)
+
+prep_d_03 <- 
+  prep_d_01 %>% 
+  full_join(prep_d_02) %>% 
+  mutate(
+    n = num/tot,
+    text = scales::comma(num)
+  ) %>% 
+  mutate(
+    gsa_region = fct_reorder(gsa_region,as.numeric(gsa_region))
+  )
+
+prep_d_04 <- 
+  prep_d_03 %>% 
+  filter(.cluster_5 == "Hybrid\nworkers" |
+           .cluster_5 == "Onsite\nworkers" |
+           .cluster_5 == "Disconnected\nworkers")
+```
+
+```{r}
+p_1 <- 
+  prep_d_04 %>% 
+  ggplot(
+    aes(x = gsa_region, y = n, fill = gsa_region)
+  ) +
+  geom_col() +
+  scale_y_continuous(labels = scales::percent) +
+  ylab("Percent of cluster in region") +
+  facet_wrap(facets = vars(.cluster_5), nrow = 1) +
+  theme_light() +
+  theme(
+    legend.position = "None",
+    axis.title.x = element_blank(),
+    axis.text.x = element_text(size = 8))
+
+p_1
+```
+
+# States: MD, PA, and VA
+
+```{r}
+prep_d_01 <- 
+  d %>% 
+  group_by(location_state,.cluster_5) %>% 
+  count() %>% 
+  ungroup() %>% 
+  arrange(desc(n)) %>% 
+  rename(num = n)
+
+prep_d_02 <- 
+  d %>% 
+  group_by(.cluster_5) %>% 
+  count() %>% 
+  ungroup() %>% 
+  arrange(desc(n)) %>% 
+  rename(tot = n)
+
+prep_d_03 <- 
+  prep_d_01 %>% 
+  full_join(prep_d_02) %>% 
+  mutate(
+    n = num/tot,
+    text = scales::comma(num)
+  )# %>% 
+  # mutate(
+  #   gsa_region = fct_reorder(gsa_region,as.numeric(gsa_region))
+  # )
+
+prep_d_04 <- 
+  prep_d_03 %>% 
+  filter(location_state %in% c("MD","PA","VA")
+           )
+```
+
+```{r}
+p_1 <- 
+  prep_d_04 %>% 
+  ggplot(
+    aes(x = .cluster_5, y = n, fill = .cluster_5)
+  ) +
+  geom_col() +
+  scale_y_continuous(labels = scales::percent) +
+  ylab("Percent of cluster in state") +
+  facet_wrap(facets = vars(location_state), nrow = 1) +
+  theme_light() +
+  theme(
+    legend.position = "None",
+    axis.title.x = element_blank(),
+    axis.text.x = element_text(size = 8))
+
+p_1
+```
+
+# States: CA and IL
+
+```{r}
+prep_d_01 <- 
+  d %>% 
+  group_by(location_state,.cluster_5) %>% 
+  count() %>% 
+  ungroup() %>% 
+  arrange(desc(n)) %>% 
+  rename(num = n)
+
+prep_d_02 <- 
+  d %>% 
+  group_by(.cluster_5) %>% 
+  count() %>% 
+  ungroup() %>% 
+  arrange(desc(n)) %>% 
+  rename(tot = n)
+
+prep_d_03 <- 
+  prep_d_01 %>% 
+  full_join(prep_d_02) %>% 
+  mutate(
+    n = num/tot,
+    text = scales::comma(num)
+  )# %>% 
+  # mutate(
+  #   gsa_region = fct_reorder(gsa_region,as.numeric(gsa_region))
+  # )
+
+prep_d_04 <- 
+  prep_d_03 %>% 
+  filter(location_state %in% c("CA", "IL")
+           )
+```
+
+```{r}
+p_1 <- 
+  prep_d_04 %>% 
+  ggplot(
+    aes(x = .cluster_5, y = n, fill = .cluster_5)
+  ) +
+  geom_col() +
+  scale_y_continuous(labels = scales::percent) +
+  ylab("Percent of cluster in state") +
+  facet_wrap(facets = vars(location_state), nrow = 1) +
+  theme_light() +
+  theme(
+    legend.position = "None",
+    axis.title.x = element_blank(),
+    axis.text.x = element_text(size = 8))
+
+p_1
+```
+
+# District of Columbia
+
+```{r}
+prep_d_01 <- 
+  d %>% 
+  group_by(location_state,.cluster_5) %>% 
+  count() %>% 
+  ungroup() %>% 
+  arrange(desc(n)) %>% 
+  rename(num = n)
+
+prep_d_02 <- 
+  d %>% 
+  group_by(.cluster_5) %>% 
+  count() %>% 
+  ungroup() %>% 
+  arrange(desc(n)) %>% 
+  rename(tot = n)
+
+prep_d_03 <- 
+  prep_d_01 %>% 
+  full_join(prep_d_02) %>% 
+  mutate(
+    n = num/tot,
+    text = scales::comma(num)
+  )# %>% 
+  # mutate(
+  #   gsa_region = fct_reorder(gsa_region,as.numeric(gsa_region))
+  # )
+
+prep_d_04 <- 
+  prep_d_03 %>% 
+  filter(location_state %in% c("DC")
+           )
+```
+
+```{r}
+p_1 <- 
+  prep_d_04 %>% 
+  ggplot(
+    aes(x = .cluster_5, y = n, fill = .cluster_5)
+  ) +
+  geom_col() +
+  scale_y_continuous(labels = scales::percent) +
+  ylab("Percent of cluster in state") +
+  facet_wrap(facets = vars(location_state), nrow = 1) +
+  theme_light() +
+  theme(
+    legend.position = "None",
+    axis.title.x = element_blank(),
+    axis.text.x = element_text(size = 8))
+
+p_1
+```
+
+# Clusters and staff offices
+
+```{r}
+prep_d_01 <- 
+  d %>% 
+  group_by(gsa_sso) %>% 
+  count() %>% 
+  ungroup() %>% 
+  arrange(desc(n))
+
+prep_v_01 <- 
+  prep_d_01 %>% 
+  slice(2) %>% 
+  pull(n)
+
+prep_d_02 <-
+  d %>%
+  mutate(gsa_sso = fct_lump_min(gsa_sso, min = prep_v_01),
+         gsa_sso = fct_infreq(gsa_sso)) %>%
+  group_by(gsa_sso,.cluster_5) %>%
+  count() %>%
+  ungroup() %>%
+  arrange(desc(n)) %>% 
+  rename(num = n) %>% 
+  mutate(gsa_sso = fct_relevel(gsa_sso,
+                               "PBS",
+                               "FAS",
+                               "OCFO",
+                               "Other"))
+
+prep_d_03 <- 
+  prep_d_02 %>% 
+  filter(gsa_sso != "Other")
+
+prep_d_04 <- 
+  d %>% 
+  group_by(.cluster_5) %>% 
+  count() %>% 
+  ungroup() %>% 
+  arrange(desc(n)) %>% 
+  rename(tot = n)
+
+prep_d_05 <- 
+  prep_d_03 %>% 
+  full_join(prep_d_04) %>% 
+  mutate(
+    n = num/tot,
+    text = scales::comma(num)
+  ) 
+```
+
+```{r}
+p_1 <- 
+  prep_d_05 %>% 
+  ggplot(
+    aes(x = .cluster_5, y = n, fill = .cluster_5)
+  ) +
+  geom_col() +
+  scale_y_continuous(labels = scales::percent) +
+  ylab("Percent of cluster in staff office") +
+  facet_wrap(facets = vars(gsa_sso), nrow = 1) +
+  theme_light() +
+  theme(
+    legend.position = "None",
+    axis.title.x = element_blank(),
+    axis.text.x = element_text(size = 7))
+
+p_1
+```
+
+
+# Clusters and series
+
+```{r}
+prep_d_01 <- 
+  d %>% 
+  group_by(occupational_series) %>% 
+  count() %>% 
+  ungroup() %>% 
+  arrange(desc(n))
+
+prep_v_01 <- 
+  prep_d_01 %>% 
+  slice(3) %>% 
+  pull(n)
+
+prep_d_02 <-
+  d %>%
+  mutate(
+    # occupational_series = fct_lump_min(occupational_series, min = prep_v_01),
+    occupational_series = fct_infreq(occupational_series)
+  ) %>%
+  group_by(occupational_series, .cluster_5) %>%
+  count() %>%
+  ungroup() %>%
+  arrange(desc(n)) %>%
+  rename(num = n) %>%
+  mutate(
+    # occupational_series = fct_relevel(occupational_series,
+    #                                   "1102",
+    #                                   "1101",
+    #                                   "0343",
+    #                                   "Other"),
+    occupational_series = recode(occupational_series,
+                                 "1102" = "Contracting",
+                                 "1101" = "General Business and Industry",
+                                 "0343" = "Management and Program Analysis",
+                                 "0501" = "Financial Administration and Program",
+                                 "0560" = "Budget Analysis",
+                                 "0301" = "Miscellaneous Administration and Program",
+                                 "1170" = "Realty",
+                                 "1176" = "Building Management",
+                                 "2150" = "Transportation Operations",
+                                 "2210" = "Information Technology Management"
+                                 ),
+    occupational_series = fct_relevel(
+      occupational_series,
+      "Budget Analysis",
+      "Building Management",
+      "Contracting",
+      "Financial Administration and Program",
+      "General Business and Industry",
+      "Information Technology Management",
+      "Management and Program Analysis",
+      "Miscellaneous Administration and Program",
+      "Realty",
+      "Transportation Operations",
+    )
+  )
+
+# prep_d_02
+```
+
+
+```{r}
+prep_d_03 <-
+  prep_d_02 %>%
+  filter(
+    occupational_series %in%
+      c(
+        # "Budget Analysis",
+        # "Building Management",
+        "Contracting",
+        # "Financial Administration and Program",
+        # "General Business and Industry",
+        # "Information Technology Management",
+        "Management and Program Analysis",
+        "Miscellaneous Administration and Program"
+        # "Realty",
+        # "Transportation Operations"
+      )
+  )
+
+prep_d_04 <- 
+  d %>% 
+  group_by(.cluster_5) %>% 
+  count() %>% 
+  ungroup() %>% 
+  arrange(desc(n)) %>% 
+  rename(tot = n)
+
+prep_d_05 <- 
+  prep_d_03 %>% 
+  full_join(prep_d_04) %>% 
+  mutate(
+    n = num/tot,
+    text = scales::comma(num)
+  ) %>% 
+  mutate(
+    occupational_series = fct_relabel(occupational_series,~str_wrap(.,width = 15))
+  )
+```
+
+```{r}
+p_1 <- 
+  prep_d_05 %>% 
+  ggplot(
+    aes(x = .cluster_5, y = n, fill = .cluster_5)
+  ) +
+  geom_col() +
+  scale_y_continuous(labels = scales::percent) +
+  ylab("Percent of cluster in series") +
+  facet_wrap(facets = vars(occupational_series), nrow = 1) +
+  theme_light() +
+  theme(
+    legend.position = "None",
+    axis.title.x = element_blank(),
+    axis.text.x = element_text(size = 7))
+
+p_1
+```
+
+# Clusters and series
+
+```{r}
+prep_d_01 <- 
+  d %>% 
+  group_by(occupational_series) %>% 
+  count() %>% 
+  ungroup() %>% 
+  arrange(desc(n))
+
+prep_v_01 <- 
+  prep_d_01 %>% 
+  slice(3) %>% 
+  pull(n)
+
+prep_d_02 <-
+  d %>%
+  mutate(
+    # occupational_series = fct_lump_min(occupational_series, min = prep_v_01),
+    occupational_series = fct_infreq(occupational_series)
+  ) %>%
+  group_by(occupational_series, .cluster_5) %>%
+  count() %>%
+  ungroup() %>%
+  arrange(desc(n)) %>%
+  rename(num = n) %>%
+  mutate(
+    # occupational_series = fct_relevel(occupational_series,
+    #                                   "1102",
+    #                                   "1101",
+    #                                   "0343",
+    #                                   "Other"),
+    occupational_series = recode(occupational_series,
+                                 "1102" = "Contracting",
+                                 "1101" = "General Business and Industry",
+                                 "0343" = "Management and Program Analysis",
+                                 "0501" = "Financial Administration and Program",
+                                 "0560" = "Budget Analysis",
+                                 "0301" = "Miscellaneous Administration and Program",
+                                 "1170" = "Realty",
+                                 "1176" = "Building Management",
+                                 "2150" = "Transportation Operations",
+                                 "2210" = "Information Technology Management"
+                                 ),
+    occupational_series = fct_relevel(
+      occupational_series,
+      "Budget Analysis",
+      "Building Management",
+      "Contracting",
+      "Financial Administration and Program",
+      "General Business and Industry",
+      "Information Technology Management",
+      "Management and Program Analysis",
+      "Miscellaneous Administration and Program",
+      "Realty",
+      "Transportation Operations",
+    )
+  )
+
+# prep_d_02
+```
+
+
+```{r}
+prep_d_03 <-
+  prep_d_02 %>%
+  filter(
+    occupational_series %in%
+      c(
+        "Budget Analysis",
+        # "Building Management",
+        # "Contracting",
+        "Financial Administration and Program",
+        # "General Business and Industry",
+        "Information Technology Management",
+        # "Management and Program Analysis",
+        # "Miscellaneous Administration and Program"
+        # "Realty",
+        # "Transportation Operations"
+      )
+  )
+
+prep_d_04 <- 
+  d %>% 
+  group_by(.cluster_5) %>% 
+  count() %>% 
+  ungroup() %>% 
+  arrange(desc(n)) %>% 
+  rename(tot = n)
+
+prep_d_05 <- 
+  prep_d_03 %>% 
+  full_join(prep_d_04) %>% 
+  mutate(
+    n = num/tot,
+    text = scales::comma(num)
+  ) %>% 
+  mutate(
+    occupational_series = fct_relabel(occupational_series,~str_wrap(.,width = 15))
+  )
+```
+
+```{r}
+p_1 <- 
+  prep_d_05 %>% 
+  ggplot(
+    aes(x = .cluster_5, y = n, fill = .cluster_5)
+  ) +
+  geom_col() +
+  scale_y_continuous(labels = scales::percent) +
+  ylab("Percent of cluster in series") +
+  facet_wrap(facets = vars(occupational_series), nrow = 1) +
+  theme_light() +
+  theme(
+    legend.position = "None",
+    axis.title.x = element_blank(),
+    axis.text.x = element_text(size = 7))
+
+p_1
+```
+
+
+# Clusters and series
+
+```{r}
+prep_d_01 <- 
+  d %>% 
+  group_by(occupational_series) %>% 
+  count() %>% 
+  ungroup() %>% 
+  arrange(desc(n))
+
+prep_v_01 <- 
+  prep_d_01 %>% 
+  slice(3) %>% 
+  pull(n)
+
+prep_d_02 <-
+  d %>%
+  mutate(
+    # occupational_series = fct_lump_min(occupational_series, min = prep_v_01),
+    occupational_series = fct_infreq(occupational_series)
+  ) %>%
+  group_by(occupational_series, .cluster_5) %>%
+  count() %>%
+  ungroup() %>%
+  arrange(desc(n)) %>%
+  rename(num = n) %>%
+  mutate(
+    # occupational_series = fct_relevel(occupational_series,
+    #                                   "1102",
+    #                                   "1101",
+    #                                   "0343",
+    #                                   "Other"),
+    occupational_series = recode(occupational_series,
+                                 "1102" = "Contracting",
+                                 "1101" = "General Business and Industry",
+                                 "0343" = "Management and Program Analysis",
+                                 "0501" = "Financial Administration and Program",
+                                 "0560" = "Budget Analysis",
+                                 "0301" = "Miscellaneous Administration and Program",
+                                 "1170" = "Realty",
+                                 "1176" = "Building Management",
+                                 "2150" = "Transportation Operations",
+                                 "2210" = "Information Technology Management"
+                                 ),
+    occupational_series = fct_relevel(
+      occupational_series,
+      "Budget Analysis",
+      "Building Management",
+      "Contracting",
+      "Financial Administration and Program",
+      "General Business and Industry",
+      "Information Technology Management",
+      "Management and Program Analysis",
+      "Miscellaneous Administration and Program",
+      "Realty",
+      "Transportation Operations",
+    )
+  )
+
+# prep_d_02
+```
+
+
+```{r}
+prep_d_03 <-
+  prep_d_02 %>%
+  filter(
+    occupational_series %in%
+      c(
+        # "Budget Analysis",
+        "Building Management",
+        # "Contracting",
+        # "Financial Administration and Program",
+        "General Business and Industry",
+        # "Information Technology Management",
+        # "Management and Program Analysis",
+        # "Miscellaneous Administration and Program"
+        "Realty",
+        "Transportation Operations"
+      )
+  )
+
+prep_d_04 <- 
+  d %>% 
+  group_by(.cluster_5) %>% 
+  count() %>% 
+  ungroup() %>% 
+  arrange(desc(n)) %>% 
+  rename(tot = n)
+
+prep_d_05 <- 
+  prep_d_03 %>% 
+  full_join(prep_d_04) %>% 
+  mutate(
+    n = num/tot,
+    text = scales::comma(num)
+  )  %>% 
+  mutate(
+    occupational_series = fct_relabel(occupational_series,~str_wrap(.,width = 15))
+  )
+```
+
+```{r}
+p_1 <- 
+  prep_d_05 %>% 
+  ggplot(
+    aes(x = .cluster_5, y = n, fill = .cluster_5)
+  ) +
+  geom_col() +
+  scale_y_continuous(labels = scales::percent) +
+  ylab("Percent of cluster in series") +
+  facet_wrap(facets = vars(occupational_series), nrow = 1) +
+  theme_light() +
+  theme(
+    legend.position = "None",
+    axis.title.x = element_blank(),
+    axis.text.x = element_text(size = 7))
+
+p_1
+```
+
+# Clusters and series
+
+```{r}
+prep_d_01 <- 
+  d %>% 
+  group_by(occupational_series) %>% 
+  count() %>% 
+  ungroup() %>% 
+  arrange(desc(n))
+
+prep_v_01 <- 
+  prep_d_01 %>% 
+  slice(3) %>% 
+  pull(n)
+
+prep_d_02 <-
+  d %>%
+  mutate(
+    # occupational_series = fct_lump_min(occupational_series, min = prep_v_01),
+    occupational_series = fct_infreq(occupational_series)
+  ) %>%
+  group_by(occupational_series, .cluster_5) %>%
+  count() %>%
+  ungroup() %>%
+  arrange(desc(n)) %>%
+  rename(num = n) %>%
+  mutate(
+    # occupational_series = fct_relevel(occupational_series,
+    #                                   "1102",
+    #                                   "1101",
+    #                                   "0343",
+    #                                   "Other"),
+    occupational_series = recode(occupational_series,
+                                 "1102" = "Contracting",
+                                 "1101" = "General Business and Industry",
+                                 "0343" = "Management and Program Analysis",
+                                 "0501" = "Financial Administration and Program",
+                                 "0560" = "Budget Analysis",
+                                 "0301" = "Miscellaneous Administration and Program",
+                                 "1170" = "Realty",
+                                 "1176" = "Building Management",
+                                 "2150" = "Transportation Operations",
+                                 "2210" = "Information Technology Management"
+                                 ),
+    occupational_series = fct_relevel(
+      occupational_series,
+      "Budget Analysis",
+      "Building Management",
+      "Contracting",
+      "Financial Administration and Program",
+      "General Business and Industry",
+      "Information Technology Management",
+      "Management and Program Analysis",
+      "Miscellaneous Administration and Program",
+      "Realty",
+      "Transportation Operations",
+    )
+  )
+
+# prep_d_02
+```
+
+
+```{r}
+prep_d_03 <-
+  prep_d_02 %>%
+  filter(
+    occupational_series %in%
+      c(
+        # "Budget Analysis",
+        "Building Management",
+        # "Contracting",
+        # "Financial Administration and Program",
+        "General Business and Industry",
+        # "Information Technology Management",
+        # "Management and Program Analysis",
+        # "Miscellaneous Administration and Program"
+        "Realty",
+        "Transportation Operations"
+      )
+  )
+
+prep_d_04 <- 
+  d %>% 
+  group_by(.cluster_5) %>% 
+  count() %>% 
+  ungroup() %>% 
+  arrange(desc(n)) %>% 
+  rename(tot = n)
+
+prep_d_05 <- 
+  prep_d_03 %>% 
+  full_join(prep_d_04) %>% 
+  mutate(
+    n = num/tot,
+    text = scales::comma(num)
+  )  %>% 
+  mutate(
+    occupational_series = fct_relabel(occupational_series,~str_wrap(.,width = 15))
+  )
+```
+
+```{r}
+p_1 <- 
+  prep_d_05 %>% 
+  ggplot(
+    aes(x = .cluster_5, y = n, fill = .cluster_5)
+  ) +
+  geom_col() +
+  scale_y_continuous(labels = scales::percent) +
+  ylab("Percent of cluster in series") +
+  facet_wrap(facets = vars(occupational_series), nrow = 1) +
+  theme_light() +
+  theme(
+    legend.position = "None",
+    axis.title.x = element_blank(),
+    axis.text.x = element_text(size = 7))
+
+p_1
+```
+
+```{r}
+# f <- file.path(params$google_drive_home,"03. Data Collection","tiger","tl_2022_us_state.zip")
+# library(tigris)
+# tigris::load_tiger(url = f)
+```
+
+
+# CONTINUE FROM HERE
+
+```{r}
+beepr::beep(sound = 5)
+```
+
+```{r}
+
 ```
