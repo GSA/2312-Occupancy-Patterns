@@ -14,7 +14,6 @@ params:
   in_number_of_clusters_1: 2
   in_number_of_clusters_2: 5
   in_specification: "scale_observation_none_1_20_TRUE"
-  
 ---
 
 ```{r setup, include=FALSE}
@@ -42,11 +41,11 @@ if(!("oesrrr" %in% installed.packages()[,"Package"]))
 {
   devtools::install_github(repo = "GSA/oesrrr")
 }
-if(!("oesrrr" %in% installed.packages()[,"Package"]))
+if(!("oescolorrrs" %in% installed.packages()[,"Package"]))
 {
-  devtools::install_github(repo = "GSA/oesrrr")
+  devtools::install_github(repo = "GSA/oescolorrrs")
 }
-install.packages("tigris")
+# install.packages("tigris")
 library(oesrrr)
 library(tidyverse)
 library(janitor)
@@ -62,6 +61,7 @@ library(tidymodels)
 library(patchwork)
 library(sf)
 library(tigris)
+library(ggrepel)
 options(tigris_class = "sf")
 options(tigris_use_cache = TRUE)
 ```
@@ -168,20 +168,194 @@ d <- d %>%
   )
 ```
 
-# How much telework?
+# What is the GSA priority?
+
+-   Telework has become very common
+
+-   Much of GSA staff telework
+
+-   How employees use telework is not clear
+
+-   Defining and describing different work patterns may help to understand organizational health
+
+-   By understanding how staff work (remote, hybrid, or onsite), different strategies may be developed to improve productivity and staff engagement
+
+# How did the evaluation work?
+
+-   Data:
+
+    -   GSA check-in data, GSA staff roster
+
+    -   March - September 2023
+
+-   All GSA staff
+
+    -   Categorized work patterns by remote or onsite
+
+    -   Rules: Mostly remote or onsite, staff category (flexible, onsite, etc), flexible onsite
+
+    -   Clusters: K-means clusters defined using frequency of work location status, collocation with team members, and team remote work
+
+# Position categories
+
+```{r}
+prep_d_01 <- 
+  d %>% 
+  group_by(position_category_description) %>% 
+  count() %>% 
+  ungroup() %>% 
+  arrange(desc(n))
+
+prep_v_01 <- 
+  prep_d_01 %>% 
+  slice(3) %>% 
+  pull(n)
+
+prep_d_02 <-
+  d %>%
+  mutate(position_category_description = fct_lump_min(position_category_description, min = prep_v_01),
+         position_category_description = fct_infreq(position_category_description)) %>%
+  group_by(position_category_description) %>%
+  count() %>%
+  ungroup() %>%
+  arrange(desc(n)) %>% 
+  rename(num = n)
+```
+
+```{r}
+p_1 <- 
+  prep_d_02 %>% 
+  ggplot(
+    aes(x = position_category_description, y = num, fill = position_category_description)
+  ) +
+  geom_col() +
+  scale_y_continuous(labels = scales::comma) +
+  ylab("Employees") +
+  theme_light() +
+  oescolorrrs::scale_fill_oes() +
+  theme(
+    legend.position = "None",
+    axis.title.x = element_blank(),
+    axis.text.x = element_text(size = 8))
+
+p_1
+```
+
+# Rule-based groups
+
+```{r}
+prep_d_01 <- 
+  d %>%
+  summarise(across(
+    .cols = starts_with("rule_based"),
+    .fns = ~ sum(., rm.na = T)
+  )) %>%
+  select(-contains("_position_category_")) %>%
+  select(-ends_with("observation")) %>%
+  rownames_to_column() %>%
+  pivot_longer(-rowname) %>%
+  select(-rowname) %>%
+  mutate(
+    name = str_remove(name, "rule_based_"),
+    name = str_remove(name, "_working"),
+    name = str_replace_all(name, "_", " "),
+    name = str_to_sentence(name),
+    name = fct_relevel(
+      name,
+      "Primarily teleworking",
+      "Mostly teleworking",
+      "Mostly reporting to job site",
+      "Primarily reporting to job site",
+      "All remote",
+      "Telework onsite minimum"
+    ),
+    name = fct_relabel(name, ~str_wrap(.,width = 20))
+  ) %>% 
+  arrange(name)
+
+prep_d_02 <- 
+  prep_d_01 %>% 
+  mutate(tot = d %>% count() %>% pull(),
+         prop = value/tot,
+         text = scales::percent(prop, accuracy = .1))
+```
+
+```{r}
+p_1 <- 
+  prep_d_01 %>% 
+  ggplot(
+    aes(x = name, y = value, fill = name)
+  ) +
+  geom_col() +
+  geom_text(data = prep_d_02, aes(x = name, y = .5*value, label = text), color = "white") +
+  scale_y_continuous(labels = scales::comma) +
+  ylab("Employees") +
+  theme_light() +
+  oescolorrrs::scale_fill_oes() +
+  theme(
+    legend.position = "None",
+    axis.title.x = element_blank(),
+    axis.text.x = element_text(size = 8))
+
+p_1
+```
+
+# Clusters
+
+1.  Teleworkers
+
+2.  Office visitors
+
+3.  Hybrid workers
+
+4.  Onsite workers
+
+5.  Disconnected workers
+
+# Clusters
+
+```{r}
+prep_d_01 <- 
+  d %>%
+  group_by(.cluster_5) %>% 
+  count() %>% 
+  ungroup()
+ 
+prep_d_02 <- 
+  prep_d_01 %>% 
+  mutate(tot = d %>% count() %>% pull(),
+         prop = n/tot,
+         text = scales::percent(prop, accuracy = .1))
+```
+
+```{r}
+p_1 <- 
+  prep_d_01 %>% 
+  ggplot(
+    aes(x = .cluster_5, y = n, fill = .cluster_5)
+  ) +
+  geom_col() +
+  geom_text(data = prep_d_02, aes(x = .cluster_5, y = .5*n, label = text), color = "white") +
+  scale_y_continuous(labels = scales::comma) +
+  ylab("Employees") +
+  theme_light() +
+  oescolorrrs::scale_fill_oes() +
+  theme(
+    legend.position = "None",
+    axis.title.x = element_blank(),
+    axis.text.x = element_text(size = 8))
+
+p_1
+```
+
+# Clusters: How much telework?
 
 ```{r include=FALSE}
 prep_01 <- 
   d %>% 
   group_by(.cluster_5) %>% 
-  summarise(num = mean(daily_status_teleworking)) %>% 
+  summarise(num = mean(daily_status_reporting_to_job_site)) %>% 
   ungroup()
-
-prep_02 <- 
-  d %>% 
-  group_by(.cluster_5) %>% 
-  summarise(xPos = max(daily_status_teleworking),
-            yPos = max((density(daily_status_teleworking))$y))
 
 prep_02 <- 
   d %>% 
@@ -190,7 +364,6 @@ prep_02 <-
             x = density(daily_status_teleworking)$x[density(daily_status_teleworking)$y == max(density(daily_status_teleworking)$y)]
   )
 ```
-
 
 ```{r}
 p_1 <- 
@@ -202,6 +375,7 @@ p_1 <-
   scale_y_continuous(labels = scales::comma) +
   ylab("Mean days of telework") +
   theme_light() +
+  oescolorrrs::scale_fill_oes() +
   theme(
     legend.position = "None",
     axis.title.x = element_blank(),
@@ -218,13 +392,15 @@ p_2 <-
   xlab("Days of telework") +
   ylab("Density") +
   theme_light() +
+  oescolorrrs::scale_fill_oes() +
+  oescolorrrs::scale_color_oes() +
   theme(legend.position = "None")
 
 
 p_1|p_2
 ```
 
-# How much onsite work?
+# Clusters: How much onsite work?
 
 ```{r include=FALSE}
 prep_01 <- 
@@ -247,7 +423,6 @@ prep_02 <-
   )
 ```
 
-
 ```{r}
 p_1 <- 
   prep_01 %>% 
@@ -258,6 +433,7 @@ p_1 <-
   scale_y_continuous(labels = scales::comma) +
   ylab("Mean days of onsite work") +
   theme_light() +
+  oescolorrrs::scale_fill_oes() +
   theme(
     legend.position = "None",
     axis.title.x = element_blank(),
@@ -274,11 +450,80 @@ p_2 <-
   xlab("Days of onsite work") +
   ylab("Density") +
   theme_light() +
+  oescolorrrs::scale_fill_oes() +
+  oescolorrrs::scale_color_oes() +
   theme(legend.position = "None")
 
 
 p_1|p_2
 ```
+
+# Clusters: Telework and onsite
+
+```{r}
+prep_01 <-
+  d %>%
+  mutate(
+    .cluster_5 = fct_relabel(.cluster_5,~str_wrap(.,width = 50))
+  ) %>% 
+  group_by(.cluster_5) %>%
+  summarise(across
+            (
+              .cols = c(
+                daily_status_teleworking,
+                daily_status_reporting_to_job_site,
+                working_days
+              ),
+              .fns = mean
+            )) %>%
+  ungroup()
+
+d %>%
+  mutate(
+    .cluster_5 = fct_relabel(.cluster_5,~str_wrap(.,width = 50))
+  ) %>% 
+  ggplot(
+    aes(
+      x = daily_status_reporting_to_job_site,
+      y = daily_status_teleworking,
+      color = .cluster_5,
+      fill = .cluster_5,
+      linetype = .cluster_5
+    )
+  ) +
+  geom_jitter(# aes(size = working_days),
+    alpha = .5) +
+  stat_ellipse(
+    geom = "polygon",
+    alpha = .15,
+    size = 2,
+    level = .99
+  ) +
+  geom_text_repel(
+    data = prep_01,
+    aes(x = daily_status_reporting_to_job_site, y = daily_status_teleworking, 
+        label = .cluster_5,
+        fill = .cluster_5),
+    # fill = "white",
+    # alpha = .15,
+    size = 3,
+    force             = 0.5,
+    # nudge_x           = 100,
+    xlim = c(125),
+    ylim = c(50,150),
+    direction         = "y",
+    hjust             = 0,
+    segment.size      = 0.2,
+    segment.curvature = -0.1,
+    color = "black"
+  ) +
+  theme_light() +
+  oescolorrrs::scale_fill_oes() +
+  oescolorrrs::scale_color_oes() +
+  theme(legend.position = "None")
+```
+
+
 
 # Disconnected workers: Working days
 
@@ -302,7 +547,6 @@ prep_02 <-
             x = density(working_days)$x[density(working_days)$y == max(density(working_days)$y)]
   )
 ```
-
 
 ```{r}
 p_1 <- 
@@ -372,143 +616,6 @@ p_1 <-
     axis.title.x = element_blank(),
     axis.text.x = element_text(size = 8)
   )
-
-p_1
-```
-
-# Position categories
-
-```{r}
-prep_d_01 <- 
-  d %>% 
-  group_by(position_category_description) %>% 
-  count() %>% 
-  ungroup() %>% 
-  arrange(desc(n))
-
-prep_v_01 <- 
-  prep_d_01 %>% 
-  slice(3) %>% 
-  pull(n)
-
-prep_d_02 <-
-  d %>%
-  mutate(position_category_description = fct_lump_min(position_category_description, min = prep_v_01),
-         position_category_description = fct_infreq(position_category_description)) %>%
-  group_by(position_category_description) %>%
-  count() %>%
-  ungroup() %>%
-  arrange(desc(n)) %>% 
-  rename(num = n)
-```
-
-```{r}
-p_1 <- 
-  prep_d_02 %>% 
-  ggplot(
-    aes(x = position_category_description, y = num, fill = position_category_description)
-  ) +
-  geom_col() +
-  scale_y_continuous(labels = scales::comma) +
-  ylab("Employees") +
-  theme_light() +
-  theme(
-    legend.position = "None",
-    axis.title.x = element_blank(),
-    axis.text.x = element_text(size = 8))
-
-p_1
-```
-
-# Rule-based groups
-
-```{r}
-prep_d_01 <- 
-  d %>%
-  summarise(across(
-    .cols = starts_with("rule_based"),
-    .fns = ~ sum(., rm.na = T)
-  )) %>%
-  select(-contains("_position_category_")) %>%
-  select(-ends_with("observation")) %>%
-  rownames_to_column() %>%
-  pivot_longer(-rowname) %>%
-  select(-rowname) %>%
-  mutate(
-    name = str_remove(name, "rule_based_"),
-    name = str_remove(name, "_working"),
-    name = str_replace_all(name, "_", " "),
-    name = str_to_sentence(name),
-    name = fct_relevel(
-      name,
-      "Primarily teleworking",
-      "Mostly teleworking",
-      "Mostly reporting to job site",
-      "Primarily reporting to job site",
-      "All remote",
-      "Telework onsite minimum"
-    ),
-    name = fct_relabel(name, ~str_wrap(.,width = 20))
-  ) %>% 
-  arrange(name)
-
-prep_d_02 <- 
-  prep_d_01 %>% 
-  mutate(tot = d %>% count() %>% pull(),
-         prop = value/tot,
-         text = scales::percent(prop, accuracy = .1))
-```
-
-```{r}
-p_1 <- 
-  prep_d_01 %>% 
-  ggplot(
-    aes(x = name, y = value, fill = name)
-  ) +
-  geom_col() +
-  geom_text(data = prep_d_02, aes(x = name, y = .5*value, label = text), color = "white") +
-  scale_y_continuous(labels = scales::comma) +
-  ylab("Employees") +
-  theme_light() +
-  theme(
-    legend.position = "None",
-    axis.title.x = element_blank(),
-    axis.text.x = element_text(size = 8))
-
-p_1
-```
-
-# Clusters
-
-```{r}
-prep_d_01 <- 
-  d %>%
-  group_by(.cluster_5) %>% 
-  count() %>% 
-  ungroup()
- 
-prep_d_02 <- 
-  prep_d_01 %>% 
-  mutate(tot = d %>% count() %>% pull(),
-         prop = n/tot,
-         text = scales::percent(prop, accuracy = .1))
-```
-
-```{r}
-p_1 <- 
-  prep_d_01 %>% 
-  ggplot(
-    aes(x = .cluster_5, y = n, fill = .cluster_5)
-  ) +
-  geom_col() +
-  geom_text(data = prep_d_02, aes(x = .cluster_5, y = .5*n, label = text), color = "white") +
-  scale_y_continuous(labels = scales::comma) +
-  ylab("Employees") +
-  theme_light() +
-  theme(
-    legend.position = "None",
-    axis.title.x = element_blank(),
-    axis.text.x = element_text(size = 8))
 
 p_1
 ```
@@ -932,7 +1039,6 @@ p_1 <-
 p_1
 ```
 
-
 # Clusters and series
 
 ```{r}
@@ -994,7 +1100,6 @@ prep_d_02 <-
 
 # prep_d_02
 ```
-
 
 ```{r}
 prep_d_03 <-
@@ -1116,7 +1221,6 @@ prep_d_02 <-
 # prep_d_02
 ```
 
-
 ```{r}
 prep_d_03 <-
   prep_d_02 %>%
@@ -1128,7 +1232,7 @@ prep_d_03 <-
         # "Contracting",
         "Financial Administration and Program",
         # "General Business and Industry",
-        "Information Technology Management",
+        "Information Technology Management"
         # "Management and Program Analysis",
         # "Miscellaneous Administration and Program"
         # "Realty",
@@ -1175,7 +1279,6 @@ p_1 <-
 p_1
 ```
 
-
 # Clusters and series
 
 ```{r}
@@ -1238,7 +1341,6 @@ prep_d_02 <-
 # prep_d_02
 ```
 
-
 ```{r}
 prep_d_03 <-
   prep_d_02 %>%
@@ -1249,12 +1351,12 @@ prep_d_03 <-
         "Building Management",
         # "Contracting",
         # "Financial Administration and Program",
-        "General Business and Industry",
+        "General Business and Industry"
         # "Information Technology Management",
         # "Management and Program Analysis",
         # "Miscellaneous Administration and Program"
-        "Realty",
-        "Transportation Operations"
+        # "Realty",
+        # "Transportation Operations"
       )
   )
 
@@ -1359,7 +1461,6 @@ prep_d_02 <-
 # prep_d_02
 ```
 
-
 ```{r}
 prep_d_03 <-
   prep_d_02 %>%
@@ -1367,10 +1468,10 @@ prep_d_03 <-
     occupational_series %in%
       c(
         # "Budget Analysis",
-        "Building Management",
+        # "Building Management",
         # "Contracting",
         # "Financial Administration and Program",
-        "General Business and Industry",
+        # "General Business and Industry",
         # "Information Technology Management",
         # "Management and Program Analysis",
         # "Miscellaneous Administration and Program"
@@ -1419,9 +1520,371 @@ p_1
 ```
 
 ```{r}
-# f <- file.path(params$google_drive_home,"03. Data Collection","tiger","tl_2022_us_state.zip")
-# library(tigris)
-# tigris::load_tiger(url = f)
+states()
+```
+
+# TIL
+
+-   Telework is very common - most GSA employees telework
+
+-   Teleworkers and office visitors are very common for those that live in states neighboring DC
+
+-   Employees living in DC are more likely to come to the office 
+
+-   PBS has considerable more onsite work than other offices
+
+
+# Appendix
+
+# Position Categories: How much telework?
+
+```{r include=FALSE}
+prep_d_01 <- 
+  d %>% 
+  group_by(position_category_description) %>% 
+  count() %>% 
+  ungroup() %>% 
+  arrange(desc(n))
+
+prep_v_01 <- 
+  prep_d_01 %>% 
+  slice(3) %>% 
+  pull(n)
+
+prep_01 <- 
+  d %>% 
+   mutate(position_category_description = fct_lump_min(position_category_description, min = prep_v_01),
+         position_category_description = fct_infreq(position_category_description)) %>%
+  group_by(position_category_description) %>% 
+  summarise(num = mean(daily_status_teleworking)) %>% 
+  ungroup()
+
+prep_02 <- 
+  d %>% 
+   mutate(position_category_description = fct_lump_min(position_category_description, min = prep_v_01),
+         position_category_description = fct_infreq(position_category_description)) %>%
+  group_by(position_category_description) %>% 
+  summarise(y = max(density(daily_status_teleworking)$y),
+            x = density(daily_status_teleworking)$x[density(daily_status_teleworking)$y == max(density(daily_status_teleworking)$y)]
+  )
+```
+
+```{r}
+p_1 <- 
+  prep_01 %>% 
+  ggplot(
+    aes(x = position_category_description, y = num, fill = position_category_description)
+  ) +
+  geom_col() +
+  scale_y_continuous(labels = scales::comma) +
+  ylab("Mean days of telework") +
+  theme_light() +
+  theme(
+    legend.position = "None",
+    axis.title.x = element_blank(),
+    axis.text.x = element_text(size = 8))
+
+p_2 <- 
+  d %>% 
+  mutate(position_category_description = fct_lump_min(position_category_description, min = prep_v_01),
+         position_category_description = fct_infreq(position_category_description)) %>%
+  ggplot(
+    aes(x = daily_status_teleworking, color = position_category_description, fill = position_category_description)
+  ) +
+  geom_density(alpha = .5) +
+  # geom_vline(data = prep_01, aes(xintercept = num, color = position_category_description)) +
+  geom_text(data=prep_02, aes(x=x, y=y, label=position_category_description), size = 3, hjust = "inward") +
+  xlab("Days of telework") +
+  ylab("Density") +
+  theme_light() +
+  theme(legend.position = "None")
+
+
+p_1|p_2
+```
+
+# Position Categories: How much onsite work?
+
+```{r include=FALSE}
+prep_d_01 <- 
+  d %>% 
+  group_by(position_category_description) %>% 
+  count() %>% 
+  ungroup() %>% 
+  arrange(desc(n))
+
+prep_v_01 <- 
+  prep_d_01 %>% 
+  slice(3) %>% 
+  pull(n)
+
+prep_01 <- 
+  d %>% 
+   mutate(position_category_description = fct_lump_min(position_category_description, min = prep_v_01),
+         position_category_description = fct_infreq(position_category_description)) %>%
+  group_by(position_category_description) %>% 
+  summarise(num = mean(daily_status_reporting_to_job_site)) %>% 
+  ungroup()
+
+prep_02 <- 
+  d %>% 
+   mutate(position_category_description = fct_lump_min(position_category_description, min = prep_v_01),
+         position_category_description = fct_infreq(position_category_description)) %>%
+  group_by(position_category_description) %>% 
+  summarise(y = max(density(daily_status_reporting_to_job_site)$y),
+            x = density(daily_status_reporting_to_job_site)$x[density(daily_status_reporting_to_job_site)$y == max(density(daily_status_reporting_to_job_site)$y)]
+  )
+```
+
+```{r}
+p_1 <- 
+  prep_01 %>% 
+  ggplot(
+    aes(x = position_category_description, y = num, fill = position_category_description)
+  ) +
+  geom_col() +
+  scale_y_continuous(labels = scales::comma) +
+  ylab("Mean days of onsite work") +
+  theme_light() +
+  theme(
+    legend.position = "None",
+    axis.title.x = element_blank(),
+    axis.text.x = element_text(size = 8))
+
+p_2 <- 
+  d %>% 
+  mutate(position_category_description = fct_lump_min(position_category_description, min = prep_v_01),
+         position_category_description = fct_infreq(position_category_description)) %>%
+  ggplot(
+    aes(x = daily_status_reporting_to_job_site, color = position_category_description, fill = position_category_description)
+  ) +
+  geom_density(alpha = .5) +
+  # geom_vline(data = prep_01, aes(xintercept = num, color = position_category_description)) +
+  geom_text(data=prep_02, aes(x=x, y=y, label=position_category_description), size = 3, hjust = "inward") +
+  xlab("Days of onsite work") +
+  ylab("Density") +
+  theme_light() +
+  theme(legend.position = "None")
+
+
+p_1|p_2
+```
+
+# Rule-based groups: How much telework?
+
+```{r}
+prep_d_01 <-
+  d %>%
+  select(person_id, 
+         rule_based_primarily_teleworking_working,
+         rule_based_mostly_teleworking_working,
+         rule_based_mostly_reporting_to_job_site_working,
+         rule_based_primarily_reporting_to_job_site_working,
+         rule_based_all_remote,
+         rule_based_telework_onsite_minimum,
+         daily_status_teleworking) %>% 
+  pivot_longer(starts_with("rule_based_")) %>% 
+  filter(value == 1) %>% 
+  mutate(
+    name = str_remove(name, "rule_based_"),
+    name = str_remove(name, "_working"),
+    name = str_replace_all(name, "_", " "),
+    name = str_to_sentence(name),
+    name = fct_relevel(
+      name,
+      "Primarily teleworking",
+      "Mostly teleworking",
+      "Mostly reporting to job site",
+      "Primarily reporting to job site",
+      "All remote",
+      "Telework onsite minimum"
+    ),
+    name = fct_relabel(name, ~str_wrap(.,width = 20))
+  ) %>% 
+  arrange(name)
+
+prep_01 <- 
+  prep_d_01 %>% 
+  group_by(name) %>% 
+  summarise(num = mean(daily_status_teleworking)) %>% 
+  ungroup()
+
+prep_02 <- 
+  prep_d_01 %>% 
+  group_by(name) %>% 
+  summarise(y = max(density(daily_status_teleworking)$y),
+            x = density(daily_status_teleworking)$x[density(daily_status_teleworking)$y == max(density(daily_status_teleworking)$y)]
+  )
+```
+
+```{r}
+p_1 <- 
+  prep_01 %>% 
+  ggplot(
+    aes(x = name, y = num, fill = name)
+  ) +
+  geom_col() +
+  scale_y_continuous(labels = scales::comma) +
+  ylab("Mean days of telework") +
+  theme_light() +
+  theme(
+    legend.position = "None",
+    axis.title.x = element_blank(),
+    axis.text.x = element_text(size = 8))
+
+p_2 <- 
+  prep_d_01 %>% 
+  ggplot(
+    aes(x = daily_status_teleworking, color = name, fill = name)
+  ) +
+  geom_density(alpha = .5) +
+  # geom_vline(data = prep_01, aes(xintercept = num, color = name)) +
+  geom_text(data=prep_02, aes(x=x, y=y, label=name), size = 3, hjust = "inward") +
+  xlab("Days of telework") +
+  ylab("Density") +
+  theme_light() +
+  theme(legend.position = "None")
+
+
+p_1|p_2
+```
+
+# Rule-based groups: How much telework?
+
+```{r}
+prep_d_01 <-
+  d %>%
+  select(person_id, 
+         rule_based_primarily_teleworking_working,
+         rule_based_mostly_teleworking_working,
+         rule_based_mostly_reporting_to_job_site_working,
+         rule_based_primarily_reporting_to_job_site_working,
+         rule_based_all_remote,
+         rule_based_telework_onsite_minimum,
+         daily_status_reporting_to_job_site) %>% 
+  pivot_longer(starts_with("rule_based_")) %>% 
+  filter(value == 1) %>% 
+  mutate(
+    name = str_remove(name, "rule_based_"),
+    name = str_remove(name, "_working"),
+    name = str_replace_all(name, "_", " "),
+    name = str_to_sentence(name),
+    name = fct_relevel(
+      name,
+      "Primarily teleworking",
+      "Mostly teleworking",
+      "Mostly reporting to job site",
+      "Primarily reporting to job site",
+      "All remote",
+      "Telework onsite minimum"
+    ),
+    name = fct_relabel(name, ~str_wrap(.,width = 20))
+  ) %>% 
+  arrange(name)
+
+prep_01 <- 
+  prep_d_01 %>% 
+  group_by(name) %>% 
+  summarise(num = mean(daily_status_reporting_to_job_site)) %>% 
+  ungroup()
+
+prep_02 <- 
+  prep_d_01 %>% 
+  group_by(name) %>% 
+  summarise(y = max(density(daily_status_reporting_to_job_site)$y),
+            x = density(daily_status_reporting_to_job_site)$x[density(daily_status_reporting_to_job_site)$y == max(density(daily_status_reporting_to_job_site)$y)]
+  )
+```
+
+```{r}
+p_1 <- 
+  prep_01 %>% 
+  ggplot(
+    aes(x = name, y = num, fill = name)
+  ) +
+  geom_col() +
+  scale_y_continuous(labels = scales::comma) +
+  ylab("Mean days of onsite work") +
+  theme_light() +
+  theme(
+    legend.position = "None",
+    axis.title.x = element_blank(),
+    axis.text.x = element_text(size = 8))
+
+p_2 <- 
+  prep_d_01 %>% 
+  ggplot(
+    aes(x = daily_status_reporting_to_job_site, color = name, fill = name)
+  ) +
+  geom_density(alpha = .5) +
+  # geom_vline(data = prep_01, aes(xintercept = num, color = name)) +
+  geom_text(data=prep_02, aes(x=x, y=y, label=name), size = 3, hjust = "inward") +
+  xlab("Days of onsite work") +
+  ylab("Density") +
+  theme_light() +
+  theme(legend.position = "None")
+
+
+p_1|p_2
+```
+
+# Onsite Flexible: Rule-based groups
+
+```{r}
+prep_d_01 <- 
+  d %>%
+  filter(position_category_description == "Onsite Flexible") %>% 
+  summarise(across(
+    .cols = starts_with("rule_based"),
+    .fns = ~ sum(., rm.na = T)
+  )) %>%
+  select(-contains("_position_category_")) %>%
+  select(-ends_with("observation")) %>%
+  rownames_to_column() %>%
+  pivot_longer(-rowname) %>%
+  select(-rowname) %>%
+  mutate(
+    name = str_remove(name, "rule_based_"),
+    name = str_remove(name, "_working"),
+    name = str_replace_all(name, "_", " "),
+    name = str_to_sentence(name),
+    name = fct_relevel(
+      name,
+      "Primarily teleworking",
+      "Mostly teleworking",
+      "Mostly reporting to job site",
+      "Primarily reporting to job site",
+      "All remote",
+      "Telework onsite minimum"
+    ),
+    name = fct_relabel(name, ~str_wrap(.,width = 20))
+  ) %>% 
+  arrange(name)
+
+prep_d_02 <- 
+  prep_d_01 %>% 
+  mutate(tot = d %>% count() %>% pull(),
+         prop = value/tot,
+         text = scales::percent(prop, accuracy = .1))
+```
+
+```{r}
+p_1 <- 
+  prep_d_01 %>% 
+  ggplot(
+    aes(x = name, y = value, fill = name)
+  ) +
+  geom_col() +
+  geom_text(data = prep_d_02, aes(x = name, y = .5*value, label = text), color = "white") +
+  scale_y_continuous(labels = scales::comma) +
+  ylab("Employees") +
+  theme_light() +
+  theme(
+    legend.position = "None",
+    axis.title.x = element_blank(),
+    axis.text.x = element_text(size = 8))
+
+p_1
 ```
 
 
