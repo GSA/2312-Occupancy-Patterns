@@ -25,6 +25,10 @@ knitr::opts_chunk$set(echo = FALSE,
                       dpi = 300)
 options(scipen=999)
 tictoc::tic()
+if(!("ggalluvial" %in% installed.packages()[,"Package"]))
+{
+  install.packages("ggalluvial")
+}
 if(!("arsenal" %in% installed.packages()[,"Package"]))
 {
   install.packages("arsenal")
@@ -45,6 +49,10 @@ if(!("oescolorrrs" %in% installed.packages()[,"Package"]))
 {
   devtools::install_github(repo = "GSA/oescolorrrs")
 }
+if(!("ggrain" %in% installed.packages()[,"Package"]))
+{
+  install.packages("ggrain")
+}
 # install.packages("tigris")
 library(oesrrr)
 library(tidyverse)
@@ -62,6 +70,8 @@ library(patchwork)
 library(sf)
 library(tigris)
 library(ggrepel)
+library(ggalluvial)
+library(ggrain)
 options(tigris_class = "sf")
 options(tigris_use_cache = TRUE)
 ```
@@ -162,7 +172,7 @@ d <- d %>%
                             "Teleworkers" = "1",
                             "Office visitors" = "2",
                             "Hybrid workers" = "3",
-                            "Onsite workers" = "4",
+                            "In-office workers" = "4",
                             "Disconnected workers" = "5"),
     .cluster_5 = fct_relabel(.cluster_5, ~str_wrap(.x,width = 10))
   )
@@ -354,7 +364,7 @@ p_1
 prep_01 <- 
   d %>% 
   group_by(.cluster_5) %>% 
-  summarise(num = mean(daily_status_reporting_to_job_site)) %>% 
+  summarise(num = mean(daily_status_teleworking)) %>% 
   ungroup()
 
 prep_02 <- 
@@ -399,6 +409,114 @@ p_2 <-
 
 p_1|p_2
 ```
+
+# Clusters: How much telework? (proportion of working)
+
+```{r include=FALSE}
+prep_01 <- 
+  d %>% 
+  group_by(.cluster_5) %>% 
+  summarise(num = mean(daily_status_teleworking_working_prop)) %>% 
+  ungroup()
+
+prep_02 <- 
+  d %>% 
+  group_by(.cluster_5) %>% 
+  summarise(y = max(density(daily_status_teleworking_working_prop)$y),
+            x = density(daily_status_teleworking_working_prop)$x[density(daily_status_teleworking_working_prop)$y == max(density(daily_status_teleworking_working_prop)$y)]
+  )
+```
+
+```{r}
+p_1 <- 
+  prep_01 %>% 
+  ggplot(
+    aes(x = .cluster_5, y = num, fill = .cluster_5)
+  ) +
+  geom_col() +
+  scale_y_continuous(labels = scales::comma) +
+  ylab("Mean days of telework") +
+  theme_light() +
+  oescolorrrs::scale_fill_oes() +
+  theme(
+    legend.position = "None",
+    axis.title.x = element_blank(),
+    axis.text.x = element_text(size = 8))
+
+p_2 <- 
+  d %>% 
+  ggplot(
+    aes(x = daily_status_teleworking_working_prop, color = .cluster_5, fill = .cluster_5)
+  ) +
+  geom_density(alpha = .5) +
+  # geom_vline(data = prep_01, aes(xintercept = num, color = .cluster_5)) +
+  geom_text(data=prep_02, aes(x=x, y=y, label=.cluster_5), size = 3, hjust = "inward") +
+  xlab("Days of telework") +
+  ylab("Density") +
+  theme_light() +
+  oescolorrrs::scale_fill_oes() +
+  oescolorrrs::scale_color_oes() +
+  theme(legend.position = "None")
+
+
+p_1|p_2
+```
+
+# Clusters: How much telework? (proportion of working) (rain)
+
+```{r}
+d %>% 
+  ggplot(
+    aes(x = 1, y = daily_status_teleworking_working_prop, fill = .cluster_5)
+  ) +
+ geom_rain(alpha = .5,
+           rain.side = "r") +
+  coord_flip()
+```
+
+# Clusters: How much telework? (proportion of working) (rain)
+
+```{r}
+prep_01 <-
+  d %>%
+  group_by(.cluster_5) %>%
+  summarise(
+    num = mean(daily_status_teleworking_working_prop),
+    l = quantile(daily_status_teleworking_working_prop, probs = .25),
+    u = quantile(daily_status_teleworking_working_prop, probs = .75)
+  ) %>%
+  ungroup()
+
+# d %>%
+  ggplot(
+  ) +
+  geom_jitter(data = d,
+    aes(
+      x = .cluster_5,
+      y = daily_status_teleworking_working_prop,
+      fill = .cluster_5,
+      color = .cluster_5
+    ),
+    position = position_jitter(0.2), color = "darkgray") +
+  geom_pointrange(
+    aes(
+      x = .cluster_5,
+      fill = .cluster_5,
+      color = .cluster_5,
+      y = num,
+      ymin = l,
+      ymax = u
+    ),
+    data = prep_01
+  )
+
+# Combine with violin plots
+# d %>% 
+#   ggplot(df, aes(dose, len)) +
+#   geom_violin(color = "darkgray", trim = FALSE) + 
+#   geom_pointrange(aes(ymin = len-sd, ymax = len+sd), data = df.summary)
+```
+
 
 # Clusters: How much onsite work?
 
@@ -477,8 +595,11 @@ prep_01 <-
               .fns = mean
             )) %>%
   ungroup()
+```
 
-d %>%
+
+```{r}
+prep_gg_1 <- d %>%
   mutate(
     .cluster_5 = fct_relabel(.cluster_5,~str_wrap(.,width = 50))
   ) %>% 
@@ -490,7 +611,13 @@ d %>%
       fill = .cluster_5,
       linetype = .cluster_5
     )
-  ) +
+  )
+```
+
+
+```{r}
+p_1 <- 
+  prep_gg_1 +
   geom_jitter(# aes(size = working_days),
     alpha = .5) +
   stat_ellipse(
@@ -517,10 +644,70 @@ d %>%
     segment.curvature = -0.1,
     color = "black"
   ) +
+  xlab("Days reporting to the site") +
+  ylab("Days teleworking") +
   theme_light() +
   oescolorrrs::scale_fill_oes() +
   oescolorrrs::scale_color_oes() +
   theme(legend.position = "None")
+```
+
+```{r}
+p_1
+```
+
+```{r}
+p_2 <- 
+  prep_gg_1 +
+  geom_jitter(# aes(size = working_days),
+    alpha = .5,
+    size = .5) +
+  stat_ellipse(
+    geom = "polygon",
+    alpha = .15,
+    size = .5,
+    level = .99
+  ) +
+  geom_text_repel(
+    data = prep_01,
+    aes(x = daily_status_reporting_to_job_site, y = daily_status_teleworking, 
+        label = .cluster_5,
+        fill = .cluster_5),
+    # fill = "white",
+    # alpha = .15,
+    size = 3,
+    force             = 0.5,
+    # nudge_x           = 100,
+    xlim = c(100, 150),
+    ylim = c(75,150),
+    direction         = "y",
+    hjust             = 0,
+    segment.size      = 0.2,
+    segment.curvature = -0.1,
+    color = "black"
+  ) +
+  xlab("Days reporting to the site") +
+  ylab("Days teleworking") +
+  theme_light() +
+  oescolorrrs::scale_fill_oes() +
+  oescolorrrs::scale_color_oes() +
+  theme(legend.position = "None",
+        axis.title = element_text(size = 8))
+```
+
+```{r}
+p_2
+```
+
+
+```{r}
+file_name <- "abstract_1.png"
+fp <- file.path(params$google_drive_home,"04. Analysis", "output", "png",file_name)
+```
+
+
+```{r}
+ggsave(filename = fp, plot = p_2, width = 3, height = 3, units = "in")
 ```
 
 
@@ -691,6 +878,89 @@ p_1 <-
 
 p_1
 ```
+
+# Clusters and position categories (alluvial)
+
+```{r}
+is_alluvia_form(prep_d_05)
+```
+
+```{r}
+p_1 <- 
+  prep_d_05 %>% 
+  mutate(.cluster_5 = fct_relabel(.cluster_5,~str_wrap(.,width = 50))) %>% 
+  ggplot(aes(y = num, axis1 = .cluster_5, axis2 = position_category_description, fill = .cluster_5)) +
+  geom_alluvium(width = 1/12) +
+  geom_stratum(width = 1/12,
+               # alpha = 1,
+               fill = "black",
+               color = "white"
+               ) +
+  geom_label(stat = "stratum", aes(label = after_stat(stratum)),
+             fill = "white",
+             # , alpha = .05,
+             hjust = "inward"
+             ) +
+  ylab("Number of employees") +
+  scale_y_continuous(labels = scales::comma) +
+  oescolorrrs::scale_fill_oes() +
+  oescolorrrs::scale_color_oes() +
+  theme_light() +
+  theme(
+    legend.position = "None",
+    axis.title.x = element_blank(),
+    axis.text.x = element_blank())
+```
+
+
+```{r}
+p_1
+```
+
+```{r}
+p_2 <- 
+  prep_d_05 %>% 
+  mutate(.cluster_5 = fct_relabel(.cluster_5,~str_wrap(.,width = 50))) %>% 
+  ggplot(aes(y = num, axis1 = .cluster_5, axis2 = position_category_description, fill = .cluster_5)) +
+  geom_alluvium(width = 1/12) +
+  geom_stratum(width = 1/12,
+               # alpha = 1,
+               fill = "black",
+               color = "white"
+               ) +
+  geom_label(stat = "stratum", aes(label = after_stat(stratum)),
+             fill = "white",
+             # , alpha = .05,
+              size = 2,
+             hjust = "inward"
+             ) +
+  ylab("Number of employees") +
+  scale_y_continuous(labels = scales::comma) +
+  oescolorrrs::scale_fill_oes() +
+  oescolorrrs::scale_color_oes() +
+  theme_light() +
+  theme(
+    legend.position = "None",
+    axis.title.y = element_text(size = 8),
+    axis.title.x = element_blank(),
+    axis.text.x = element_blank())
+```
+
+```{r}
+p_2
+```
+
+
+```{r}
+file_name <- "abstract_2.png"
+fp <- file.path(params$google_drive_home,"04. Analysis", "output", "png",file_name)
+```
+
+
+```{r}
+ggsave(filename = fp, plot = p_2, width = 3, height = 3, units = "in")
+```
+
 
 # Teleworkers, office visitors, and regions
 
