@@ -9,8 +9,8 @@ params:
   project_name: "Occupancy Patterns"
   google_drive_home: "G:/Shared drives/GSA Evaluation Division/Projects/1.0 Real Estate Solutions (LQ1)/2312 Work Patterns"
   data_folder_1: "prepared-data"
-  data_file_1: "clusters-employee-2023-08-09.rdata"
-  data_file_2: "prep_employees_2023-08-09.rdata"
+  data_file_1: "clusters-employee-2023-09-06.rdata"
+  data_file_2: "prep_employees_2023-09-06.rdata"
   in_number_of_clusters_1: 2
   in_number_of_clusters_2: 5
   in_specification: "scale_observation_none_1_20_TRUE"
@@ -169,7 +169,7 @@ d <-
 d <- d %>% 
   mutate(
     .cluster_5 = fct_recode(.cluster_5,
-                            "Teleworkers" = "1",
+                            "Telecommuters" = "1",
                             "Office visitors" = "2",
                             "Hybrid workers" = "3",
                             "In-office workers" = "4",
@@ -312,7 +312,7 @@ p_1
 
 # Clusters
 
-1.  Teleworkers
+1.  Telecommuters
 
 2.  Office visitors
 
@@ -962,7 +962,7 @@ ggsave(filename = fp, plot = p_2, width = 3, height = 3, units = "in")
 ```
 
 
-# Teleworkers, office visitors, and regions
+# Telecommuters, office visitors, and regions
 
 ```{r}
 prep_d_01 <- 
@@ -994,7 +994,7 @@ prep_d_03 <-
 
 prep_d_04 <- 
   prep_d_03 %>% 
-  filter(.cluster_5 == "Teleworkers" |
+  filter(.cluster_5 == "Telecommuters" |
            .cluster_5 == "Office\nvisitors"
            )
 ```
@@ -1797,7 +1797,7 @@ states()
 
 -   Telework is very common - most GSA employees telework
 
--   Teleworkers and office visitors are very common for those that live in states neighboring DC
+-   Telecommuters and office visitors are very common for those that live in states neighboring DC
 
 -   Employees living in DC are more likely to come to the office 
 

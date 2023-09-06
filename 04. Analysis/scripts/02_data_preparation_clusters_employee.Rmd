@@ -46,7 +46,10 @@ library(ggthemes)
 date_cohort_month_start <- ymd(params$date_cohort_month)
 date_cohort_month_end <- ceiling_date(date_cohort_month_start,unit = "month") %>% rollbackward()
 date_observation_window_month_start <- date_cohort_month_start %m+% months(params$observation_window_length_months)
-date_observation_window_month_end <- ceiling_date(date_observation_window_month_start,unit = "month") %>% rollbackward()
+date_observation_window_month_end <- 
+  # ceiling_date(date_observation_window_month_start,unit = "month") %>% 
+  date_observation_window_month_start %>% 
+  rollbackward()
 ```
 
 # Data preparation {.tabset .tabset-pills}

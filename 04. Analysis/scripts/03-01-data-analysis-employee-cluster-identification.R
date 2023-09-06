@@ -14,9 +14,9 @@ library(purrr)
 author <-  "Ben Jaques-Leslie"
 project_number <-  2312
 project_name <-  "Occupancy Patterns"
-google_drive_home <-  "G:/Shared drives/MSG Projects/1.0 Real Estate Solutions (LQ1)/2312 Work Patterns"
+google_drive_home <-  "G:/Shared drives/GSA Evaluation Division/Projects/1.0 Real Estate Solutions (LQ1)/2312 Work Patterns"
 data_folder_1 <-  "prepared-data"
-data_file_1 <-  "prep_employees_2023-08-09.rdata"
+data_file_1 <-  "prep_employees_2023-09-06.rdata"
 unique_identifier_1 <- c("date","person_id")
 date_cohort_month <-  "2022-03-01"
 observation_window_length_months <-  6
