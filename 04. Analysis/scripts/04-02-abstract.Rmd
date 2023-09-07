@@ -166,18 +166,7 @@ d <-
   )
 ```
 
-```{r include=FALSE}
-d <- d %>% 
-  mutate(
-    .cluster_5 = fct_recode(.cluster_5,
-                            "Telecommuters" = "1",
-                            "Office visitors" = "2",
-                            "Hybrid workers" = "3",
-                            "Disconnected workers" = "4",
-                            "In-office workers" = "5"),
-    .cluster_5 = fct_relabel(.cluster_5, ~str_wrap(.x,width = 10))
-  )
-```
+# Summary
 
 ```{r}
 d %>% 
@@ -203,6 +192,40 @@ d %>%
        team_size_mode) %>% 
   as.data.frame()
 ```
+
+# CONTINUE FROM HERE
+
+```{r}
+beepr::beep(sound = 5)
+```
+
+```{r}
+
+```
+
+# Defining work pattern groups
+
+```{r}
+d <- d %>% 
+  mutate(
+    .cluster_5 = fct_recode(.cluster_5,
+                            "Telecommuters" = "1",
+                            "Office visitors" = "2",
+                            "In-office workers" = "3",
+                            "Disconnected workers" = "4",
+                            "Hybrid workers" = "5"),
+    .cluster_5 = fct_relevel(.cluster_5,
+                            "Telecommuters",
+                            "Office visitors",
+                            "Hybrid workers",
+                            "In-office workers",
+                            "Disconnected workers"
+                            ),
+    .cluster_5 = fct_relabel(.cluster_5, ~str_wrap(.x,width = 10))
+  )
+```
+
+
 
 
 # Table data
@@ -235,6 +258,10 @@ date_observation_window_month_end <-
   # ceiling_date(date_observation_window_month_start,unit = "month") %>% 
   date_observation_window_month_start %>% 
   rollbackward()
+date_cohort_month_start
+date_cohort_month_end
+date_observation_window_month_start
+date_observation_window_month_end
 ```
 
 
@@ -255,28 +282,177 @@ prep_a %>%
   skim()
 ```
 
-```{r}
-params$date_cohort_month %m+% months(params$observation_window_length_months)
-```
-
-
-Second, create a dataframe of all the days of the year.
+Filter to just the days in the observation window. 
 
 ```{r}
 prep_b <- 
-  tibble(
-  date = seq.Date(from = ymd("2022-01-01"),
-         to = ymd("2022-12-31"),
-         by = "days")
-)
+  prep_a %>% 
+  filter(date >= date_cohort_month_start & date <= date_observation_window_month_end)
+
+prep_b
+```
+
+Count the number of pay periods.
+
+```{r}
+prep_val_01 <- prep_b %>% 
+  summarise(n_distinct(period_number)) %>% 
+  pull()
+
+prep_val_01
+```
+
+Calculate telework and onsite per pay period. 
+
+```{r}
+d <- 
+  d %>% 
+  mutate(across(
+    .cols = c(daily_status_reporting_to_job_site,daily_status_teleworking),
+    .fns = ~./prep_val_01,
+    .names = "{col}_ppp"
+  ))
 ```
 
 Review data.
 
 ```{r}
-prep_b %>% 
-  skim()
+d %>% 
+  skim(ends_with("_ppp"))
 ```
+
+## Calculate averages
+
+```{r}
+d %>% 
+  group_by(.cluster_5) %>% 
+  skim(daily_status_reporting_to_job_site,
+       daily_status_reporting_to_job_site_observation_prop,
+       daily_status_reporting_to_job_site_working_prop,
+       daily_status_reporting_to_job_site_ppp,
+       daily_status_teleworking,
+       daily_status_teleworking_observation_prop,
+       daily_status_teleworking_working_prop,
+       daily_status_teleworking_ppp,
+       days_colocated_1,
+       days_colocated_1_observation_prop,
+       days_colocated_supervisor,
+       days_colocated_supervisor_observation_prop,
+       days_colocated_team,
+       days_colocated_team_observation_prop,
+       days_telework_team,
+       days_telework_team_observation_prop,
+       working_days,
+       team_size_mode)
+```
+
+# Calculating ranges
+
+```{r}
+d %>% 
+  group_by(.cluster_5) %>% 
+  summarise(
+    across(
+      .cols = c(daily_status_reporting_to_job_site_ppp,
+                daily_status_reporting_to_job_site_working_prop,
+                daily_status_teleworking_ppp,
+                daily_status_teleworking_working_prop),
+      .fns = list(q_025 = ~quantile(.,probs = .025),
+                  q_975 = ~quantile(.,probs = .975))
+    )
+  ) %>% 
+  pivot_longer(-.cluster_5) %>% 
+  pivot_wider(values_from = value, names_from = .cluster_5)
+```
+
+# Regional difference.
+
+```{r}
+prep_d_01 <- 
+  d %>% 
+  group_by(location_state,.cluster_5) %>% 
+  count() %>% 
+  ungroup() %>% 
+  arrange(desc(n)) %>% 
+  rename(num = n)
+
+prep_d_02 <- 
+  d %>% 
+  group_by(.cluster_5) %>% 
+  count() %>% 
+  ungroup() %>% 
+  arrange(desc(n)) %>% 
+  rename(tot = n)
+
+prep_d_03 <- 
+  prep_d_01 %>% 
+  full_join(prep_d_02) %>% 
+  mutate(
+    n = num/tot,
+    text = scales::comma(num)
+  )# %>% 
+  # mutate(
+  #   gsa_region = fct_reorder(gsa_region,as.numeric(gsa_region))
+  # )
+
+prep_d_03
+```
+
+# Office differences
+
+```{r}
+prep_d_01 <- 
+  d %>% 
+  group_by(gsa_sso) %>% 
+  count() %>% 
+  ungroup() %>% 
+  arrange(desc(n))
+
+prep_v_01 <- 
+  prep_d_01 %>% 
+  slice(2) %>% 
+  pull(n)
+
+prep_d_02 <-
+  d %>%
+  mutate(gsa_sso = fct_lump_min(gsa_sso, min = prep_v_01),
+         gsa_sso = fct_infreq(gsa_sso)) %>%
+  group_by(gsa_sso,.cluster_5) %>%
+  count() %>%
+  ungroup() %>%
+  arrange(desc(n)) %>% 
+  rename(num = n) %>% 
+  mutate(gsa_sso = fct_relevel(gsa_sso,
+                               "PBS",
+                               "FAS",
+                               "OCFO",
+                               "Other"))
+
+prep_d_03 <- 
+  prep_d_02 %>% 
+  filter(gsa_sso != "Other")
+
+prep_d_04 <- 
+  d %>% 
+  group_by(.cluster_5) %>% 
+  count() %>% 
+  ungroup() %>% 
+  arrange(desc(n)) %>% 
+  rename(tot = n)
+
+prep_d_05 <- 
+  prep_d_03 %>% 
+  full_join(prep_d_04) %>% 
+  mutate(
+    n = num/tot,
+    text = scales::comma(num)
+  ) 
+
+prep_d_05 %>% view()
+```
+
+
+
 
 # Clusters and position categories (alluvial)
 
@@ -410,4 +586,107 @@ fp <- file.path(params$google_drive_home,"04. Analysis", "output", "png",file_na
 
 ```{r}
 ggsave(filename = fp, plot = p_2, width = 6, height = 3, units = "in")
+```
+# Clusters: How much telework?
+
+```{r include=FALSE}
+prep_01 <- 
+  d %>% 
+  group_by(.cluster_5) %>% 
+  summarise(num = mean(daily_status_teleworking)) %>% 
+  ungroup()
+
+prep_02 <- 
+  d %>% 
+  group_by(.cluster_5) %>% 
+  summarise(y = max(density(daily_status_teleworking)$y),
+            x = density(daily_status_teleworking)$x[density(daily_status_teleworking)$y == max(density(daily_status_teleworking)$y)]
+  )
+```
+
+```{r}
+p_1 <- 
+  prep_01 %>% 
+  ggplot(
+    aes(x = .cluster_5, y = num, fill = .cluster_5)
+  ) +
+  geom_col() +
+  scale_y_continuous(labels = scales::comma) +
+  ylab("Mean days of telework") +
+  theme_light() +
+  oescolorrrs::scale_fill_oes() +
+  theme(
+    legend.position = "None",
+    axis.title.x = element_blank(),
+    axis.text.x = element_text(size = 8))
+
+p_2 <- 
+  d %>% 
+  ggplot(
+    aes(x = daily_status_teleworking, color = .cluster_5, fill = .cluster_5)
+  ) +
+  geom_density(alpha = .5) +
+  # geom_vline(data = prep_01, aes(xintercept = num, color = .cluster_5)) +
+  geom_text(data=prep_02, aes(x=x, y=y, label=.cluster_5), size = 3, hjust = "inward") +
+  xlab("Days of telework") +
+  ylab("Density") +
+  theme_light() +
+  oescolorrrs::scale_fill_oes() +
+  oescolorrrs::scale_color_oes() +
+  theme(legend.position = "None")
+
+
+p_1|p_2
+```
+
+# Clusters: How much telework? (proportion of working)
+
+```{r include=FALSE}
+prep_01 <- 
+  d %>% 
+  group_by(.cluster_5) %>% 
+  summarise(num = mean(daily_status_teleworking_working_prop)) %>% 
+  ungroup()
+
+prep_02 <- 
+  d %>% 
+  group_by(.cluster_5) %>% 
+  summarise(y = max(density(daily_status_teleworking_working_prop)$y),
+            x = density(daily_status_teleworking_working_prop)$x[density(daily_status_teleworking_working_prop)$y == max(density(daily_status_teleworking_working_prop)$y)]
+  )
+```
+
+```{r}
+p_1 <- 
+  prep_01 %>% 
+  ggplot(
+    aes(x = .cluster_5, y = num, fill = .cluster_5)
+  ) +
+  geom_col() +
+  scale_y_continuous(labels = scales::comma) +
+  ylab("Mean days of telework") +
+  theme_light() +
+  oescolorrrs::scale_fill_oes() +
+  theme(
+    legend.position = "None",
+    axis.title.x = element_blank(),
+    axis.text.x = element_text(size = 8))
+
+p_2 <- 
+  d %>% 
+  ggplot(
+    aes(x = daily_status_teleworking_working_prop, color = .cluster_5, fill = .cluster_5)
+  ) +
+  geom_density(alpha = .5) +
+  # geom_vline(data = prep_01, aes(xintercept = num, color = .cluster_5)) +
+  geom_text(data=prep_02, aes(x=x, y=y, label=.cluster_5), size = 3, hjust = "inward") +
+  xlab("Days of telework") +
+  ylab("Density") +
+  theme_light() +
+  oescolorrrs::scale_fill_oes() +
+  oescolorrrs::scale_color_oes() +
+  theme(legend.position = "None")
+
+
+p_1|p_2
 ```
