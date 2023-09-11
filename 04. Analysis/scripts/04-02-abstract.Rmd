@@ -193,15 +193,7 @@ d %>%
   as.data.frame()
 ```
 
-# CONTINUE FROM HERE
 
-```{r}
-beepr::beep(sound = 5)
-```
-
-```{r}
-
-```
 
 # Defining work pattern groups
 
@@ -309,8 +301,8 @@ d <-
   d %>% 
   mutate(across(
     .cols = c(daily_status_reporting_to_job_site,daily_status_teleworking),
-    .fns = ~./prep_val_01,
-    .names = "{col}_ppp"
+    .fns = list(ppp = ~./prep_val_01,pm = ~./params$observation_window_length_months),
+    .names = "{col}_{fn}"
   ))
 ```
 
@@ -318,7 +310,7 @@ Review data.
 
 ```{r}
 d %>% 
-  skim(ends_with("_ppp"))
+  skim(ends_with("_ppp"),ends_with("_pm"))
 ```
 
 ## Calculate averages
@@ -330,10 +322,12 @@ d %>%
        daily_status_reporting_to_job_site_observation_prop,
        daily_status_reporting_to_job_site_working_prop,
        daily_status_reporting_to_job_site_ppp,
+       daily_status_reporting_to_job_site_pm,
        daily_status_teleworking,
        daily_status_teleworking_observation_prop,
        daily_status_teleworking_working_prop,
        daily_status_teleworking_ppp,
+       daily_status_teleworking_pm,
        days_colocated_1,
        days_colocated_1_observation_prop,
        days_colocated_supervisor,
@@ -354,8 +348,10 @@ d %>%
   summarise(
     across(
       .cols = c(daily_status_reporting_to_job_site_ppp,
+                daily_status_reporting_to_job_site_pm,
                 daily_status_reporting_to_job_site_working_prop,
                 daily_status_teleworking_ppp,
+                daily_status_teleworking_pm,
                 daily_status_teleworking_working_prop),
       .fns = list(q_025 = ~quantile(.,probs = .025),
                   q_975 = ~quantile(.,probs = .975))
@@ -568,6 +564,8 @@ p_2 <-
   theme_light() +
   theme(
     legend.position = "None",
+    plot.title = element_text(hjust = 0.5,
+                              size = 13),
     axis.title.y = element_text(size = 8),
     axis.title.x = element_blank(),
     axis.text.x = element_blank())
@@ -587,6 +585,7 @@ fp <- file.path(params$google_drive_home,"04. Analysis", "output", "png",file_na
 ```{r}
 ggsave(filename = fp, plot = p_2, width = 6, height = 3, units = "in")
 ```
+
 # Clusters: How much telework?
 
 ```{r include=FALSE}
@@ -689,4 +688,23 @@ p_2 <-
 
 
 p_1|p_2
+```
+
+# Difference in colocation
+
+```{r}
+d %>% 
+  group_by(.cluster_5) %>% 
+  skim(team_size_mode,starts_with("days_colocated"), starts_with("days_telework"))
+```
+
+
+# CONTINUE FROM HERE
+
+```{r}
+beepr::beep(sound = 5)
+```
+
+```{r}
+
 ```
