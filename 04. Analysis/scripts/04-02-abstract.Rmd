@@ -240,6 +240,24 @@ prep_d_02 <-
 prep_d_02
 ```
 
+## Percent of GSA employees by office
+
+```{r}
+prep_d_01 <- 
+  d %>%
+  group_by(gsa_sso) %>% 
+  count() %>% 
+  ungroup()
+ 
+prep_d_02 <- 
+  prep_d_01 %>% 
+  mutate(tot = d %>% count() %>% pull(),
+         prop = n/tot,
+         text = scales::percent(prop, accuracy = .1))
+
+prep_d_02
+```
+
 ## Days per pay period
 
 ```{r}
@@ -300,7 +318,7 @@ Calculate telework and onsite per pay period.
 d <- 
   d %>% 
   mutate(across(
-    .cols = c(daily_status_reporting_to_job_site,daily_status_teleworking),
+    .cols = c(daily_status_reporting_to_job_site,daily_status_teleworking, daily_status_leave),
     .fns = list(ppp = ~./prep_val_01,pm = ~./params$observation_window_length_months),
     .names = "{col}_{fn}"
   ))
@@ -328,6 +346,9 @@ d %>%
        daily_status_teleworking_working_prop,
        daily_status_teleworking_ppp,
        daily_status_teleworking_pm,
+       daily_status_leave,
+       daily_status_leave_pm,
+       daily_status_leave_ppp,
        days_colocated_1,
        days_colocated_1_observation_prop,
        days_colocated_supervisor,
@@ -698,6 +719,64 @@ d %>%
   skim(team_size_mode,starts_with("days_colocated"), starts_with("days_telework"))
 ```
 
+# Work and leave ppp
+
+```{r}
+prep_d_06 <- 
+  d %>% 
+  group_by(.cluster_5) %>% 
+  summarise(
+    across(
+      .cols = ends_with("_ppp"),
+      .fns = mean
+    )
+  ) %>% 
+  pivot_longer(cols = -.cluster_5) %>% 
+  mutate(
+    name = str_remove(name,"daily_status_"),
+    name = str_remove(name,"_ppp"),
+    name = str_replace_all(name,"_", " "),
+    name = str_to_sentence(name),
+    name = str_wrap(name, width = 15)
+  )
+
+prep_d_06
+```
+
+
+```{r}
+p_3 <- 
+  prep_d_06 %>% 
+  ggplot(aes(x = .cluster_5, y = value, fill = name)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Work and leave per pay period") +
+  ylab("Days per pay period") +
+  scale_y_continuous(labels = scales::comma) +
+  oescolorrrs::scale_fill_oes() +
+  oescolorrrs::scale_color_oes() +
+  theme_light() +
+  theme(
+    legend.position = "right",
+    legend.title = element_blank(),
+    plot.title = element_text(hjust = 0.5,
+                              size = 13),
+    axis.title.y = element_text(size = 8),
+    axis.title.x = element_blank()
+    )
+
+p_3
+```
+
+
+```{r}
+file_name <- "abstract_3.png"
+fp <- file.path(params$google_drive_home,"04. Analysis", "output", "png",file_name)
+```
+
+
+```{r}
+ggsave(filename = fp, plot = p_3, width = 6, height = 3, units = "in")
+```
 
 # CONTINUE FROM HERE
 
