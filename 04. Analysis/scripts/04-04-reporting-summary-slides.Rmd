@@ -1,0 +1,2115 @@
+---
+title: "GSA Work Patterns"
+author: "Ben Jaques-Leslie"
+date: "2023-08-22"
+output: powerpoint_presentation
+params:
+  author: "Ben Jaques-Leslie"
+  project_number: 2312
+  project_name: "Occupancy Patterns"
+  google_drive_home: "G:/Shared drives/GSA Evaluation Division/Projects/1.0 Real Estate Solutions (LQ1)/2312 Work Patterns"
+  data_folder_1: "prepared-data"
+  data_file_1: "clusters-employee-2023-09-06.rdata"
+  data_file_2: "prep_employees_2023-09-06.rdata"
+  in_number_of_clusters_1: 2
+  in_number_of_clusters_2: 5
+  in_specification: "scale_observation_none_1_20_TRUE"
+  date_cohort_month: "2022-03-01"
+  observation_window_length_months: 6
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE,
+                      warning = FALSE,
+                      message = FALSE,
+                      fig.width = 8,
+                      fig.height = 4,
+                      dpi = 300)
+options(scipen=999)
+tictoc::tic()
+if(!("ggalluvial" %in% installed.packages()[,"Package"]))
+{
+  install.packages("ggalluvial")
+}
+if(!("arsenal" %in% installed.packages()[,"Package"]))
+{
+  install.packages("arsenal")
+}
+if(!("beepr" %in% installed.packages()[,"Package"]))
+{
+  install.packages("beepr")
+}
+if(!("geomtextpath" %in% installed.packages()[,"Package"]))
+{
+  install.packages("geomtextpath")
+}
+if(!("oesrrr" %in% installed.packages()[,"Package"]))
+{
+  devtools::install_github(repo = "GSA/oesrrr")
+}
+if(!("oescolorrrs" %in% installed.packages()[,"Package"]))
+{
+  devtools::install_github(repo = "GSA/oescolorrrs")
+}
+if(!("ggrain" %in% installed.packages()[,"Package"]))
+{
+  install.packages("ggrain")
+}
+# install.packages("tigris")
+library(oesrrr)
+library(tidyverse)
+library(janitor)
+library(skimr)
+library(DataExplorer)
+library(readr)
+library(arsenal)
+library(Hmisc)
+library(readxl)
+library(flextable)
+library(ggthemes)
+library(tidymodels)
+library(patchwork)
+library(sf)
+library(tigris)
+library(ggrepel)
+library(ggalluvial)
+library(ggrain)
+options(tigris_class = "sf")
+options(tigris_use_cache = TRUE)
+```
+
+```{r include=FALSE}
+load(file = file.path(params$google_drive_home,"03. Data Collection",params$data_folder_1,params$data_file_1))
+```
+
+```{r include=FALSE}
+load(file = file.path(params$google_drive_home,"03. Data Collection",params$data_folder_1,params$data_file_2))
+```
+
+```{r include=FALSE}
+clust_1 <- 
+  kclusts %>% 
+  filter(
+    k == params$in_number_of_clusters_1 &
+      specification == params$in_specification
+  )
+```
+
+```{r include=FALSE}
+clust_2 <- 
+  kclusts %>% 
+  filter(
+    k == params$in_number_of_clusters_2 &
+      specification == params$in_specification
+  )
+```
+
+```{r include=FALSE}
+clusters_1 <- 
+  clust_1 %>%
+  unnest(cols = c(tidied))
+
+assignments_1 <- 
+  clust_1 %>% 
+  unnest(cols = c(augmented))
+
+clusterings_1 <- 
+  clust_1 %>%
+  unnest(cols = c(glanced))
+
+```
+
+```{r include=FALSE}
+clusters_2 <- 
+  clust_2 %>%
+  unnest(cols = c(tidied))
+
+assignments_2 <- 
+  clust_2 %>% 
+  unnest(cols = c(augmented))
+
+clusterings_2 <- 
+  clust_2 %>%
+  unnest(cols = c(glanced))
+
+```
+
+```{r include=FALSE}
+rename_to_k <- function(in_data)
+{
+  tot_cluster <- in_data %>% select(k) %>% distinct() %>% pull()
+  out_data <-
+    in_data %>% rename_with( ~ glue::glue("{.x}_{tot_cluster}"), .cluster)
+  return(out_data)
+}
+```
+
+```{r include=FALSE}
+assignments <-
+  assignments_1 %>%
+  rename_to_k() %>%
+  select(person_id, starts_with(".cluster")) %>%
+  full_join(assignments_2 %>%
+              rename_to_k() %>%
+              select(person_id, starts_with(".cluster")))
+```
+
+```{r include=FALSE}
+d <-
+  assignments %>%
+  select(person_id, starts_with(".cluster")) %>%
+  full_join(prep_employees) %>% 
+  mutate(
+    across(
+      .cols = starts_with(".cluster"),
+      .fns = ~fct_na_value_to_level(., level = "(Missing)")
+    )
+  )
+```
+
+```{r include=FALSE}
+d <- d %>% 
+  mutate(
+    .cluster_5 = fct_recode(.cluster_5,
+                            "Telecommuters" = "1",
+                            "Office visitors" = "2",
+                            "In-office workers" = "3",
+                            "Disconnected workers" = "4",
+                            "Hybrid workers" = "5"),
+    .cluster_5 = fct_relevel(.cluster_5,
+                            "Telecommuters",
+                            "Office visitors",
+                            "Hybrid workers",
+                            "In-office workers",
+                            "Disconnected workers"
+                            ),
+    .cluster_5 = fct_relabel(.cluster_5, ~str_wrap(.x,width = 10))
+  )
+```
+
+```{r}
+date_cohort_month_start <- ymd(params$date_cohort_month)
+date_cohort_month_end <- ceiling_date(date_cohort_month_start,unit = "month") %>% rollbackward()
+date_observation_window_month_start <- date_cohort_month_start %m+% months(params$observation_window_length_months)
+date_observation_window_month_end <- 
+  # ceiling_date(date_observation_window_month_start,unit = "month") %>% 
+  date_observation_window_month_start %>% 
+  rollbackward()
+```
+
+```{r}
+prep_a <- 
+  tibble(
+  date = seq.Date(from = ymd("2022-01-01"),
+         to = ymd("2022-12-31"),
+         by = "2 weeks")
+) %>% 
+  rownames_to_column(var = "period_number") 
+```
+
+```{r}
+prep_b <- 
+  prep_a %>% 
+  filter(date >= date_cohort_month_start & date <= date_observation_window_month_end)
+
+
+```
+
+```{r}
+prep_val_01 <- prep_b %>% 
+  summarise(n_distinct(period_number)) %>% 
+  pull()
+
+
+```
+
+```{r}
+d <- 
+  d %>% 
+  mutate(across(
+    .cols = c(daily_status_reporting_to_job_site,daily_status_teleworking, daily_status_leave),
+    .fns = list(ppp = ~./prep_val_01,pm = ~./params$observation_window_length_months),
+    .names = "{col}_{fn}"
+  ))
+```
+
+# GSA Work Patterns
+
+**What is the GSA priority?**
+
+Hybrid work has become widespread over the past three years, however, little is known about GSA employee work patterns.
+
+This information can be used to develop and tailor technologies, spaces, and strategies to support hybrid and distributed models of work so that employees are engaged, perform at their best, and remain focused on mission delivery.
+
+# GSA Work Patterns
+
+**What is the GSA priority?**
+
+Existing administrative data offers an opportunity to better understand how and where employees work and make progress in addressing GSA's Learning Agenda priority question:
+
+*What technologies and solutions does the federal workforce need to improve effectiveness in a more responsive remote work setting?*
+
+# GSA Work Patterns
+
+**What did we evaluate?**
+
+This **descriptive study** characterizes the different ways GSA employees work remotely or from the office by investigating frequencies of onsite work and telework.
+
+The **purpose of the study** is to describe these groups in greater detail with recent data to inform strategic decision-making.
+
+# GSA Work Patterns
+
+**How did the evaluation work?**
+
+-   GSA employees are asked daily to report their work status
+
+    -   Telework, reporting to job site, on leave, etc.
+
+-   We combined these daily check-in data with other information about employees
+
+    -   Position categories (onsite required, onsite flexible, offsite), supervisors, staff offices, and other information from the GSA roster.
+
+# GSA Work Patterns
+
+**How did the evaluation work?**
+
+1.  **Data**: March-September 2023
+
+2.  **Preparation**: Calculate:
+
+    1.  Frequencies of work status for the 11,251 GSA employees who worked in March 2023
+
+    2.  Number of days the entire team teleworks or works onsite
+
+3.  **Grouping**: Based on similarities in their frequencies of working remote or onsite
+
+# GSA Work Patterns
+
+**What did we learn?**
+
+GSA employees can be clustered into five work pattern groups:
+
+-   **Telecommuters**: Work more days and almost all telework
+
+-   **Office visitors**: Primarily telework, occasionally onsite, works 10 fewer days than teleworkers
+
+-   **Hybrid workers**: Mostly telework, periodically onsite
+
+-   **In-office workers**: Sometimes work remote, primarily onsite
+
+-   **Disconnected workers**: Work fewer days, likely to exit employment
+
+# GSA Work Patterns
+
+```{r}
+prep_d_01 <- 
+  d %>%
+  group_by(.cluster_5) %>% 
+  count() %>% 
+  ungroup()
+ 
+prep_d_02 <- 
+  prep_d_01 %>% 
+  mutate(tot = d %>% count() %>% pull(),
+         prop = n/tot,
+         text = scales::percent(prop, accuracy = .1))
+```
+
+```{r}
+p_1 <- 
+  prep_d_01 %>% 
+  ggplot(
+    aes(x = .cluster_5, y = n, fill = .cluster_5)
+  ) +
+  geom_col() +
+  geom_text(data = prep_d_02, aes(x = .cluster_5, y = .5*n, label = text), color = "white") +
+  scale_y_continuous(labels = scales::comma) +
+  ylab("Employees") +
+  labs(
+    title = "GSA Employees in work pattern groups"
+  ) +
+  theme_light() +
+  oescolorrrs::scale_fill_oes() +
+  theme(
+    legend.position = "None",
+    plot.title = element_text(hjust = 0.5,
+                              size = 13),
+    axis.title.x = element_blank(),
+    axis.text.x = element_text(size = 8))
+
+p_1
+```
+
+# GSA Work Patterns
+
+```{r}
+prep_d_06 <- 
+  d %>% 
+  group_by(.cluster_5) %>% 
+  summarise(
+    across(
+      .cols = ends_with("_ppp"),
+      .fns = mean
+    )
+  ) %>% 
+  pivot_longer(cols = -.cluster_5) %>% 
+  mutate(
+    name = str_remove(name,"daily_status_"),
+    name = str_remove(name,"_ppp"),
+    name = str_replace_all(name,"_", " "),
+    name = str_to_sentence(name),
+    name = str_wrap(name, width = 15)
+  )
+```
+
+```{r}
+p_3 <- 
+  prep_d_06 %>% 
+  ggplot(aes(x = .cluster_5, y = value, fill = name)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Work and leave per pay period") +
+  ylab("Days per pay period") +
+  scale_y_continuous(labels = scales::comma) +
+  oescolorrrs::scale_fill_oes() +
+  oescolorrrs::scale_color_oes() +
+  theme_light() +
+  theme(
+    legend.position = "right",
+    legend.title = element_blank(),
+    plot.title = element_text(hjust = 0.5,
+                              size = 13),
+    axis.title.y = element_text(size = 8),
+    axis.title.x = element_blank()
+    )
+
+p_3
+```
+
+# GSA Work Patterns
+
+**What do we recommend?**
+
+-   Areas of exploration
+
+    -    Why some Offsite classified employees occasionally work in the office?
+
+    -   What drives workers to come in on particular days?
+
+    -   Do work pattern groups have differing levels of employee satisfaction or engagement? Advancement and tenure?
+
+-   Design and target specific interventions for improving organizational health using these work pattern groups
+
+# Appendix
+
+# GSA Work Patterns
+
+```{r}
+prep_01 <-
+  d %>%
+  group_by(.cluster_5) %>%
+  summarise(
+    num = mean(daily_status_reporting_to_job_site_working_prop),
+    l = quantile(daily_status_reporting_to_job_site_working_prop, probs = .25),
+    u = quantile(daily_status_reporting_to_job_site_working_prop, probs = .75)
+  ) %>%
+  ungroup()
+```
+
+```{r}
+# d %>%
+  ggplot(
+  ) +
+  geom_jitter(data = d,
+    aes(
+      x = .cluster_5,
+      y = daily_status_reporting_to_job_site_working_prop,
+      fill = .cluster_5,
+      color = .cluster_5
+    ),
+    position = position_jitter(0.3), color = "darkgray") +
+  geom_pointrange(
+    aes(
+      x = .cluster_5,
+      fill = .cluster_5,
+      color = .cluster_5,
+      y = num,
+      ymin = l,
+      ymax = u
+    ),
+    data = prep_01
+  ) +
+  labs(title = "Percent of days reporting to job site") +
+  ylab("Percent of working days") +
+  scale_y_continuous(labels = scales::percent) +
+  oescolorrrs::scale_fill_oes() +
+  oescolorrrs::scale_color_oes() +
+  theme_light() +
+  theme(
+    legend.position = "none",
+    legend.title = element_blank(),
+    plot.title = element_text(hjust = 0.5,
+                              size = 13),
+    axis.title.y = element_text(size = 8),
+    axis.title.x = element_blank()
+    )
+
+```
+
+# GSA Work Patterns
+
+```{r}
+prep_01 <-
+  d %>%
+  group_by(.cluster_5) %>%
+  summarise(
+    num = mean(daily_status_teleworking_working_prop),
+    l = quantile(daily_status_teleworking_working_prop, probs = .25),
+    u = quantile(daily_status_teleworking_working_prop, probs = .75)
+  ) %>%
+  ungroup()
+```
+
+```{r}
+# d %>%
+  ggplot(
+  ) +
+  geom_jitter(data = d,
+    aes(
+      x = .cluster_5,
+      y = daily_status_teleworking_working_prop,
+      fill = .cluster_5,
+      color = .cluster_5
+    ),
+    position = position_jitter(0.3), color = "darkgray") +
+  geom_pointrange(
+    aes(
+      x = .cluster_5,
+      fill = .cluster_5,
+      color = .cluster_5,
+      y = num,
+      ymin = l,
+      ymax = u
+    ),
+    data = prep_01
+  ) +
+  labs(title = "Percent of days teleworking") +
+  ylab("Percent of working days") +
+  scale_y_continuous(labels = scales::percent) +
+  oescolorrrs::scale_fill_oes() +
+  oescolorrrs::scale_color_oes() +
+  theme_light() +
+  theme(
+    legend.position = "none",
+    legend.title = element_blank(),
+    plot.title = element_text(hjust = 0.5,
+                              size = 13),
+    axis.title.y = element_text(size = 8),
+    axis.title.x = element_blank()
+    )
+
+```
+
+# GSA Work Patterns
+
+```{r}
+prep_01 <-
+  d %>%
+  group_by(.cluster_5) %>%
+  summarise(
+    num = mean(daily_status_leave),
+    l = quantile(daily_status_leave, probs = .25),
+    u = quantile(daily_status_leave, probs = .75)
+  ) %>%
+  ungroup()
+```
+
+```{r}
+# d %>%
+  ggplot(
+  ) +
+  geom_jitter(data = d,
+    aes(
+      x = .cluster_5,
+      y = daily_status_leave,
+      fill = .cluster_5,
+      color = .cluster_5
+    ),
+    position = position_jitter(0.3), color = "darkgray") +
+  geom_pointrange(
+    aes(
+      x = .cluster_5,
+      fill = .cluster_5,
+      color = .cluster_5,
+      y = num,
+      ymin = l,
+      ymax = u
+    ),
+    data = prep_01
+  ) +
+  labs(title = "Number of days on leave") +
+  ylab("Number of days") +
+  scale_y_continuous(labels = scales::comma) +
+  oescolorrrs::scale_fill_oes() +
+  oescolorrrs::scale_color_oes() +
+  theme_light() +
+  theme(
+    legend.position = "none",
+    legend.title = element_blank(),
+    plot.title = element_text(hjust = 0.5,
+                              size = 13),
+    axis.title.y = element_text(size = 8),
+    axis.title.x = element_blank()
+    )
+
+```
+
+# GSA Work Patterns
+
+```{r}
+prep_d_01 <- 
+  d %>% 
+  group_by(location_state,.cluster_5) %>% 
+  count() %>% 
+  ungroup() %>% 
+  arrange(desc(n)) %>% 
+  rename(num = n)
+
+prep_d_02 <- 
+  d %>% 
+  group_by(.cluster_5) %>% 
+  count() %>% 
+  ungroup() %>% 
+  arrange(desc(n)) %>% 
+  rename(tot = n)
+
+prep_d_03 <- 
+  prep_d_01 %>% 
+  full_join(prep_d_02) %>% 
+  mutate(
+    n = num/tot,
+    text = scales::comma(num)
+  )# %>% 
+  # mutate(
+  #   gsa_region = fct_reorder(gsa_region,as.numeric(gsa_region))
+  # )
+
+prep_d_04 <- 
+  prep_d_03 %>% 
+  filter(location_state %in% c("MD","PA","VA")
+           )
+```
+
+```{r}
+geom_region <- function(in_data)
+{
+  out <- 
+  in_data %>% 
+  ggplot(
+    aes(x = .cluster_5, y = n, fill = .cluster_5)
+  ) +
+  geom_col() +
+  facet_wrap(facets = vars(location_state), nrow = 1) +
+  labs(title = "Percent of working pattern group by state") +
+  ylab("Percent of working pattern group") +
+  scale_y_continuous(labels = scales::percent) +
+  oescolorrrs::scale_fill_oes() +
+  oescolorrrs::scale_color_oes() +
+  theme_light() +
+  theme(
+    legend.position = "none",
+    legend.title = element_blank(),
+    plot.title = element_text(hjust = 0.5,
+                              size = 13),
+    axis.title.y = element_text(size = 8),
+    axis.title.x = element_blank(),
+    axis.text.x = element_text(size = 6)
+    )
+
+return(out)
+}
+
+```
+
+```{r}
+p_1 <- 
+  prep_d_04 %>% 
+  geom_region()
+
+p_1
+```
+
+# GSA Work Patterns
+
+```{r}
+prep_d_01 <- 
+  d %>% 
+  group_by(location_state,.cluster_5) %>% 
+  count() %>% 
+  ungroup() %>% 
+  arrange(desc(n)) %>% 
+  rename(num = n)
+
+prep_d_02 <- 
+  d %>% 
+  group_by(.cluster_5) %>% 
+  count() %>% 
+  ungroup() %>% 
+  arrange(desc(n)) %>% 
+  rename(tot = n)
+
+prep_d_03 <- 
+  prep_d_01 %>% 
+  full_join(prep_d_02) %>% 
+  mutate(
+    n = num/tot,
+    text = scales::comma(num)
+  )# %>% 
+  # mutate(
+  #   gsa_region = fct_reorder(gsa_region,as.numeric(gsa_region))
+  # )
+
+prep_d_04 <- 
+  prep_d_03 %>% 
+  filter(location_state %in% c("CA", "IL")
+           )
+```
+
+```{r}
+p_1 <- 
+  prep_d_04 %>% 
+  geom_region()
+
+p_1
+```
+
+# GSA Work Patterns
+
+```{r}
+prep_d_01 <- 
+  d %>% 
+  group_by(location_state,.cluster_5) %>% 
+  count() %>% 
+  ungroup() %>% 
+  arrange(desc(n)) %>% 
+  rename(num = n)
+
+prep_d_02 <- 
+  d %>% 
+  group_by(.cluster_5) %>% 
+  count() %>% 
+  ungroup() %>% 
+  arrange(desc(n)) %>% 
+  rename(tot = n)
+
+prep_d_03 <- 
+  prep_d_01 %>% 
+  full_join(prep_d_02) %>% 
+  mutate(
+    n = num/tot,
+    text = scales::comma(num)
+  )# %>% 
+  # mutate(
+  #   gsa_region = fct_reorder(gsa_region,as.numeric(gsa_region))
+  # )
+
+prep_d_04 <- 
+  prep_d_03 %>% 
+  filter(location_state %in% c("DC")
+           )
+```
+
+```{r}
+p_1 <- 
+  prep_d_04 %>% 
+  geom_region()
+
+p_1
+```
+
+# GSA Work Patterns
+
+```{r}
+prep_d_01 <- 
+  d %>% 
+  group_by(gsa_sso) %>% 
+  count() %>% 
+  ungroup() %>% 
+  arrange(desc(n))
+
+prep_v_01 <- 
+  prep_d_01 %>% 
+  slice(2) %>% 
+  pull(n)
+
+prep_d_02 <-
+  d %>%
+  mutate(gsa_sso = fct_lump_min(gsa_sso, min = prep_v_01),
+         gsa_sso = fct_infreq(gsa_sso)) %>%
+  group_by(gsa_sso,.cluster_5) %>%
+  count() %>%
+  ungroup() %>%
+  arrange(desc(n)) %>% 
+  rename(num = n) %>% 
+  mutate(gsa_sso = fct_relevel(gsa_sso,
+                               "PBS",
+                               "FAS",
+                               "OCFO",
+                               "Other"))
+
+prep_d_03 <- 
+  prep_d_02 #%>% 
+  # filter(gsa_sso != "Other")
+
+prep_d_04 <- 
+  d %>% 
+  group_by(.cluster_5) %>% 
+  count() %>% 
+  ungroup() %>% 
+  arrange(desc(n)) %>% 
+  rename(tot = n)
+
+prep_d_05 <- 
+  prep_d_03 %>% 
+  full_join(prep_d_04) %>% 
+  mutate(
+    n = num/tot,
+    text = scales::comma(num)
+  ) 
+```
+
+```{r}
+p_1 <- 
+  prep_d_05 %>% 
+  ggplot(
+    aes(x = .cluster_5, y = n, fill = .cluster_5)
+  ) +
+  geom_col() +
+  facet_wrap(facets = vars(gsa_sso), nrow = 1) +
+  labs(title = "Percent of working pattern group by office") +
+  ylab("Percent of working pattern group") +
+  scale_y_continuous(labels = scales::percent) +
+  oescolorrrs::scale_fill_oes() +
+  oescolorrrs::scale_color_oes() +
+  theme_light() +
+  theme(
+    legend.position = "none",
+    legend.title = element_blank(),
+    plot.title = element_text(hjust = 0.5,
+                              size = 13),
+    axis.title.y = element_text(size = 8),
+    axis.title.x = element_blank()
+    )
+
+
+p_1
+```
+
+# GSA Work Patterns
+
+```{r}
+prep_d_01 <- 
+  d %>% 
+  group_by(position_category_description) %>% 
+  count() %>% 
+  ungroup() %>% 
+  arrange(desc(n))
+
+prep_v_01 <- 
+  prep_d_01 %>% 
+  slice(3) %>% 
+  pull(n)
+
+prep_d_02 <-
+  d %>%
+  mutate(position_category_description = fct_lump_min(position_category_description, min = prep_v_01),
+         position_category_description = fct_infreq(position_category_description)) %>%
+  group_by(position_category_description,.cluster_5) %>%
+  count() %>%
+  ungroup() %>%
+  arrange(desc(n)) %>% 
+  rename(num = n) %>% 
+  mutate(
+    position_category_description = fct_relevel(position_category_description, 
+                                               "Offsite",
+                                               "Onsite Flexible",
+                                               "Onsite Required",
+                                               "Other")
+  )
+
+prep_d_03 <- 
+  prep_d_02 %>% 
+  filter(position_category_description != "Other")
+
+prep_d_04 <- 
+  d %>% 
+  group_by(.cluster_5) %>% 
+  count() %>% 
+  ungroup() %>% 
+  arrange(desc(n)) %>% 
+  rename(tot = n)
+
+prep_d_05 <- 
+  prep_d_03 %>% 
+  full_join(prep_d_04) %>% 
+  mutate(
+    n = num/tot,
+    text = scales::comma(num)
+  ) 
+```
+
+```{r}
+p_1 <- 
+  prep_d_05 %>% 
+   mutate(.cluster_5 = fct_relabel(.cluster_5,~str_wrap(.,width = 50))) %>% 
+  ggplot(aes(y = num, axis1 = position_category_description, axis2 = .cluster_5, fill = .cluster_5)) +
+  geom_alluvium(width = 1/12) +
+  geom_stratum(width = 1/12,
+               # alpha = 1,
+               fill = "black",
+               color = "white"
+               ) +
+  geom_label(stat = "stratum", aes(label = after_stat(stratum)),
+             fill = "white",
+             # , alpha = .05,
+              size = 4,
+             hjust = "inward"
+             ) +
+  labs(title = "Linking position categories to work pattern groups") +
+  ylab("Number of employees") +
+  scale_y_continuous(labels = scales::comma) +
+  oescolorrrs::scale_fill_oes() +
+  oescolorrrs::scale_color_oes() +
+  theme_light() +
+  theme(
+    legend.position = "None",
+    axis.title.x = element_blank(),
+    axis.text.x = element_blank(),
+    plot.title = element_text(hjust = 0.5,
+                              size = 10))
+```
+
+```{r}
+p_1
+```
+
+# GSA Work Patterns
+
+```{r}
+prep_d_01 <- 
+  d %>% 
+  group_by(position_category_description) %>% 
+  count() %>% 
+  ungroup() %>% 
+  arrange(desc(n))
+
+prep_v_01 <- 
+  prep_d_01 %>% 
+  slice(3) %>% 
+  pull(n)
+
+prep_d_02 <-
+  d %>%
+  mutate(position_category_description = fct_lump_min(position_category_description, min = prep_v_01),
+         position_category_description = fct_infreq(position_category_description)) %>%
+  group_by(position_category_description) %>%
+  count() %>%
+  ungroup() %>%
+  arrange(desc(n)) %>% 
+  rename(num = n)
+```
+
+```{r}
+p_1 <- 
+  prep_d_02 %>% 
+  ggplot(
+    aes(x = position_category_description, y = num, fill = position_category_description)
+  ) +
+  geom_col() +
+  labs(title = "Number of employees by position category") +
+  ylab("Number of employees") +
+  scale_y_continuous(labels = scales::comma) +
+  oescolorrrs::scale_fill_oes() +
+  oescolorrrs::scale_color_oes() +
+  theme_light() +
+  theme(
+    legend.position = "None",
+    axis.title.x = element_blank(),
+    # axis.text.x = element_blank(),
+    plot.title = element_text(hjust = 0.5,
+                              size = 10))
+
+p_1
+```
+
+# GSA Work Patterns
+
+```{r}
+prep_d_01 <- 
+  d %>%
+  summarise(across(
+    .cols = starts_with("rule_based"),
+    .fns = ~ sum(., rm.na = T)
+  )) %>%
+  select(-contains("_position_category_")) %>%
+  select(-ends_with("observation")) %>%
+  rownames_to_column() %>%
+  pivot_longer(-rowname) %>%
+  select(-rowname) %>%
+  mutate(
+    name = str_remove(name, "rule_based_"),
+    name = str_remove(name, "_working"),
+    name = str_replace_all(name, "_", " "),
+    name = str_to_sentence(name),
+    name = fct_relevel(
+      name,
+      "Primarily teleworking",
+      "Mostly teleworking",
+      "Mostly reporting to job site",
+      "Primarily reporting to job site",
+      "All remote",
+      "Telework onsite minimum"
+    ),
+    name = fct_relabel(name, ~str_wrap(.,width = 20))
+  ) %>% 
+  arrange(name)
+
+prep_d_02 <- 
+  prep_d_01 %>% 
+  mutate(tot = d %>% count() %>% pull(),
+         prop = value/tot,
+         text = scales::percent(prop, accuracy = .1))
+```
+
+```{r}
+p_1 <- 
+  prep_d_01 %>% 
+  ggplot(
+    aes(x = name, y = value, fill = name)
+  ) +
+  geom_col() +
+  geom_text(data = prep_d_02, aes(x = name, y = .5*value, label = text), color = "white") +
+  labs(title = "Number and percent of employees by rule-based group") +
+  ylab("Number of employees") +
+  scale_y_continuous(labels = scales::comma) +
+  oescolorrrs::scale_fill_oes() +
+  oescolorrrs::scale_color_oes() +
+  theme_light() +
+  theme(
+    legend.position = "None",
+    axis.title.x = element_blank(),
+    axis.text.x = element_text(size = 8),
+    plot.title = element_text(hjust = 0.5,
+                              size = 10))
+
+p_1
+```
+
+# GSA Work Patterns
+
+```{r include=FALSE}
+prep_01 <- 
+  d %>% 
+  group_by(.cluster_5) %>% 
+  summarise(num = mean(daily_status_teleworking)) %>% 
+  ungroup()
+
+prep_02 <- 
+  d %>% 
+  group_by(.cluster_5) %>% 
+  summarise(y = max(density(daily_status_teleworking)$y),
+            x = density(daily_status_teleworking)$x[density(daily_status_teleworking)$y == max(density(daily_status_teleworking)$y)]
+  )
+```
+
+```{r}
+p_1 <- 
+  prep_01 %>% 
+  ggplot(
+    aes(x = .cluster_5, y = num, fill = .cluster_5)
+  ) +
+  geom_col() +
+  scale_y_continuous(labels = scales::comma) +
+  ylab("Average days of telework") +
+  theme_light() +
+  oescolorrrs::scale_fill_oes() +
+  theme(
+    legend.position = "None",
+    axis.title.x = element_blank(),
+    axis.text.x = element_text(size = 8))
+
+p_2 <- 
+  d %>% 
+  ggplot(
+    aes(x = daily_status_teleworking, color = .cluster_5, fill = .cluster_5)
+  ) +
+  geom_density(alpha = .5) +
+  # geom_vline(data = prep_01, aes(xintercept = num, color = .cluster_5)) +
+  geom_text(data=prep_02, aes(x=x, y=y, label=.cluster_5), size = 3, hjust = "inward") +
+  xlab("Days of telework") +
+  ylab("Density") +
+  theme_light() +
+  oescolorrrs::scale_fill_oes() +
+  oescolorrrs::scale_color_oes() +
+  theme(legend.position = "None")
+
+
+(p_1|p_2) +
+  plot_annotation(
+    title = "Average days of telework and distribution by work pattern group",
+    theme = theme(plot.title = element_text(hjust = 0.5,
+                              size = 10))
+  )
+```
+
+# GSA Work Patterns
+
+```{r include=FALSE}
+prep_01 <- 
+  d %>% 
+  group_by(.cluster_5) %>% 
+  summarise(num = mean(daily_status_teleworking_working_prop)) %>% 
+  ungroup()
+
+prep_02 <- 
+  d %>% 
+  group_by(.cluster_5) %>% 
+  summarise(y = max(density(daily_status_teleworking_working_prop)$y),
+            x = density(daily_status_teleworking_working_prop)$x[density(daily_status_teleworking_working_prop)$y == max(density(daily_status_teleworking_working_prop)$y)]
+  )
+```
+
+```{r}
+p_1 <- 
+  prep_01 %>% 
+  ggplot(
+    aes(x = .cluster_5, y = num, fill = .cluster_5)
+  ) +
+  geom_col() +
+  scale_y_continuous(labels = scales::percent) +
+  ylab("Percent of working days teleworking") +
+  theme_light() +
+  oescolorrrs::scale_fill_oes() +
+  theme(
+    legend.position = "None",
+    axis.title.x = element_blank(),
+    axis.text.x = element_text(size = 8))
+
+p_2 <- 
+  d %>% 
+  ggplot(
+    aes(x = daily_status_teleworking_working_prop, color = .cluster_5, fill = .cluster_5)
+  ) +
+  geom_density(alpha = .5) +
+  # geom_vline(data = prep_01, aes(xintercept = num, color = .cluster_5)) +
+  geom_text(data=prep_02, aes(x=x, y=y, label=.cluster_5), size = 3, hjust = "inward") +
+  xlab("Days of telework") +
+  ylab("Density") +
+  theme_light() +
+  oescolorrrs::scale_fill_oes() +
+  oescolorrrs::scale_color_oes() +
+  theme(legend.position = "None")
+
+
+(p_1|p_2) +
+  plot_annotation(
+    title = "Average telework percent and distribution by work pattern group",
+    theme = theme(plot.title = element_text(hjust = 0.5,
+                              size = 10))
+  )
+```
+
+
+# GSA Work Patterns
+
+```{r include=FALSE}
+prep_01 <- 
+  d %>% 
+  group_by(.cluster_5) %>% 
+  summarise(num = mean(daily_status_reporting_to_job_site)) %>% 
+  ungroup()
+
+prep_02 <- 
+  d %>% 
+  group_by(.cluster_5) %>% 
+  summarise(xPos = max(daily_status_reporting_to_job_site),
+            yPos = max((density(daily_status_reporting_to_job_site))$y))
+
+prep_02 <- 
+  d %>% 
+  group_by(.cluster_5) %>% 
+  summarise(y = max(density(daily_status_reporting_to_job_site)$y),
+            x = density(daily_status_reporting_to_job_site)$x[density(daily_status_reporting_to_job_site)$y == max(density(daily_status_reporting_to_job_site)$y)]
+  )
+```
+
+```{r}
+p_1 <- 
+  prep_01 %>% 
+  ggplot(
+    aes(x = .cluster_5, y = num, fill = .cluster_5)
+  ) +
+  geom_col() +
+  scale_y_continuous(labels = scales::comma) +
+  ylab("Average days of onsite work") +
+  theme_light() +
+  oescolorrrs::scale_fill_oes() +
+  theme(
+    legend.position = "None",
+    axis.title.x = element_blank(),
+    axis.text.x = element_text(size = 8))
+
+p_2 <- 
+  d %>% 
+  ggplot(
+    aes(x = daily_status_reporting_to_job_site, color = .cluster_5, fill = .cluster_5)
+  ) +
+  geom_density(alpha = .5) +
+  # geom_vline(data = prep_01, aes(xintercept = num, color = .cluster_5)) +
+  geom_text(data=prep_02, aes(x=x, y=y, label=.cluster_5), size = 3, hjust = "inward") +
+  xlab("Days of onsite work") +
+  ylab("Density") +
+  theme_light() +
+  oescolorrrs::scale_fill_oes() +
+  oescolorrrs::scale_color_oes() +
+  theme(legend.position = "None")
+
+
+(p_1|p_2) +
+  plot_annotation(
+    title = "Average days working onsite and distribution by work pattern group",
+    theme = theme(plot.title = element_text(hjust = 0.5,
+                              size = 10))
+  )
+```
+
+# GSA Work Patterns
+
+```{r}
+prep_01 <-
+  d %>%
+  mutate(
+    .cluster_5 = fct_relabel(.cluster_5,~str_wrap(.,width = 50))
+  ) %>% 
+  group_by(.cluster_5) %>%
+  summarise(across
+            (
+              .cols = c(
+                daily_status_teleworking,
+                daily_status_reporting_to_job_site,
+                working_days
+              ),
+              .fns = mean
+            )) %>%
+  ungroup()
+```
+
+```{r}
+prep_gg_1 <- d %>%
+  mutate(
+    .cluster_5 = fct_relabel(.cluster_5,~str_wrap(.,width = 50))
+  ) %>% 
+  ggplot(
+    aes(
+      x = daily_status_reporting_to_job_site,
+      y = daily_status_teleworking,
+      color = .cluster_5,
+      fill = .cluster_5,
+      linetype = .cluster_5
+    )
+  )
+```
+
+```{r}
+p_1 <- 
+  prep_gg_1 +
+  geom_jitter(# aes(size = working_days),
+    alpha = .5) +
+  stat_ellipse(
+    geom = "polygon",
+    alpha = .15,
+    size = 2,
+    level = .99
+  ) +
+  geom_text_repel(
+    data = prep_01,
+    aes(x = daily_status_reporting_to_job_site, y = daily_status_teleworking, 
+        label = .cluster_5,
+        fill = .cluster_5),
+    # fill = "white",
+    # alpha = .15,
+    size = 3,
+    force             = 0.5,
+    # nudge_x           = 100,
+    xlim = c(90),
+    ylim = c(50,150),
+    direction         = "y",
+    hjust             = 0,
+    segment.size      = 0.2,
+    segment.curvature = -0.1,
+    color = "black"
+  ) +
+  xlab("Days reporting to the site") +
+  ylab("Days teleworking") +
+  labs(title = "Days teleworking and working onsite by work pattern group") +
+  theme_light() +
+  oescolorrrs::scale_fill_oes() +
+  oescolorrrs::scale_color_oes() +
+   theme_light() +
+  theme(
+    legend.position = "None",
+    # axis.title.x = element_blank(),
+    # axis.text.x = element_text(size = 8),
+    plot.title = element_text(hjust = 0.5,
+                              size = 10))
+```
+
+```{r}
+p_1
+```
+
+# GSA Work Patterns
+
+```{r include=FALSE}
+prep_01 <- 
+  d %>% 
+  group_by(.cluster_5) %>% 
+  summarise(num = mean(working_days)) %>% 
+  ungroup()
+
+prep_02 <- 
+  d %>% 
+  group_by(.cluster_5) %>% 
+  summarise(xPos = max(working_days),
+            yPos = max((density(working_days))$y))
+
+prep_02 <- 
+  d %>% 
+  group_by(.cluster_5) %>% 
+  summarise(y = max(density(working_days)$y),
+            x = density(working_days)$x[density(working_days)$y == max(density(working_days)$y)]
+  )
+```
+
+```{r}
+p_1 <- 
+  prep_01 %>% 
+  ggplot(
+    aes(x = .cluster_5, y = num, fill = .cluster_5)
+  ) +
+  geom_col() +
+  scale_y_continuous(labels = scales::comma) +
+  ylab("Average working days") +
+  theme_light() +
+  oescolorrrs::scale_fill_oes() +
+  theme(
+    legend.position = "None",
+    axis.title.x = element_blank(),
+    axis.text.x = element_text(size = 8))
+
+p_2 <- 
+  d %>% 
+  ggplot(
+    aes(x = daily_status_reporting_to_job_site, color = .cluster_5, fill = .cluster_5)
+  ) +
+  geom_density(alpha = .5) +
+  # geom_vline(data = prep_01, aes(xintercept = num, color = .cluster_5)) +
+  geom_text(data=prep_02, aes(x=x, y=y, label=.cluster_5), size = 3, hjust = "inward") +
+  xlab("Days of onsite work") +
+  ylab("Density") +
+  theme_light() +
+  oescolorrrs::scale_fill_oes() +
+  oescolorrrs::scale_color_oes() +
+  theme(legend.position = "None")
+
+
+(p_1|p_2) +
+  plot_annotation(
+    title = "Average working days and distribution by work pattern group",
+    theme = theme(plot.title = element_text(hjust = 0.5,
+                              size = 10))
+  )
+```
+
+# GSA Work Patterns
+
+```{r include=FALSE}
+prep_01 <- 
+  d %>% 
+  group_by(.cluster_5) %>% 
+  summarise(num = sum(exit_employment)) %>% 
+  ungroup()
+
+prep_02 <- 
+  d %>% 
+  group_by(.cluster_5) %>% 
+  count() %>% 
+  ungroup()
+
+prep_03 <- 
+  prep_01 %>% 
+  full_join(prep_02) %>% 
+  mutate(
+    num = num/n
+  )
+```
+
+```{r}
+p_1 <-
+  prep_03 %>%
+  ggplot(aes(x = .cluster_5, y = num, fill = .cluster_5)) +
+  geom_col() +
+  scale_y_continuous(labels = scales::percent) +
+ xlab("Percent exiting employment") +
+  ylab("Days teleworking") +
+  labs(title = "Percent exiting employment by work pattern group") +
+  theme_light() +
+  oescolorrrs::scale_fill_oes() +
+  oescolorrrs::scale_color_oes() +
+   theme_light() +
+  theme(
+    legend.position = "None",
+    axis.title.x = element_blank(),
+    # axis.text.x = element_text(size = 8),
+    plot.title = element_text(hjust = 0.5,
+                              size = 10))
+
+p_1
+```
+
+# GSA Work Patterns
+
+```{r}
+prep_d_01 <- 
+  d %>% 
+  group_by(position_category_description) %>% 
+  count() %>% 
+  ungroup() %>% 
+  arrange(desc(n))
+
+prep_v_01 <- 
+  prep_d_01 %>% 
+  slice(3) %>% 
+  pull(n)
+
+prep_d_02 <-
+  d %>%
+  mutate(position_category_description = fct_lump_min(position_category_description, min = prep_v_01),
+         position_category_description = fct_infreq(position_category_description)) %>%
+  group_by(position_category_description,.cluster_5) %>%
+  count() %>%
+  ungroup() %>%
+  arrange(desc(n)) %>% 
+  rename(num = n) %>% 
+  mutate(
+    position_category_description = fct_relevel(position_category_description, 
+                                               "Offsite",
+                                               "Onsite Flexible",
+                                               "Onsite Required",
+                                               "Other")
+  )
+
+prep_d_03 <- 
+  prep_d_02 %>% 
+  filter(position_category_description != "Other")
+
+prep_d_04 <- 
+  d %>% 
+  group_by(.cluster_5) %>% 
+  count() %>% 
+  ungroup() %>% 
+  arrange(desc(n)) %>% 
+  rename(tot = n)
+
+prep_d_05 <- 
+  prep_d_03 %>% 
+  full_join(prep_d_04) %>% 
+  mutate(
+    n = num/tot,
+    text = scales::comma(num)
+  ) 
+```
+
+```{r}
+p_1 <- 
+  prep_d_05 %>% 
+  ggplot(
+    aes(x = .cluster_5, y = n, fill = .cluster_5)
+  ) +
+  geom_col() +
+  scale_y_continuous(labels = scales::percent) +
+  ylab("Percent of cluster in position category") +
+  facet_wrap(facets = vars(position_category_description), nrow = 1) +
+  labs(title = "Percent of working pattern group by position category") +
+  ylab("Percent of working pattern group") +
+  scale_y_continuous(labels = scales::percent) +
+  oescolorrrs::scale_fill_oes() +
+  oescolorrrs::scale_color_oes() +
+  theme_light() +
+  theme(
+    legend.position = "none",
+    legend.title = element_blank(),
+    plot.title = element_text(hjust = 0.5,
+                              size = 13),
+    axis.title.y = element_text(size = 8),
+    axis.title.x = element_blank(),
+    axis.text.x = element_text(size = 6)
+    )
+
+p_1
+```
+
+# GSA Work Patterns
+
+```{r}
+prep_d_01 <- 
+  d %>% 
+  group_by(gsa_region,.cluster_5) %>% 
+  count() %>% 
+  ungroup() %>% 
+  arrange(desc(n)) %>% 
+  rename(num = n)
+
+prep_d_02 <- 
+  d %>% 
+  group_by(.cluster_5) %>% 
+  count() %>% 
+  ungroup() %>% 
+  arrange(desc(n)) %>% 
+  rename(tot = n)
+
+prep_d_03 <- 
+  prep_d_01 %>% 
+  full_join(prep_d_02) %>% 
+  mutate(
+    n = num/tot,
+    text = scales::comma(num)
+  ) %>% 
+  mutate(
+    gsa_region = fct_reorder(gsa_region,as.numeric(gsa_region))
+  )
+
+prep_d_04 <- 
+  prep_d_03 %>% 
+  filter(.cluster_5 == "Telecommuters" |
+           .cluster_5 == "Office\nvisitors"
+           )
+```
+
+```{r}
+p_1 <- 
+  prep_d_04 %>% 
+  ggplot(
+    aes(x = gsa_region, y = n, fill = gsa_region)
+  ) +
+  geom_col() +
+  facet_wrap(facets = vars(.cluster_5), nrow = 1) +
+  labs(title = "Percent of working pattern group by GSA region") +
+  ylab("Percent of working pattern group") +
+  xlab("GSA region number") + 
+  scale_y_continuous(labels = scales::percent) +
+  oescolorrrs::scale_fill_oes() +
+  oescolorrrs::scale_color_oes() +
+  theme_light() +
+  theme(
+    legend.position = "none",
+    legend.title = element_blank(),
+    plot.title = element_text(hjust = 0.5,
+                              size = 13),
+    axis.title.y = element_text(size = 8),
+    # axis.title.x = element_blank(),
+    axis.text.x = element_text(size = 6)
+    )
+
+p_1
+```
+
+# GSA Work Patterns
+
+```{r}
+prep_d_01 <- 
+  d %>% 
+  group_by(gsa_region,.cluster_5) %>% 
+  count() %>% 
+  ungroup() %>% 
+  arrange(desc(n)) %>% 
+  rename(num = n)
+
+prep_d_02 <- 
+  d %>% 
+  group_by(.cluster_5) %>% 
+  count() %>% 
+  ungroup() %>% 
+  arrange(desc(n)) %>% 
+  rename(tot = n)
+
+prep_d_03 <- 
+  prep_d_01 %>% 
+  full_join(prep_d_02) %>% 
+  mutate(
+    n = num/tot,
+    text = scales::comma(num)
+  ) %>% 
+  mutate(
+    gsa_region = fct_reorder(gsa_region,as.numeric(gsa_region))
+  )
+
+prep_d_04 <- 
+  prep_d_03 %>% 
+  filter(.cluster_5 == "Hybrid\nworkers" |
+           .cluster_5 == "In-office\nworkers" |
+           .cluster_5 == "Disconnected\nworkers")
+```
+
+```{r}
+p_1 <- 
+  prep_d_04 %>% 
+  ggplot(
+    aes(x = gsa_region, y = n, fill = gsa_region)
+  ) +
+  geom_col() +
+  facet_wrap(facets = vars(.cluster_5), nrow = 1) +
+  labs(title = "Percent of working pattern group by GSA region") +
+  ylab("Percent of working pattern group") +
+  xlab("GSA region number") + 
+  scale_y_continuous(labels = scales::percent) +
+  oescolorrrs::scale_fill_oes() +
+  oescolorrrs::scale_color_oes() +
+  theme_light() +
+  theme(
+    legend.position = "none",
+    legend.title = element_blank(),
+    plot.title = element_text(hjust = 0.5,
+                              size = 13),
+    axis.title.y = element_text(size = 8),
+    # axis.title.x = element_blank(),
+    axis.text.x = element_text(size = 6)
+    )
+
+p_1
+```
+
+# GSA Work Patterns
+
+```{r}
+prep_d_01 <- 
+  d %>% 
+  group_by(occupational_series) %>% 
+  count() %>% 
+  ungroup() %>% 
+  arrange(desc(n))
+
+prep_v_01 <- 
+  prep_d_01 %>% 
+  slice(3) %>% 
+  pull(n)
+
+prep_d_02 <-
+  d %>%
+  mutate(
+    # occupational_series = fct_lump_min(occupational_series, min = prep_v_01),
+    occupational_series = fct_infreq(occupational_series)
+  ) %>%
+  group_by(occupational_series, .cluster_5) %>%
+  count() %>%
+  ungroup() %>%
+  arrange(desc(n)) %>%
+  rename(num = n) %>%
+  mutate(
+    # occupational_series = fct_relevel(occupational_series,
+    #                                   "1102",
+    #                                   "1101",
+    #                                   "0343",
+    #                                   "Other"),
+    occupational_series = recode(occupational_series,
+                                 "1102" = "Contracting",
+                                 "1101" = "General Business and Industry",
+                                 "0343" = "Management and Program Analysis",
+                                 "0501" = "Financial Administration and Program",
+                                 "0560" = "Budget Analysis",
+                                 "0301" = "Miscellaneous Administration and Program",
+                                 "1170" = "Realty",
+                                 "1176" = "Building Management",
+                                 "2150" = "Transportation Operations",
+                                 "2210" = "Information Technology Management"
+                                 ),
+    occupational_series = fct_relevel(
+      occupational_series,
+      "Budget Analysis",
+      "Building Management",
+      "Contracting",
+      "Financial Administration and Program",
+      "General Business and Industry",
+      "Information Technology Management",
+      "Management and Program Analysis",
+      "Miscellaneous Administration and Program",
+      "Realty",
+      "Transportation Operations",
+    )
+  )
+
+# prep_d_02
+```
+
+```{r}
+prep_d_03 <-
+  prep_d_02 %>%
+  filter(
+    occupational_series %in%
+      c(
+        # "Budget Analysis",
+        # "Building Management",
+        "Contracting",
+        # "Financial Administration and Program",
+        # "General Business and Industry",
+        # "Information Technology Management",
+        "Management and Program Analysis",
+        "Miscellaneous Administration and Program"
+        # "Realty",
+        # "Transportation Operations"
+      )
+  )
+
+prep_d_04 <- 
+  d %>% 
+  group_by(.cluster_5) %>% 
+  count() %>% 
+  ungroup() %>% 
+  arrange(desc(n)) %>% 
+  rename(tot = n)
+
+prep_d_05 <- 
+  prep_d_03 %>% 
+  full_join(prep_d_04) %>% 
+  mutate(
+    n = num/tot,
+    text = scales::comma(num)
+  ) %>% 
+  mutate(
+    occupational_series = fct_relabel(occupational_series,~str_wrap(.,width = 15))
+  )
+```
+
+```{r}
+p_1 <- 
+  prep_d_05 %>% 
+  ggplot(
+    aes(x = .cluster_5, y = n, fill = .cluster_5)
+  ) +
+  geom_col() +
+  facet_wrap(facets = vars(occupational_series), nrow = 1) +
+  labs(title = "Percent of working pattern group by occupational series") +
+  ylab("Percent of working pattern group") +
+  xlab("occupational series number") + 
+  scale_y_continuous(labels = scales::percent) +
+  oescolorrrs::scale_fill_oes() +
+  oescolorrrs::scale_color_oes() +
+  theme_light() +
+  theme(
+    legend.position = "none",
+    legend.title = element_blank(),
+    plot.title = element_text(hjust = 0.5,
+                              size = 13),
+    axis.title.y = element_text(size = 8),
+    axis.title.x = element_blank(),
+    axis.text.x = element_text(size = 6)
+    )
+
+p_1
+```
+
+# GSA Work Patterns
+
+```{r}
+prep_d_01 <- 
+  d %>% 
+  group_by(occupational_series) %>% 
+  count() %>% 
+  ungroup() %>% 
+  arrange(desc(n))
+
+prep_v_01 <- 
+  prep_d_01 %>% 
+  slice(3) %>% 
+  pull(n)
+
+prep_d_02 <-
+  d %>%
+  mutate(
+    # occupational_series = fct_lump_min(occupational_series, min = prep_v_01),
+    occupational_series = fct_infreq(occupational_series)
+  ) %>%
+  group_by(occupational_series, .cluster_5) %>%
+  count() %>%
+  ungroup() %>%
+  arrange(desc(n)) %>%
+  rename(num = n) %>%
+  mutate(
+    # occupational_series = fct_relevel(occupational_series,
+    #                                   "1102",
+    #                                   "1101",
+    #                                   "0343",
+    #                                   "Other"),
+    occupational_series = recode(occupational_series,
+                                 "1102" = "Contracting",
+                                 "1101" = "General Business and Industry",
+                                 "0343" = "Management and Program Analysis",
+                                 "0501" = "Financial Administration and Program",
+                                 "0560" = "Budget Analysis",
+                                 "0301" = "Miscellaneous Administration and Program",
+                                 "1170" = "Realty",
+                                 "1176" = "Building Management",
+                                 "2150" = "Transportation Operations",
+                                 "2210" = "Information Technology Management"
+                                 ),
+    occupational_series = fct_relevel(
+      occupational_series,
+      "Budget Analysis",
+      "Building Management",
+      "Contracting",
+      "Financial Administration and Program",
+      "General Business and Industry",
+      "Information Technology Management",
+      "Management and Program Analysis",
+      "Miscellaneous Administration and Program",
+      "Realty",
+      "Transportation Operations",
+    )
+  )
+
+# prep_d_02
+```
+
+```{r}
+prep_d_03 <-
+  prep_d_02 %>%
+  filter(
+    occupational_series %in%
+      c(
+        "Budget Analysis",
+        # "Building Management",
+        # "Contracting",
+        "Financial Administration and Program",
+        # "General Business and Industry",
+        "Information Technology Management"
+        # "Management and Program Analysis",
+        # "Miscellaneous Administration and Program"
+        # "Realty",
+        # "Transportation Operations"
+      )
+  )
+
+prep_d_04 <- 
+  d %>% 
+  group_by(.cluster_5) %>% 
+  count() %>% 
+  ungroup() %>% 
+  arrange(desc(n)) %>% 
+  rename(tot = n)
+
+prep_d_05 <- 
+  prep_d_03 %>% 
+  full_join(prep_d_04) %>% 
+  mutate(
+    n = num/tot,
+    text = scales::comma(num)
+  ) %>% 
+  mutate(
+    occupational_series = fct_relabel(occupational_series,~str_wrap(.,width = 15))
+  )
+```
+
+```{r}
+p_1 <- 
+  prep_d_05 %>% 
+  ggplot(
+    aes(x = .cluster_5, y = n, fill = .cluster_5)
+  ) +
+  geom_col() +
+  facet_wrap(facets = vars(occupational_series), nrow = 1) +
+  labs(title = "Percent of working pattern group by occupational series") +
+  ylab("Percent of working pattern group") +
+  xlab("occupational series number") + 
+  scale_y_continuous(labels = scales::percent) +
+  oescolorrrs::scale_fill_oes() +
+  oescolorrrs::scale_color_oes() +
+  theme_light() +
+  theme(
+    legend.position = "none",
+    legend.title = element_blank(),
+    plot.title = element_text(hjust = 0.5,
+                              size = 13),
+    axis.title.y = element_text(size = 8),
+    axis.title.x = element_blank(),
+    axis.text.x = element_text(size = 6)
+    )
+
+p_1
+```
+
+# GSA Work Patterns
+
+```{r}
+prep_d_01 <- 
+  d %>% 
+  group_by(occupational_series) %>% 
+  count() %>% 
+  ungroup() %>% 
+  arrange(desc(n))
+
+prep_v_01 <- 
+  prep_d_01 %>% 
+  slice(3) %>% 
+  pull(n)
+
+prep_d_02 <-
+  d %>%
+  mutate(
+    # occupational_series = fct_lump_min(occupational_series, min = prep_v_01),
+    occupational_series = fct_infreq(occupational_series)
+  ) %>%
+  group_by(occupational_series, .cluster_5) %>%
+  count() %>%
+  ungroup() %>%
+  arrange(desc(n)) %>%
+  rename(num = n) %>%
+  mutate(
+    # occupational_series = fct_relevel(occupational_series,
+    #                                   "1102",
+    #                                   "1101",
+    #                                   "0343",
+    #                                   "Other"),
+    occupational_series = recode(occupational_series,
+                                 "1102" = "Contracting",
+                                 "1101" = "General Business and Industry",
+                                 "0343" = "Management and Program Analysis",
+                                 "0501" = "Financial Administration and Program",
+                                 "0560" = "Budget Analysis",
+                                 "0301" = "Miscellaneous Administration and Program",
+                                 "1170" = "Realty",
+                                 "1176" = "Building Management",
+                                 "2150" = "Transportation Operations",
+                                 "2210" = "Information Technology Management"
+                                 ),
+    occupational_series = fct_relevel(
+      occupational_series,
+      "Budget Analysis",
+      "Building Management",
+      "Contracting",
+      "Financial Administration and Program",
+      "General Business and Industry",
+      "Information Technology Management",
+      "Management and Program Analysis",
+      "Miscellaneous Administration and Program",
+      "Realty",
+      "Transportation Operations",
+    )
+  )
+
+# prep_d_02
+```
+
+```{r}
+prep_d_03 <-
+  prep_d_02 %>%
+  filter(
+    occupational_series %in%
+      c(
+        # "Budget Analysis",
+        "Building Management",
+        # "Contracting",
+        # "Financial Administration and Program",
+        "General Business and Industry"
+        # "Information Technology Management",
+        # "Management and Program Analysis",
+        # "Miscellaneous Administration and Program"
+        # "Realty",
+        # "Transportation Operations"
+      )
+  )
+
+prep_d_04 <- 
+  d %>% 
+  group_by(.cluster_5) %>% 
+  count() %>% 
+  ungroup() %>% 
+  arrange(desc(n)) %>% 
+  rename(tot = n)
+
+prep_d_05 <- 
+  prep_d_03 %>% 
+  full_join(prep_d_04) %>% 
+  mutate(
+    n = num/tot,
+    text = scales::comma(num)
+  )  %>% 
+  mutate(
+    occupational_series = fct_relabel(occupational_series,~str_wrap(.,width = 15))
+  )
+```
+
+```{r}
+p_1 <- 
+  prep_d_05 %>% 
+  ggplot(
+    aes(x = .cluster_5, y = n, fill = .cluster_5)
+  ) +
+  geom_col() +
+  facet_wrap(facets = vars(occupational_series), nrow = 1) +
+  labs(title = "Percent of working pattern group by occupational series") +
+  ylab("Percent of working pattern group") +
+  xlab("occupational series number") + 
+  scale_y_continuous(labels = scales::percent) +
+  oescolorrrs::scale_fill_oes() +
+  oescolorrrs::scale_color_oes() +
+  theme_light() +
+  theme(
+    legend.position = "none",
+    legend.title = element_blank(),
+    plot.title = element_text(hjust = 0.5,
+                              size = 13),
+    axis.title.y = element_text(size = 8),
+    axis.title.x = element_blank(),
+    axis.text.x = element_text(size = 6)
+    )
+
+p_1
+```
+
+# GSA Work Patterns
+
+```{r}
+prep_d_01 <- 
+  d %>% 
+  group_by(occupational_series) %>% 
+  count() %>% 
+  ungroup() %>% 
+  arrange(desc(n))
+
+prep_v_01 <- 
+  prep_d_01 %>% 
+  slice(3) %>% 
+  pull(n)
+
+prep_d_02 <-
+  d %>%
+  mutate(
+    # occupational_series = fct_lump_min(occupational_series, min = prep_v_01),
+    occupational_series = fct_infreq(occupational_series)
+  ) %>%
+  group_by(occupational_series, .cluster_5) %>%
+  count() %>%
+  ungroup() %>%
+  arrange(desc(n)) %>%
+  rename(num = n) %>%
+  mutate(
+    # occupational_series = fct_relevel(occupational_series,
+    #                                   "1102",
+    #                                   "1101",
+    #                                   "0343",
+    #                                   "Other"),
+    occupational_series = recode(occupational_series,
+                                 "1102" = "Contracting",
+                                 "1101" = "General Business and Industry",
+                                 "0343" = "Management and Program Analysis",
+                                 "0501" = "Financial Administration and Program",
+                                 "0560" = "Budget Analysis",
+                                 "0301" = "Miscellaneous Administration and Program",
+                                 "1170" = "Realty",
+                                 "1176" = "Building Management",
+                                 "2150" = "Transportation Operations",
+                                 "2210" = "Information Technology Management"
+                                 ),
+    occupational_series = fct_relevel(
+      occupational_series,
+      "Budget Analysis",
+      "Building Management",
+      "Contracting",
+      "Financial Administration and Program",
+      "General Business and Industry",
+      "Information Technology Management",
+      "Management and Program Analysis",
+      "Miscellaneous Administration and Program",
+      "Realty",
+      "Transportation Operations",
+    )
+  )
+
+# prep_d_02
+```
+
+```{r}
+prep_d_03 <-
+  prep_d_02 %>%
+  filter(
+    occupational_series %in%
+      c(
+        # "Budget Analysis",
+        # "Building Management",
+        # "Contracting",
+        # "Financial Administration and Program",
+        # "General Business and Industry",
+        # "Information Technology Management",
+        # "Management and Program Analysis",
+        # "Miscellaneous Administration and Program"
+        "Realty",
+        "Transportation Operations"
+      )
+  )
+
+prep_d_04 <- 
+  d %>% 
+  group_by(.cluster_5) %>% 
+  count() %>% 
+  ungroup() %>% 
+  arrange(desc(n)) %>% 
+  rename(tot = n)
+
+prep_d_05 <- 
+  prep_d_03 %>% 
+  full_join(prep_d_04) %>% 
+  mutate(
+    n = num/tot,
+    text = scales::comma(num)
+  )  %>% 
+  mutate(
+    occupational_series = fct_relabel(occupational_series,~str_wrap(.,width = 15))
+  )
+```
+
+```{r}
+p_1 <- 
+  prep_d_05 %>% 
+  ggplot(
+    aes(x = .cluster_5, y = n, fill = .cluster_5)
+  ) +
+  geom_col() +
+  facet_wrap(facets = vars(occupational_series), nrow = 1) +
+  labs(title = "Percent of working pattern group by occupational series") +
+  ylab("Percent of working pattern group") +
+  xlab("occupational series number") + 
+  scale_y_continuous(labels = scales::percent) +
+  oescolorrrs::scale_fill_oes() +
+  oescolorrrs::scale_color_oes() +
+  theme_light() +
+  theme(
+    legend.position = "none",
+    legend.title = element_blank(),
+    plot.title = element_text(hjust = 0.5,
+                              size = 13),
+    axis.title.y = element_text(size = 8),
+    axis.title.x = element_blank(),
+    axis.text.x = element_text(size = 6)
+    )
+
+p_1
+```
+
+# CONTINUE FROM HERE
+
+```{r}
+beepr::beep(sound = 5)
+```
+
+```{r}
+
+```
