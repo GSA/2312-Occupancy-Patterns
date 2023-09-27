@@ -465,7 +465,7 @@ prep_d_05 <-
     text = scales::comma(num)
   ) 
 
-prep_d_05 %>% view()
+prep_d_05
 ```
 
 
@@ -776,6 +776,44 @@ fp <- file.path(params$google_drive_home,"04. Analysis", "output", "png",file_na
 
 ```{r}
 ggsave(filename = fp, plot = p_3, width = 6, height = 3, units = "in")
+```
+
+## small 
+
+```{r}
+p_3 <- 
+  prep_d_06 %>% 
+  ggplot(aes(x = .cluster_5, y = value, fill = name)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Work and leave per pay period") +
+  ylab("Days per pay period") +
+  scale_y_continuous(labels = scales::comma) +
+  oescolorrrs::scale_fill_oes() +
+  oescolorrrs::scale_color_oes() +
+  theme_light() +
+  theme(
+    legend.position = "bottom",
+    legend.title = element_blank(),
+    plot.title = element_text(hjust = 0.5,
+                              size = 10),
+    axis.title.y = element_text(size = 8, vjust = -2),
+    axis.title.x = element_blank(),
+    axis.text = element_text(size = 7),
+    legend.text = element_text(size = 7)
+    )
+
+p_3
+```
+
+
+```{r}
+file_name <- "abstract_3.png"
+fp <- file.path(params$google_drive_home,"04. Analysis", "output", "png",file_name)
+```
+
+
+```{r}
+ggsave(filename = fp, plot = p_3, width = 3, height = 3, units = "in")
 ```
 
 # CONTINUE FROM HERE
