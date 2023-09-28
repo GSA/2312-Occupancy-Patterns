@@ -237,9 +237,9 @@ d <-
 
 **What is the GSA priority?**
 
-Hybrid work has become widespread over the past three years, however, little is known about GSA employee work patterns.
+-   Hybrid work has become widespread over the past three years, however, little is known about GSA employee work patterns.
 
-This information can be used to develop and tailor technologies, spaces, and strategies to support hybrid and distributed models of work so that employees are engaged, perform at their best, and remain focused on mission delivery.
+-   This information can be used to develop and tailor technologies, spaces, and strategies to support hybrid and distributed models of work so that employees are engaged, perform at their best, and remain focused on mission delivery.
 
 # GSA Work Patterns
 
@@ -247,7 +247,7 @@ This information can be used to develop and tailor technologies, spaces, and str
 
 Existing administrative data offers an opportunity to better understand how and where employees work and make progress in addressing GSA's Learning Agenda priority question:
 
-*What technologies and solutions does the federal workforce need to improve effectiveness in a more responsive remote work setting?*
+> *What technologies and solutions does the federal workforce need to improve effectiveness in a more responsive remote work setting?*
 
 # GSA Work Patterns
 
@@ -391,7 +391,7 @@ p_3
 
 -   Areas of exploration
 
-    -    Why some Offsite classified employees occasionally work in the office?
+    -   Why some Offsite classified employees occasionally work in the office?
 
     -   What drives workers to come in on particular days?
 
@@ -797,7 +797,8 @@ p_1 <-
     plot.title = element_text(hjust = 0.5,
                               size = 13),
     axis.title.y = element_text(size = 8),
-    axis.title.x = element_blank()
+    axis.title.x = element_blank(),
+    axis.text.x = element_text(size = 6)
     )
 
 
@@ -1117,7 +1118,6 @@ p_2 <-
                               size = 10))
   )
 ```
-
 
 # GSA Work Patterns
 
